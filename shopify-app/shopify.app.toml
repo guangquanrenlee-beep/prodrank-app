@@ -1,0 +1,17 @@
+name = "prodrank"
+handle = "prodrank-ai-commerce-seo"
+client_id = "68693bd65e752d8ba73f896e37709114"
+application_url = "https://activity-aggregate-justice.ngrok-free.dev"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,write_products,read_themes,write_themes,read_content,write_content"
+
+[auth]
+redirect_urls = ["https://activity-aggregate-justice.ngrok-free.dev/api/shopify/callback"]
+
+[webhooks]
+api_version = "2026-07"
+
+extension_directories = ["extensions/schema-inject"]
+web_directories = ["web"]

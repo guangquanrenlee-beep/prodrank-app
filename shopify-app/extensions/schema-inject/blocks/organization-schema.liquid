@@ -1,0 +1,28 @@
+{% comment %}
+  ProdRank — Organization Schema Injection (site-wide)
+  Injects Organization JSON-LD into every page's <head>.
+{% endcomment %}
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "Organization",
+  "name": {{ shop.name | json }},
+  "url": {{ shop.url | json }},
+  "logo": {% if shop.brand.logo %}"{{ shop.brand.logo | image_url: '600x' }}"{% else %}null{% endif %},
+  "description": {{ shop.description | default: shop.name | json }},
+  "sameAs": [
+    {% for social_link in shop.social_links %}
+      "{{ social_link }}"{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ]
+}
+</script>
+
+{% schema %}
+{
+  "name": "ProdRank Org Schema",
+  "target": "head",
+  "settings": []
+}
+{% endschema %}

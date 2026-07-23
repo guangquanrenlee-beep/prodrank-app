@@ -1,0 +1,27 @@
+type = "theme_app_extension"
+name = "ProdRank Schema Inject"
+handle = "schema-inject"
+uid = "15892994-efe2-d384-59c4-0c870cdad8ffd4069b74"
+
+[capabilities]
+network_access = false
+
+[metafields.prodrank_product_schema]
+namespace = "prodrank"
+key = "product_schema"
+
+[metafields.prodrank_faq_schema]
+namespace = "prodrank"
+key = "faq_schema"
+
+[metafields.prodrank_org_schema]
+namespace = "prodrank"
+key = "organization_schema"
+
+[metafields.prodrank_ai_desc]
+namespace = "prodrank"
+key = "ai_description"
+
+[metafields.prodrank_audit_score]
+namespace = "prodrank"
+key = "audit_score"

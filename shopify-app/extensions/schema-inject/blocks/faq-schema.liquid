@@ -1,0 +1,22 @@
+{% comment %}
+  ProdRank — FAQPage Schema Injection Block
+  Injects AI-generated FAQ JSON-LD into product pages.
+{% endcomment %}
+
+{% if app.metafields.prodrank.faq_schema %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org/",
+    "@type": "FAQPage",
+    "mainEntity": {{ app.metafields.prodrank.faq_schema.value | json }}
+  }
+  </script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "ProdRank FAQ",
+  "target": "head",
+  "settings": []
+}
+{% endschema %}

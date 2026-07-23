@@ -1,0 +1,130 @@
+{
+  "running shoes": [
+    {
+      "text": "best running shoes",
+      "category": "running shoes",
+      "question_type": "recommendation",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "fallback",
+      "added_at": 1784802956.1444523
+    },
+    {
+      "text": "best budget running shoes",
+      "category": "running shoes",
+      "question_type": "price",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "fallback",
+      "added_at": 1784802956.1444554
+    },
+    {
+      "text": "is running shoes worth it",
+      "category": "running shoes",
+      "question_type": "recommendation",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "fallback",
+      "added_at": 1784802956.1444569
+    },
+    {
+      "text": "how to choose a running shoes",
+      "category": "running shoes",
+      "question_type": "usage",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "fallback",
+      "added_at": 1784802956.1444583
+    },
+    {
+      "text": "what's actually the difference between running shoes made for road vs trail",
+      "category": "running shoes",
+      "question_type": "comparison",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8833416
+    },
+    {
+      "text": "are these shoes good if I have flat feet or do I need something special",
+      "category": "running shoes",
+      "question_type": "comparison",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8833573
+    },
+    {
+      "text": "how much should I actually spend on running shoes to make them last",
+      "category": "running shoes",
+      "question_type": "care",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8833866
+    },
+    {
+      "text": "will these shoes work for both running and casual everyday wear",
+      "category": "running shoes",
+      "question_type": "comparison",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8833933
+    },
+    {
+      "text": "what's the deal with all these brands claiming their shoes reduce injury",
+      "category": "running shoes",
+      "question_type": "price",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8834095
+    },
+    {
+      "text": "do I need to replace my running shoes every 500 miles like everyone says",
+      "category": "running shoes",
+      "question_type": "recommendation",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8834324
+    },
+    {
+      "text": "are expensive Nike running shoes actually better than cheaper brands",
+      "category": "running shoes",
+      "question_type": "comparison",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8834376
+    },
+    {
+      "text": "what's the difference between these shoes and ones that cost half the price",
+      "category": "running shoes",
+      "question_type": "comparison",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8834426
+    },
+    {
+      "text": "will cushioned shoes or minimal shoes be better for my knees",
+      "category": "running shoes",
+      "question_type": "comparison",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.883447
+    },
+    {
+      "text": "how do I know if a running shoe fits right when I'm buying online",
+      "category": "running shoes",
+      "question_type": "recommendation",
+      "search_volume": 0,
+      "ai_coverage_pct": 0,
+      "source": "ai-generated",
+      "added_at": 1784803090.8834686
+    }
+  ]
+}
