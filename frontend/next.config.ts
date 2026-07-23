@@ -1,11 +1,17 @@
 import type { NextConfig } from "next";
 
+const API_URL = process.env.API_URL || "http://localhost:8000";
+
 const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
         source: "/api/:path*",
-        destination: "http://72.11.140.241/api/:path*",
+        destination: `${API_URL}/api/:path*`,
+      },
+      {
+        source: "/inject.js",
+        destination: `${API_URL}/api/inject.js`,
       },
     ];
   },
