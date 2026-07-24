@@ -2,16 +2,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
-    // Supabase Auth magic link or Clerk redirect — coming in Phase 2
-    setSent(true);
+    setLoading(true); setError("");
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: "https://prodrank.app/dashboard" } });
+    setLoading(false);
+    if (error) setError(error.message);
+    else setSent(true);
   };
 
   return (
@@ -20,38 +26,22 @@ export default function LoginPage() {
         <div className="text-center">
           <Link href="/" className="text-zinc-500 hover:text-zinc-300 text-sm">← Back</Link>
           <h1 className="text-2xl font-bold mt-2">Sign in to ProdRank</h1>
-          <p className="text-sm text-zinc-400 mt-1">Monitor your AI visibility</p>
+          <p className="text-sm text-zinc-400 mt-1">We&apos;ll email you a magic link</p>
         </div>
-
         {sent ? (
           <div className="bg-emerald-900/20 border border-emerald-800 rounded-xl p-4 text-center">
-            <p className="text-emerald-400 text-sm">Magic link sent! Check your email.</p>
-            <p className="text-xs text-zinc-500 mt-2">Auth coming in Phase 2. Enter any email to see this flow.</p>
+            <p className="text-emerald-400">Magic link sent! Check {email}</p>
           </div>
         ) : (
           <form onSubmit={handleLogin} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
-            <div>
-              <label className="block text-sm text-zinc-400 mb-1">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@store.com"
-                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <button type="submit" disabled={!email.trim()} className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg transition">
-              Send Magic Link
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@store.com" className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <button type="submit" disabled={loading || !email.trim()} className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg transition">
+              {loading ? "Sending..." : "Send Magic Link"}
             </button>
-            <div className="text-center">
-              <Link href="/signup" className="text-xs text-emerald-400 hover:text-emerald-300">Don&apos;t have an account? Sign up</Link>
-            </div>
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            <div className="text-center"><Link href="/signup" className="text-xs text-emerald-400 hover:text-emerald-300">Don&apos;t have an account? Sign up</Link></div>
           </form>
         )}
-
-        <p className="text-center text-xs text-zinc-600">
-          Auth powered by Supabase — coming in Phase 2.
-        </p>
       </div>
     </main>
   );

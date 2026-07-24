@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
-const API_URL = process.env.API_URL || "http://localhost:8000";
+const API_URL = process.env.API_URL || "https://prodrank-api.keywordslends.workers.dev";
 
 const nextConfig: NextConfig = {
+  output: "export",
   async rewrites() {
     return [
       {

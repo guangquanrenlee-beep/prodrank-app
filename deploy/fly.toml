@@ -1,0 +1,28 @@
+app = "prodrank"
+primary_region = "iad"
+
+[build]
+  dockerfile = "deploy/Dockerfile"
+
+[env]
+  OPENAI_API_KEY = "sk-of-CTDFzYxIjKVQEvpXbklAxMXLAPgDyzLSRNLYxUjGWLzMopdTRIvgblzuDsckhFUm"
+  OPENAI_BASE_URL = "https://api.ofox.ai/v1"
+  SUPABASE_URL = "https://reqacknemyxnyqzkvrpe.supabase.co"
+  SUPABASE_ANON_KEY = "sb_publishable_yr6jYKYiMfTqTcaYZfzLhg_Rb-NYk4n"
+  SUPABASE_SERVICE_KEY = "sb_secret_CnEkK4jWT4JauVa5ySA-LA_vJoJgtfS"
+  SHOPIFY_CLIENT_ID = "68693bd65e752d8ba73f896e37709114"
+  SHOPIFY_CLIENT_SECRET = "6c4b649bf1e2c0296f30bc5d9d1f4606"
+  DEBUG = "false"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8080
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
