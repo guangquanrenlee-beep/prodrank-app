@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface CMSResult {
   domain: string;
@@ -13,6 +14,7 @@ interface CMSResult {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [domain, setDomain] = useState("");
   const [cms, setCms] = useState<CMSResult | null>(null);
   const [cmsLoading, setCmsLoading] = useState(false);
@@ -32,7 +34,11 @@ export default function HomePage() {
         body: JSON.stringify({ domain: domain.trim() }),
       });
       if (!res.ok) throw new Error(await res.text());
-      setCms(await res.json());
+      const result = await res.json();
+      setCms(result);
+      // Auto-navigate to full analytics
+      const cleanDomain = domain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
+      router.push(`/analytics?domain=${encodeURIComponent(cleanDomain)}`);
     } catch (err: any) {
       setError(err.message);
     } finally {

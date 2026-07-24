@@ -83,6 +83,18 @@ class DB:
             "raw_response": raw,
             "checked_at": datetime.now(timezone.utc).isoformat(),
         }).execute().data[0] if True else {}
+
+    def get_ai_history(self, keyword: str, limit: int = 30) -> list[dict]:
+        """Get recent AI ranking history for a keyword."""
+        data = self.client.table("ai_responses").select("*").eq("keyword", keyword).order("checked_at", desc=True).limit(limit).execute().data or []
+        return [{
+            "ai_agent": r.get("ai_agent", ""),
+            "keyword": r.get("keyword", ""),
+            "rank": r.get("rank_position"),
+            "description": (r.get("description") or "")[:100],
+            "sentiment": r.get("sentiment", ""),
+            "checked_at": r.get("checked_at", ""),
+        } for r in data]
     # ── Citations ──
 
     def save_citation(self, ai_response_id: str, source_url: str,
