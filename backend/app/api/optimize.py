@@ -1,7 +1,8 @@
 """Optimize API — Generate fix-ready JSON-LD Schema from audit or product data."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+from app.core.rate_limit import check_free_limit
 
 from app.services.optimizer import Optimizer
 from app.services.schema_detector import SchemaDetector
@@ -34,8 +35,9 @@ class OptimizeFromDataRequest(BaseModel):
 
 
 @router.post("/fixes")
-async def generate_fixes(req: OptimizeRequest):
-    """Audit a product page and generate fix-ready JSON-LD Schema."""
+async def generate_fixes(req: OptimizeRequest, request: Request):
+    """Generate fix-ready JSON-LD Schema. Free: 3/day."""
+    check_free_limit(request)
     # 1. Audit the page to get current data
     audit = await detector.audit_product(req.url)
     title = audit.title or req.url.split("/")[-1]

@@ -1,10 +1,11 @@
 """Audit API — Product, Site, and Competitor audit endpoints."""
 
 import asyncio
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.services.schema_detector import SchemaDetector
+from app.core.rate_limit import check_free_limit
 
 router = APIRouter()
 detector = SchemaDetector()
@@ -33,8 +34,9 @@ class CompareRequest(BaseModel):
 
 
 @router.post("/product")
-async def audit_product(req: AuditProductRequest):
-    """Audit a single product page for AI visibility."""
+async def audit_product(req: AuditProductRequest, request: Request):
+    """Audit a single product page for AI visibility. Free: 3/day."""
+    check_free_limit(request)
     url = str(req.url)
     if not url.startswith("http"):
         url = f"https://{url}"

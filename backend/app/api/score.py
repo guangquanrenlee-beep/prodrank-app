@@ -1,7 +1,8 @@
 """AI Shopping Index scoring endpoint + Question Library + Entity Taxonomy data."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
+from app.core.rate_limit import check_free_limit
 
 from app.services.ai_score import AIScoringEngine
 from app.services.schema_detector import SchemaDetector
@@ -22,8 +23,9 @@ class ScoreRequest(BaseModel):
 
 
 @router.post("/calculate")
-async def calculate_score(req: ScoreRequest):
-    """Calculate AI Shopping Index for a product page."""
+async def calculate_score(req: ScoreRequest, request: Request):
+    """Calculate AI Shopping Index. Free: 3/day."""
+    check_free_limit(request)
     # 1. Schema audit
     audit = await detector.audit_product(req.url)
 
