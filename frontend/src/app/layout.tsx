@@ -26,7 +26,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
-            var API = "https://vienna-deeply-node-balanced.trycloudflare.com";
+            var API = "https://isaac-validation-temporal-hundred.trycloudflare.com";
             var realFetch = window.fetch;
             window.fetch = function(url, opts) {
               if (typeof url === "string" && url.startsWith("/api/")) {
