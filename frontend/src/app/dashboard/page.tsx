@@ -14,6 +14,7 @@ const NAV = [
   { label: "AI Recommendations", href: "/rank", icon: "🏆" },
   { label: "Citation Sources", href: "/cite", icon: "📰" },
   { label: "Competitors", href: "/compare", icon: "⚔️" },
+  { label: "Action Center", href: "/actions", icon: "⚡" },
   { label: "Optimization Center", href: "/optimize", icon: "🔧" },
   { label: "Verification", href: "/verify", icon: "📸" },
   { label: "Monitoring", href: "/monitoring", icon: "📡" },
