@@ -32,7 +32,7 @@ export default function HomePage() {
       {/* Hero */}
       <section className="px-4 py-20 md:py-28 text-center max-w-4xl mx-auto space-y-6">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-800 bg-emerald-900/20 text-emerald-400 text-xs font-medium">AI Shopping Visibility OS</div>
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight">Make AI recommend <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">your products</span></h1>
+        <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight text-white">Make AI recommend your products</h1>
         <p className="text-lg text-zinc-400 max-w-2xl mx-auto">ProdRank tells you if ChatGPT, Gemini, Claude, and Grok can find your products — and fixes it when they can&apos;t. One click. Any platform.</p>
         <form onSubmit={handleCTA} className="flex gap-3 max-w-md mx-auto pt-4">
           <input type="text" value={domain} onChange={e => setDomain(e.target.value)} placeholder="yourstore.com" className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
