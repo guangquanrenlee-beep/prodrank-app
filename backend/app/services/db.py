@@ -54,14 +54,33 @@ class DB:
                      description: str = "", price: str = "", sku: str = "",
                      brand: str = "", schema_fields: int = 0,
                      content_score: int = 0, ai_score: int = 0) -> dict:
-        return self.client.table("products").upsert({
+        if not site_id:
+            return {}
+        data = self.client.table("products").upsert({
             "site_id": site_id, "title": title, "url": url,
             "description": description, "price": price, "sku": sku,
             "brand": brand, "schema_fields": schema_fields,
             "content_quality_score": content_score,
             "ai_visibility_score": ai_score,
             "updated_at": datetime.now(timezone.utc).isoformat(),
-        }, on_conflict="site_id,url").execute().data[0] if True else {}
+        }, on_conflict="site_id,url").execute().data
+        return data[0] if data else {}
+
+    def save_products_batch(self, site_id: str, products: list[dict]):
+        """Batch insert products from site audit."""
+        if not site_id or not products:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        rows = [{
+            "site_id": site_id, "title": p.get("title", p.get("name", "")),
+            "url": p.get("url", ""), "description": p.get("description", ""),
+            "price": str(p.get("price", "")), "sku": p.get("sku", ""),
+            "brand": p.get("brand", ""), "schema_fields": p.get("schema_fields", 0),
+            "content_quality_score": p.get("content_quality_score", 0),
+            "ai_visibility_score": p.get("ai_visibility_score", 0),
+            "updated_at": now,
+        } for p in products]
+        self.client.table("products").upsert(rows, on_conflict="site_id,url").execute()
 
     def get_products(self, site_id: str, limit: int = 50) -> list[dict]:
         return self.client.table("products").select("*").eq("site_id", site_id).limit(limit).execute().data or []
@@ -135,6 +154,32 @@ class DB:
 
     def get_questions(self, category: str, limit: int = 50) -> list[dict]:
         return self.client.table("questions").select("*").eq("category", category).limit(limit).execute().data or []
+
+    def save_questions_batch(self, questions: list[dict]):
+        """Batch save questions to Supabase."""
+        if not questions:
+            return
+        self.client.table("questions").upsert([
+            {"category": q["category"], "question_text": q["text"],
+             "search_volume": q.get("volume", 0), "ai_coverage_pct": q.get("coverage", 0)}
+            for q in questions
+        ], on_conflict="category,question_text").execute()
+
+    # ── Verifications ──
+
+    def save_verification(self, product_id: str, before: dict, after: dict = None, delta: int = None) -> dict:
+        data = self.client.table("verifications").insert({
+            "product_id": product_id,
+            "snapshot_before": before,
+            "snapshot_after": after,
+            "delta_score": delta,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }).execute().data
+        return data[0] if data else {}
+
+    def get_verifications(self, product_id: str) -> list[dict]:
+        data = self.client.table("verifications").select("*").eq("product_id", product_id).order("verified_at", desc=True).execute().data
+        return data or []
 
     # ── Subscriptions ──
 

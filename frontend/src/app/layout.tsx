@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Geist } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import Footer from "@/components/Footer";
+import CookieBanner from "@/components/CookieBanner";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -34,8 +36,10 @@ export default function RootLayout({
           })();
         `}} />
       </head>
-      <body className={`${inter.className} bg-zinc-950 text-zinc-100 antialiased min-h-screen`}>
-        {children}
+      <body className={`${inter.className} bg-zinc-950 text-zinc-100 antialiased min-h-screen flex flex-col`}>
+        <div className="flex-1">{children}</div>
+        <Footer />
+        <CookieBanner />
       </body>
     </html>
   );

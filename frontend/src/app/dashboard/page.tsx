@@ -11,7 +11,7 @@ const NAV = [
   { label: "Dashboard", href: "/dashboard", icon: "📊", active: true },
   { label: "Products", href: "/products", icon: "📦" },
   { label: "AI Visibility", href: "/visibility", icon: "👁" },
-  { label: "AI Recommendations", href: "/monitoring", icon: "🏆" },
+  { label: "AI Recommendations", href: "/rank", icon: "🏆" },
   { label: "Citation Sources", href: "/cite", icon: "📰" },
   { label: "Competitors", href: "/compare", icon: "⚔️" },
   { label: "Optimization Center", href: "/optimize", icon: "🔧" },

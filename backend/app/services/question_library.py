@@ -73,20 +73,22 @@ class QuestionLibrary:
             pass
 
     def _save(self):
-        """Persist question library to disk."""
+        """Persist to Supabase + local file backup."""
+        # Save to Supabase
+        try:
+            from app.services.db import DB
+            db = DB()
+            all_qs = []
+            for cat, qs in self._questions.items():
+                for q in qs:
+                    all_qs.append({"text": q.text, "category": q.category, "volume": q.search_volume, "coverage": q.ai_coverage_pct})
+            db.save_questions_batch(all_qs)
+        except Exception:
+            pass
+        # Local JSON backup
         try:
             os.makedirs(os.path.dirname(self._storage), exist_ok=True)
-            data = {
-                cat: [
-                    {"text": q.text, "category": q.category,
-                     "question_type": q.question_type,
-                     "search_volume": q.search_volume,
-                     "ai_coverage_pct": q.ai_coverage_pct,
-                     "source": q.source, "added_at": q.added_at}
-                    for q in qs
-                ]
-                for cat, qs in self._questions.items()
-            }
+            data = {cat: [{"text": q.text, "category": q.category, "question_type": q.question_type, "search_volume": q.search_volume, "ai_coverage_pct": q.ai_coverage_pct, "source": q.source, "added_at": q.added_at} for q in qs] for cat, qs in self._questions.items()}
             with open(self._storage, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception:
