@@ -18,6 +18,17 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-zinc-950">
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-4 py-4 max-w-6xl mx-auto">
+        <Link href="/" className="text-emerald-400 font-bold text-lg">ProdRank</Link>
+        <div className="flex items-center gap-6 text-sm">
+          <Link href="/pricing" className="text-zinc-400 hover:text-zinc-200 transition">Pricing</Link>
+          <Link href="/features/schema-validator" className="text-zinc-400 hover:text-zinc-200 transition">Features</Link>
+          <Link href="/login" className="text-zinc-400 hover:text-zinc-200 transition">Sign in</Link>
+          <Link href="/signup" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition">Sign up free</Link>
+        </div>
+      </nav>
+
       {/* Hero */}
       <section className="px-4 py-20 md:py-28 text-center max-w-4xl mx-auto space-y-6">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-800 bg-emerald-900/20 text-emerald-400 text-xs font-medium">AI Shopping Visibility OS</div>
