@@ -20,7 +20,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-zinc-950">
       {/* Nav */}
       <nav className="flex items-center justify-between px-4 py-4 max-w-6xl mx-auto">
-        <Link href="/" className="text-emerald-400 font-bold text-lg">ProdRank</Link>
+        <Link href="/" className="flex items-center gap-2"><img src="/logo.svg" alt="ProdRank" className="w-8 h-8" /><span className="text-white font-bold text-lg">ProdRank</span></Link>
         <div className="flex items-center gap-6 text-sm">
           <Link href="/pricing" className="text-zinc-400 hover:text-zinc-200 transition">Pricing</Link>
           <Link href="/features/schema-validator" className="text-zinc-400 hover:text-zinc-200 transition">Features</Link>

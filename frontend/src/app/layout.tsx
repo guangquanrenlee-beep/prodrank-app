@@ -10,9 +10,10 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ProdRank — AI Agent Commerce SEO",
+  title: "ProdRank — Make AI Recommend Your Products",
   description:
     "Monitor and optimize your product visibility in ChatGPT, Gemini, Perplexity, and Claude.",
+  icons: { icon: "/logo.svg" },
 };
 
 export default function RootLayout({
