@@ -26,7 +26,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
-            var API = "https://prodrank-api.keywordslends.workers.dev";
+            var API = "http://98.159.111.217";
             var realFetch = window.fetch;
             window.fetch = function(url, opts) {
               if (typeof url === "string" && url.startsWith("/api/")) {
