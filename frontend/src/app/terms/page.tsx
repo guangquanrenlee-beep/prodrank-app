@@ -1,4 +1,4 @@
-import Footer from "@/components/Footer";
+
 import Link from "next/link";
 
 export default function TermsPage() {
@@ -15,5 +15,5 @@ export default function TermsPage() {
       <section><h2 className="text-lg font-semibold text-zinc-200 mb-2">6. Limitation of Liability</h2><p>ProdRank is provided "as is" without warranties. We are not liable for any damages arising from use of the Service. AI agent rankings are estimates based on available data and may vary.</p></section>
       <section><h2 className="text-lg font-semibold text-zinc-200 mb-2">7. Contact</h2><p>Questions about these terms? Contact us at <a href="mailto:support@prodrank.app" className="text-emerald-400">support@prodrank.app</a>.</p></section>
     </div>
-  </main><Footer /></>);
+  </main></>);
 }

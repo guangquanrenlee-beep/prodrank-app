@@ -1,4 +1,4 @@
-import Footer from "@/components/Footer"; import Link from "next/link";
+
 export default function AboutPage() {
   return (<><main className="min-h-screen max-w-3xl mx-auto px-4 py-16 space-y-6">
     <Link href="/" className="text-zinc-500 text-sm">← Home</Link><h1 className="text-3xl font-bold">About ProdRank</h1>
@@ -8,5 +8,5 @@ export default function AboutPage() {
       <section><h2 className="text-lg font-semibold text-zinc-200 mb-2">The Team</h2><p>ProdRank is built by an independent developer who saw the shift from Google SEO to AI Shopping visibility and decided to build the tool that didn't exist yet. We're bootstrapped, profitable, and obsessed with AI commerce.</p></section>
       <section><h2 className="text-lg font-semibold text-zinc-200 mb-2">Technology</h2><p>Our platform analyzes products across 4 AI agents, audits 12 Schema.org fields, tracks citation sources, and generates optimization fixes — all powered by a combination of FastAPI, Next.js, Supabase, and multi-model AI via ofox.ai.</p></section>
     </div>
-  </main><Footer /></>);
+  </main></>);
 }

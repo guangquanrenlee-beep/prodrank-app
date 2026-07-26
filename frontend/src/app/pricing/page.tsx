@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import Link from "next/link";
-import Footer from "@/components/Footer";
+
 
 const PADDLE_PRICE_IDS = { pro: "pri_pro_placeholder", growth: "pri_growth_placeholder" };
 
@@ -41,6 +41,6 @@ export default function PricingPage() {
       </div>
       <p className="text-center text-xs text-zinc-600">Annual billing saves 20%. All paid plans come with 14-day money-back guarantee. <a href="/refund" className="text-emerald-400 hover:text-emerald-300">Refund Policy</a>.</p>
     </main>
-    <Footer />
+    
   </>);
 }

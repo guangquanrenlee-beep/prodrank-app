@@ -1,4 +1,4 @@
-import Footer from "@/components/Footer"; import Link from "next/link";
+
 export default function PrivacyPage() {
   return (<><main className="min-h-screen max-w-3xl mx-auto px-4 py-16 space-y-6">
     <Link href="/" className="text-zinc-500 text-sm">← Home</Link><h1 className="text-3xl font-bold">Privacy Policy</h1><p className="text-sm text-zinc-500">Last updated: July 25, 2026</p>
@@ -10,5 +10,5 @@ export default function PrivacyPage() {
       <section><h2 className="text-lg font-semibold text-zinc-200 mb-2">5. Your Rights</h2><p>You may request deletion of your data at any time by contacting <a href="mailto:support@prodrank.app" className="text-emerald-400">support@prodrank.app</a>. We will comply within 30 days.</p></section>
       <section><h2 className="text-lg font-semibold text-zinc-200 mb-2">6. GDPR Compliance</h2><p>EU users have the right to access, rectify, and erase their personal data. ProdRank acts as a data controller for account information and a data processor for store data analyzed through the Service.</p></section>
     </div>
-  </main><Footer /></>);
+  </main></>);
 }

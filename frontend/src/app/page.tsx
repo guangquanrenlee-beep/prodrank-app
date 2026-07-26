@@ -2,8 +2,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Footer from "@/components/Footer";
-
 export default function HomePage() {
   const router = useRouter();
   const [domain, setDomain] = useState("");
@@ -60,6 +58,5 @@ export default function HomePage() {
       <p className="text-zinc-400">Free for your first 3 products. No credit card.</p>
       <Link href="/signup" className="inline-block px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition text-lg">Get started free →</Link>
     </section>
-    <Footer />
   </main>);
 }
