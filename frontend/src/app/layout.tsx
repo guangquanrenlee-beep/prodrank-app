@@ -26,7 +26,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
-            var API = "https://isaac-validation-temporal-hundred.trycloudflare.com";
+            var API = "https://api.prodrank.app";
             var realFetch = window.fetch;
             window.fetch = function(url, opts) {
               if (typeof url === "string" && url.startsWith("/api/")) {

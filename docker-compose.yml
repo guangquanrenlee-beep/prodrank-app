@@ -17,8 +17,11 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./cert.pem:/etc/nginx/ssl/cert.pem
+      - ./key.pem:/etc/nginx/ssl/key.pem
     depends_on:
       - backend
 
