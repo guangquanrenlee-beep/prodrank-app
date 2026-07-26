@@ -73,23 +73,24 @@ function AnalyticsContent() {
         </div>
       </div>
 
-      {/* Score bars + Actions */}
+      {/* Score bars + Evidence */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <h3 className="font-semibold mb-4">What to fix</h3>
           {auto+manual===0 ? <p className="text-sm text-zinc-500">No issues detected. Run a deeper scan.</p> :
           <div className="space-y-2">
-            <div className="flex justify-between text-sm"><span className="text-emerald-400">🟢 Auto-fixable</span><span className="text-emerald-400 font-bold">{auto}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-amber-400">🟡 Manual work</span><span className="text-amber-400 font-bold">{manual}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-emerald-400">Auto-fixable</span><span className="text-emerald-400 font-bold">{auto}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-amber-400">Manual work</span><span className="text-amber-400 font-bold">{manual}</span></div>
             <Link href={`/actions?domain=${encodeURIComponent(domain)}`} className="inline-block mt-3 text-sm text-emerald-400 hover:text-emerald-300">Open Action Center →</Link>
           </div>}
         </div>
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <h3 className="font-semibold mb-4">AI Score Breakdown</h3>
+          <h3 className="font-semibold mb-3">AI Score Breakdown</h3>
           <div className="space-y-2">
-            {Object.entries(score.breakdown).map(([k,v]:any)=>(<div key={k}><div className="flex justify-between text-xs mb-0.5"><span className="text-zinc-500 capitalize">{k.replace(/_/g," ")}</span><span className="text-zinc-400">{v.score}</span></div><div className="w-full bg-zinc-800 h-1.5 rounded-full"><div className={`h-1.5 rounded-full ${v.score>=70?"bg-emerald-500":v.score>=40?"bg-yellow-500":"bg-red-500"}`} style={{width:Math.max(v.score,5)+"%"}}/></div></div>))}
+            {Object.entries(score.breakdown).map(([k,v]:any)=>(<div key={k}><div className="flex justify-between text-xs mb-0.5"><span className="text-zinc-500 capitalize">{k.replace(/_/g," ")}</span><span className="text-zinc-400">{v.score}/100</span></div><div className="w-full bg-zinc-800 h-1.5 rounded-full"><div className={`h-1.5 rounded-full ${v.score>=70?"bg-emerald-500":v.score>=40?"bg-yellow-500":"bg-red-500"}`} style={{width:Math.max(v.score,5)+"%"}}/></div></div>))}
           </div>
+          <details className="mt-4"><summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-300">📋 Where do these scores come from?</summary><div className="text-xs text-zinc-600 mt-2 space-y-1"><div>Knowledge Coverage → page content + AI analysis</div><div>Question Coverage → FAQ Schema + shopping questions</div><div>Citation Authority → AI agent citation sources</div><div>Recommendation Freq → how often AI mentions your brand</div><div>External Evidence → reviews, images, certifications</div><div>Product Completeness → Schema fields + content quality</div></div></details>
         </div>
       </div>
 
