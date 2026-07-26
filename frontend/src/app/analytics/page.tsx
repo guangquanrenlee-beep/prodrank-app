@@ -38,7 +38,7 @@ function AnalyticsContent() {
     <div>
       <Link href="/dashboard" className="text-zinc-500 text-sm">← Dashboard</Link>
       <h1 className="text-2xl font-bold mt-1">{domain}</h1>
-      {cms && <p className="text-sm text-zinc-500 mt-1 capitalize">{cms.platform} · {cms.confidence}% confidence</p>}
+      {cms && <p className="text-sm text-zinc-500 mt-1 capitalize">{cms.platform === "unknown" ? "Cloudflare protected — can't auto-detect. Likely Shopify or WordPress." : `${cms.platform} · ${cms.confidence}% confidence`}</p>}
     </div>
 
     {/* CMS Install Guide */}

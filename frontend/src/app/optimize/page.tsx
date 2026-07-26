@@ -1,8 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-export default function OptimizePage() {
-  const [url, setUrl] = useState(""); const [fixes, setFixes] = useState<any>(null); const [loading, setLoading] = useState(false);
+import { useSearchParams } from "next/navigation";
+
+export default function OptimizePage() { return <Suspense fallback={<div className="p-10 text-zinc-400">Loading...</div>}><OptimizeContent /></Suspense>; }
+
+function OptimizeContent() {
+  const params = useSearchParams();
+  const urlParam = params.get("url") || params.get("domain") || "";
+  const [url, setUrl] = useState(urlParam); const [fixes, setFixes] = useState<any>(null); const [loading, setLoading] = useState(false);
   const run = async () => { setLoading(true); try { const r = await fetch("/api/optimize/fixes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url.trim(), use_ai: false }) }); if (r.ok) setFixes(await r.json()); } catch {} setLoading(false); };
   const pMap: Record<string,string> = { critical: "border-red-500", high: "border-yellow-500", medium: "border-zinc-500" };
   return (<main className="min-h-screen max-w-4xl mx-auto px-4 py-10 space-y-6">

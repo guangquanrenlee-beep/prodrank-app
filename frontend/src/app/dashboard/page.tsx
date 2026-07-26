@@ -33,7 +33,10 @@ export default function DashboardPage() {
   const [sites, setSites] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  useEffect(() => { supabase.auth.getSession().then(({ data: { session } }) => { setUser(session?.user ?? null); if (session?.user) loadSites(session.user.id); }); }, []);
+  useEffect(() => { supabase.auth.getSession().then(({ data: { session } }) => { setUser(session?.user ?? null); if (session?.user) loadSites(session.user.id); }); // Restore last domain from localStorage
+    const last = localStorage.getItem("prodrank_last_domain");
+    if (last && !domain) setDomain(last);
+  }, []);
 
   const loadSites = async (uid: string) => {
     const { data } = await supabase.from("sites").select("*").eq("user_id", uid).order("updated_at", { ascending: false });
