@@ -140,8 +140,8 @@ export default function DashboardPage() {
               <h3 className="font-semibold mb-4">Recent AI Changes</h3>
               {score ? (
                 <div className="space-y-3 text-sm text-zinc-400">
-                  {score.recommendation && <div className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">💡</span><span>{score.recommendation} — <Link href="/actions" className="text-emerald-400 underline">Fix in Action Center →</Link></span></div>}
-                  {autoCount > 3 && <div className="flex items-start gap-2"><span className="text-yellow-400 mt-0.5">⚠</span><span>{autoCount} issues found. <Link href="/actions" className="text-amber-400 underline">Open Action Center →</Link></span></div>}
+                  {score.recommendation && <div className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">💡</span><span>{score.recommendation} — <Link href={`/actions?domain=${encodeURIComponent(domain)}`} className="text-emerald-400 underline">Fix in Action Center →</Link></span></div>}
+                  {autoCount > 3 && <div className="flex items-start gap-2"><span className="text-yellow-400 mt-0.5">⚠</span><span>{autoCount} issues found. <Link href={`/actions?domain=${encodeURIComponent(domain)}`} className="text-amber-400 underline">Open Action Center →</Link></span></div>}
                   {!score?.recommendation ? <div className="flex items-start gap-2"><span className="text-zinc-500 mt-0.5">ℹ</span><span>Run full scan: <Link href={`/analytics?domain=${encodeURIComponent(domain)}`} className="text-emerald-400 underline">Site Analytics →</Link></span></div> : null}
                 </div>
               ) : (
