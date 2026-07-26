@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
   const loadSites = async (uid: string) => {
     const { data } = await supabase.from("sites").select("*").eq("user_id", uid).order("updated_at", { ascending: false });
-    if (data && data.length > 0) { setSites(data); setDomain(data[0].domain); }
+    if (data && data.length > 0) { setSites(data); const last = data[0]; setDomain(last.domain); setCms({ domain: last.domain, platform: last.platform || "unknown", confidence: last.platform_confidence || 0, recommended_action: "Previously analyzed. Click Analyze to refresh.", auth_method: last.auth_method || "csv_upload" }); setScore(last.ai_visibility_score ? { ai_visibility_score: last.ai_visibility_score, label: last.ai_visibility_score >= 60 ? "Good" : "Poor", breakdown: {}, recommendation: "" } : null); }
   };
 
   const handleAnalyze = async (e: React.FormEvent) => {
@@ -140,9 +140,9 @@ export default function DashboardPage() {
               <h3 className="font-semibold mb-4">Recent AI Changes</h3>
               {score ? (
                 <div className="space-y-3 text-sm text-zinc-400">
-                  {score.recommendation && <div className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">✓</span><span>{score.recommendation}</span></div>}
-                  {autoCount > 3 && <div className="flex items-start gap-2"><span className="text-yellow-400 mt-0.5">⚠</span><span>{autoCount} issues found — check Optimization tab</span></div>}
-                  <div className="flex items-start gap-2"><span className="text-zinc-500 mt-0.5">ℹ</span><span>Connect your store to get real-time AI recommendations tracking.</span></div>
+                  {score.recommendation && <div className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">💡</span><span>{score.recommendation} — <Link href="/actions" className="text-emerald-400 underline">Fix in Action Center →</Link></span></div>}
+                  {autoCount > 3 && <div className="flex items-start gap-2"><span className="text-yellow-400 mt-0.5">⚠</span><span>{autoCount} issues found. <Link href="/actions" className="text-amber-400 underline">Open Action Center →</Link></span></div>}
+                  {!score?.recommendation ? <div className="flex items-start gap-2"><span className="text-zinc-500 mt-0.5">ℹ</span><span>Run full scan: <Link href={`/analytics?domain=${encodeURIComponent(domain)}`} className="text-emerald-400 underline">Site Analytics →</Link></span></div> : null}
                 </div>
               ) : (
                 <div className="text-zinc-500 text-sm pt-4 text-center">Run your first analysis to see AI changes.</div>
