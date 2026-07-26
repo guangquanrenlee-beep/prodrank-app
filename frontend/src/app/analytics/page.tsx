@@ -3,6 +3,10 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+function InstallCard({ icon, title, desc, href, cta }: { icon:string; title:string; desc:string; href:string; cta:string }) {
+  return <a href={href} className="bg-zinc-800/50 hover:bg-zinc-800 rounded-xl p-4 transition flex flex-col justify-between"><div><div className="text-2xl mb-2">{icon}</div><div className="text-sm font-medium text-zinc-200">{title}</div><div className="text-xs text-zinc-500 mt-1">{desc}</div></div><div className="mt-3 text-xs text-emerald-400 font-medium">{cta}</div></a>;
+}
+
 export default function AnalyticsPage() { return <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-zinc-400">Loading...</div>}><AnalyticsContent /></Suspense>; }
 
 function AnalyticsContent() {
@@ -34,8 +38,26 @@ function AnalyticsContent() {
     <div>
       <Link href="/dashboard" className="text-zinc-500 text-sm">← Dashboard</Link>
       <h1 className="text-2xl font-bold mt-1">{domain}</h1>
-      {cms && <p className="text-sm text-zinc-500 mt-1 capitalize">{cms.platform} · {cms.confidence}% confidence · {cms.recommended_action}</p>}
+      {cms && <p className="text-sm text-zinc-500 mt-1 capitalize">{cms.platform} · {cms.confidence}% confidence</p>}
     </div>
+
+    {/* CMS Install Guide */}
+    {cms && (<div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-6">
+      <h2 className="font-semibold text-emerald-400 mb-3">How to install for {cms.platform === "shopify" ? "Shopify" : cms.platform === "woocommerce" || cms.platform === "wordpress" ? "WordPress" : "any platform"}</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {cms.platform === "shopify" ? (<>
+          <InstallCard icon="📲" title="Shopify App" desc="Install from App Store. One click, auto-injects Schema on all product pages." href={`/api/shopify/install?shop=${domain}`} cta="Connect Shopify →" />
+          <InstallCard icon="⚡" title="inject.js (Universal)" desc="One line of code. Works on any platform including Shopify." href="/inject-guide" cta="View Guide →" />
+        </>) : cms.platform === "woocommerce" || cms.platform === "wordpress" ? (<>
+          <InstallCard icon="📝" title="WordPress Plugin" desc="Upload & activate. Auto-injects Schema on all pages. Yoast/RankMath compatible." href="/wordpress" cta="Get Plugin →" />
+          <InstallCard icon="⚡" title="inject.js (Universal)" desc="One line of code. Works on any platform." href="/inject-guide" cta="View Guide →" />
+        </>) : (<>
+          <InstallCard icon="⚡" title="inject.js (Recommended)" desc="One line of code. Auto-detects products, injects Schema. Works everywhere." href="/inject-guide" cta="View Guide →" />
+          <InstallCard icon="📦" title="CSV Upload" desc="Export products from any store, upload here, get Schema for every SKU." href="/csv" cta="Upload CSV →" />
+        </>)}
+        <InstallCard icon="📊" title="Check AI Ranking" desc="See where your brand ranks across ChatGPT, Gemini, Claude, Grok." href={`/rank/domain?domain=${encodeURIComponent(domain)}`} cta="Check Now →" />
+      </div>
+    </div>)}
 
     {score && (<div className="space-y-8">
       {/* Big Score */}
