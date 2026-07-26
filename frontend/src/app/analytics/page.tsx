@@ -28,7 +28,9 @@ function AnalyticsContent() {
     ]).then(([s,c,st]) => { setScore(s); setCms(c); setSteps(st?.action_plan||[]); setLoading(false); });
   }, [domain]);
 
-  if (loading) return <main className="min-h-screen flex items-center justify-center"><div className="text-center space-y-3"><div className="text-zinc-400 animate-pulse text-lg">Analyzing {domain||"..."} across 4 AI agents...</div><div className="text-sm text-zinc-600">Checking Schema, rankings, citations, and optimization gaps</div></div></main>;
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => { if (loading) { const t = setInterval(() => setElapsed(e=>e+1), 1000); return () => clearInterval(t); } }, [loading]);
+  if (loading) return <main className="min-h-screen flex items-center justify-center"><div className="text-center space-y-4"><div className="text-zinc-400 animate-pulse text-lg">Analyzing {domain||"..."} across 4 AI agents...</div><div className="text-sm text-zinc-600">{elapsed < 30 ? `Checking Schema, rankings, citations... (${elapsed}s)` : "Taking longer than expected. Our servers may be busy. This is normal for large sites."}</div></div></main>;
 
   const sc = (s:number) => s>=70?"text-emerald-400":s>=40?"text-yellow-400":"text-red-400";
   const auto = steps.filter((s:any)=>s.auto_fixable).length;
@@ -63,7 +65,7 @@ function AnalyticsContent() {
       {/* Big Score */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center">
         <div className={`text-8xl font-bold ${sc(score.ai_visibility_score||0)}`}>{score.ai_visibility_score}</div>
-        <div className="text-sm text-zinc-500 mt-2">AI Visibility Score — {score.label}</div>
+        <div className="text-sm text-zinc-500 mt-2">AI Visibility Score — {score.label} <span className="text-xs text-zinc-600">(avg Shopify store: 45-55. Below 30 needs urgent fixes.)</span></div>
         <div className="flex flex-wrap justify-center gap-3 mt-6">
           <Link href={`/actions?domain=${encodeURIComponent(domain)}`} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition">Fix Issues →</Link>
           <Link href={`/rank/domain?domain=${encodeURIComponent(domain)}`} className="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium rounded-lg transition">AI Rankings →</Link>

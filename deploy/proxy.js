@@ -1,7 +1,7 @@
 export default {
   async fetch(request) {
     const url = new URL(request.url);
-    const target = 'http://98.159.111.217' + url.pathname + url.search;
+    const target = 'http://api.prodrank.app' + url.pathname + url.search;
 
     if (request.method === 'OPTIONS') {
       return new Response(null, {
