@@ -68,8 +68,8 @@ function AnalyticsContent() {
         <div className="text-sm text-zinc-500 mt-2">AI Visibility Score — {score.label} <span className="text-xs text-zinc-600">(avg Shopify store: 45-55. Below 30 needs urgent fixes.)</span></div>
         <div className="flex flex-wrap justify-center gap-3 mt-6">
           <Link href={`/actions?domain=${encodeURIComponent(domain)}`} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition">Fix Issues →</Link>
+          <button onClick={async ()=>{const r=await fetch("/api/rec/reasons",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_name:domain,keyword:`best ${domain.split('.')[0]}`,brand:domain.split('.')[0]})});if(r.ok){const d=await r.json();alert(d.breakdowns?.map((b:any)=>`[${b.ai_agent}] ${b.recommended?'Recommended':'Not recommended'}\nReasons: ${b.reasons?.join(', ')||'none'}\nBarriers: ${b.barriers?.join(', ')||'none'}`).join('\n\n'));}}} className="px-6 py-3 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg transition">🧠 Why am I not recommended?</button>
           <Link href={`/rank/domain?domain=${encodeURIComponent(domain)}`} className="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium rounded-lg transition">AI Rankings →</Link>
-          <Link href="/inject-guide" className="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium rounded-lg transition">Install inject.js →</Link>
         </div>
       </div>
 
