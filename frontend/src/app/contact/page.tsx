@@ -1,3 +1,4 @@
+import Link from "next/link";
 
 export default function ContactPage() {
   return (<><main className="min-h-screen max-w-2xl mx-auto px-4 py-16 space-y-6">

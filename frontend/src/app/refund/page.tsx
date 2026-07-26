@@ -1,3 +1,4 @@
+import Link from "next/link";
 
 export default function RefundPage() {
   return (<><main className="min-h-screen max-w-3xl mx-auto px-4 py-16 space-y-6">
