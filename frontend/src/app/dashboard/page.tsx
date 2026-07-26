@@ -165,12 +165,22 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* CTA cards */}
-          {!score && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <CTACard icon="📲" title="Connect Shopify" desc="OAuth — one click, all products synced." href={`/api/shopify/install?shop=${domain}`} />
-              <CTACard icon="📦" title="Upload CSV" desc="Export products from any platform." href="/csv" />
-              <CTACard icon="⚡" title="Install inject.js" desc="One line of code — any platform." href="/inject-guide" />
+          {/* Welcome card for new users */}
+          {sites.length === 0 && !score && (
+            <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-6 text-center space-y-3">
+              <div className="text-4xl">👋</div>
+              <h3 className="text-xl font-semibold text-white">Welcome to ProdRank!</h3>
+              <p className="text-zinc-400 text-sm max-w-md mx-auto">Start by analyzing your store above. We'll check if AI agents can see your products and show you exactly how to fix it.</p>
+              <div className="flex justify-center gap-3 pt-2">
+                <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Quick Start Guide →</Link>
+                <Link href="/pricing" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-lg transition">See Plans →</Link>
+              </div>
+            </div>
+          )}
+          {/* Last analyzed domain shortcut */}
+          {sites.length > 0 && !score && sites[0].domain && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+              <p className="text-sm text-zinc-400">Continue where you left off — <Link href={`/analytics?domain=${encodeURIComponent(sites[0].domain)}`} className="text-emerald-400 underline">{sites[0].domain}</Link></p>
             </div>
           )}
         </div>
