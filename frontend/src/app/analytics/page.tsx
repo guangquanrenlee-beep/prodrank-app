@@ -39,8 +39,8 @@ function AnalyticsContent() {
 
   return (<main className="min-h-screen max-w-4xl mx-auto px-4 py-10 space-y-8">
     <div>
-      <Link href="/dashboard" className="text-zinc-500 text-sm">← Dashboard</Link>
-      <h1 className="text-2xl font-bold mt-1">{domain}</h1>
+      <Link href="/" className="text-zinc-500 text-sm">← Home</Link>
+      <h1 className="text-2xl font-bold mt-1">AI Visibility Analysis for {domain}</h1>
       {cms && <p className="text-sm text-zinc-500 mt-1 capitalize">{cms.platform === "unknown" ? "Cloudflare protected — can't auto-detect. Likely Shopify or WordPress." : `${cms.platform} · ${cms.confidence}% confidence`}</p>}
     </div>
 
