@@ -143,6 +143,26 @@ class AIQueryService:
         )
         return await self._query_model("claude", self.model_claude, prompt)
 
+    async def query_all_multi(self, product_name: str, keyword: str, brand: str = "", samples: int = 3) -> MultiAgentReport:
+        """Run N samples and average the ranking. Returns report with confidence intervals."""
+        import asyncio
+        all_reports = await asyncio.gather(*[self.query_all(product_name, keyword, brand) for _ in range(samples)], return_exceptions=True)
+        reports = [r for r in all_reports if isinstance(r, MultiAgentReport)]
+        if not reports: return MultiAgentReport(product_name=product_name, keyword=keyword)
+        # Average: count how many times each agent mentioned the product
+        agent_ranks: dict[str, list] = {}
+        for rep in reports:
+            for r in rep.results:
+                agent_ranks.setdefault(r.ai_agent, []).append(r.rank)
+        # Build averaged report
+        avg = MultiAgentReport(product_name=product_name, keyword=keyword)
+        for agent, ranks in agent_ranks.items():
+            valid = [r for r in ranks if r is not None]
+            avg_rank = round(sum(valid)/len(valid), 1) if valid else None
+            confidence = f"{len(valid)}/{samples} samples" if valid else "0 samples"
+            avg.results.append(AIRankResult(ai_agent=agent, keyword=keyword, rank=avg_rank if isinstance(avg_rank, int) else None, total_mentioned=ranks.count(None)==0, description=f"Avg rank: {avg_rank} ({confidence})" if valid else f"Not ranked ({confidence})"))
+        return avg
+
     async def query_all(self, product_name: str, keyword: str, brand: str = "") -> MultiAgentReport:
         """Query all 4 AI agents in parallel (ChatGPT, Gemini, Claude, Grok).
         Perplexity not available on ofox.ai."""
