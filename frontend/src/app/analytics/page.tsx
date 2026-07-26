@@ -15,6 +15,7 @@ function AnalyticsContent() {
   const [score, setScore] = useState<any>(null);
   const [cms, setCms] = useState<any>(null);
   const [steps, setSteps] = useState<any[]>([]);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,10 +23,10 @@ function AnalyticsContent() {
     const d = domain.replace(/^https?:\/\//,"").split("/")[0];
     setLoading(true);
     Promise.all([
-      fetch("/api/calculate", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({url:`https://${d}`,product_name:d}) }).then(r=>r.json()).catch(()=>null),
+      fetch("/api/calculate", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({url:`https://${d}`,product_name:d}) }).then(r=>{if(r.status===429)throw new Error("rate_limited");return r.json()}).catch(e=>e.message==="rate_limited"?{error:"rate_limited"}:null),
       fetch("/api/cms", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({domain:d}) }).then(r=>r.json()).catch(()=>null),
       fetch("/api/next-steps", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({url:`https://${d}`,product_name:d}) }).then(r=>r.json()).catch(()=>null),
-    ]).then(([s,c,st]) => { setScore(s); setCms(c); setSteps(st?.action_plan||[]); setLoading(false); });
+    ]).then(([s,c,st]) => { setScore(s); setCms(c); setSteps(st?.action_plan||[]); if(s?.error==="rate_limited") setError("Daily free limit reached (3/day). Sign up for unlimited access."); setLoading(false); });
   }, [domain]);
 
   const [elapsed, setElapsed] = useState(0);
@@ -42,6 +43,8 @@ function AnalyticsContent() {
       <h1 className="text-2xl font-bold mt-1">{domain}</h1>
       {cms && <p className="text-sm text-zinc-500 mt-1 capitalize">{cms.platform === "unknown" ? "Cloudflare protected — can't auto-detect. Likely Shopify or WordPress." : `${cms.platform} · ${cms.confidence}% confidence`}</p>}
     </div>
+
+    {error && <div className="bg-amber-900/20 border border-amber-800 rounded-xl p-4 text-center"><p className="text-amber-400 text-sm">{error}</p>{error.includes("limit") && <Link href="/signup" className="inline-block mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Sign up for unlimited access →</Link>}</div>}
 
     {/* CMS Install Guide */}
     {cms && (<div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-6">
