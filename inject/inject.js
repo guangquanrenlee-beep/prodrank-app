@@ -2,7 +2,7 @@
  * ProdRank — Universal Schema Injection
  * v1.0 — One line, all platforms.
  *
- * Usage: <script async src="https://prodrank.app/inject.js" data-site="yoursite.com"></script>
+ * Usage: <script async src="https://api.prodrank.app/api/inject.js" data-site="yoursite.com"></script>
  *
  * Auto-detects product pages, extracts data from DOM,
  * generates complete JSON-LD Product + FAQPage Schema,
@@ -13,7 +13,7 @@
 
   const SCRIPT = document.currentScript;
   const SITE = (SCRIPT && SCRIPT.dataset.site) || location.hostname;
-  const API = (SCRIPT && SCRIPT.dataset.api) || "https://prodrank.app/api/inject";
+  const API = (SCRIPT && SCRIPT.dataset.api) || "https://api.prodrank.app/api";
   const DEBUG = SCRIPT && SCRIPT.dataset.debug === "true";
 
   function log(...args) {
