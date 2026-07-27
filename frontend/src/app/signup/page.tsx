@@ -1,15 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function SignupPage() {
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Already logged in? Redirect to dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      window.location.href = "/dashboard";
+    }
+  }, [authLoading, user]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -47,7 +47,7 @@ export default function VerifyPage() {
     <main className="min-h-screen max-w-3xl mx-auto px-4 py-10 space-y-8">
       <div>
         <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 text-sm">← Dashboard</Link>
-        <h1 className="text-3xl font-bold mt-1">Verification — Before & After</h1>
+        <h1 className="text-3xl font-bold mt-1">Impact — Before & After</h1>
         <p className="text-zinc-400 text-sm mt-1">Prove your optimization is working. Run a "before" snapshot, make changes, then run "after".</p>
       </div>
 

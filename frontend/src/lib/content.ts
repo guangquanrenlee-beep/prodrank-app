@@ -9,7 +9,7 @@ export const FEATURES = [
   { slug: "competitor-analysis", title: "Competitor AI Analysis", desc: "Side-by-side comparison of your Schema and AI visibility vs competitors.", icon: "⚔️" },
   { slug: "question-coverage", title: "Question Coverage Checker", desc: "See which shopper questions AI answers that your site doesn't cover.", icon: "✅" },
   { slug: "optimization-center", title: "One-Click Optimization", desc: "Auto-generate everything AI agents need to recommend your products.", icon: "🔧" },
-  { slug: "verification", title: "Optimization Verification", desc: "Before/After snapshots proving your fixes improved AI visibility.", icon: "📸" },
+  { slug: "verification", title: "Optimization Impact", desc: "Before/After snapshots proving your fixes improved AI visibility.", icon: "📸" },
   { slug: "opportunity-radar", title: "Opportunity Radar", desc: "Which of your 5000 SKUs will give the biggest AI visibility boost?", icon: "🎯" },
   { slug: "ai-playground", title: "AI Shopping Playground", desc: "Ask ChatGPT/Gemini/Claude about your products and see what they say.", icon: "🎮" },
   { slug: "ai-timeline", title: "AI Memory Timeline", desc: "Watch how AI recommendations for your brand change over time.", icon: "📅" },

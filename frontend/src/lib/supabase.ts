@@ -3,4 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = "https://reqacknemyxnyqzkvrpe.supabase.co";
 const supabaseAnonKey = "sb_publishable_yr6jYKYiMfTqTcaYZfzLhg_Rb-NYk4n";
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    storage: typeof window !== "undefined" ? window.localStorage : undefined,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+  },
+});
