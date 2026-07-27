@@ -133,7 +133,8 @@ async def manual_audit(req: ManualAuditRequest):
 
     from app.services.schema_detector import SchemaFieldResult
     fields = detector._audit_schema_fields(product_data, soup)
-    score, issues = detector._score_content(soup, product_data)
+    field_count = sum(1 for f in fields if f.present)
+    score, issues = detector._score_content(soup, product_data, field_count)
 
     return {
         "url": req.url,

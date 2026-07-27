@@ -253,9 +253,9 @@ class SchemaDetector:
         result.schema_fields = self._audit_schema_fields(product_data, soup)
         result.field_count = sum(1 for f in result.schema_fields if f.present)
 
-        # 2. Content quality
+        # 2. Content quality (includes schema completeness in score)
         result.content_quality_score, result.content_issues = (
-            self._score_content(soup, product_data)
+            self._score_content(soup, product_data, result.field_count)
         )
 
         return result
@@ -277,7 +277,7 @@ class SchemaDetector:
         results.append(SchemaFieldResult(
             field="name", present=has,
             value=product_data.get("name", "")[:100] if has else None,
-            note="" if has else "Product name missing from Schema"
+            note="" if has else "Add '\"name\": \"Product Name\"' to your Product JSON-LD"
         ))
 
         # description
@@ -285,9 +285,9 @@ class SchemaDetector:
         desc = product_data.get("description", "")
         note = ""
         if has and len(desc) < 100:
-            note = "Description too short (<100 chars), AI may lack detail"
+            note = "Description too short — expand to 200+ chars in your 'description' field"
         elif not has:
-            note = "Missing — AI has no structured description to extract"
+            note = "Add '\"description\": \"...\"' with 200+ chars to your Product JSON-LD"
             # Try meta description fallback
             meta_desc = soup.find("meta", attrs={"name": "description"})
             if meta_desc and meta_desc.get("content"):
@@ -307,7 +307,7 @@ class SchemaDetector:
             bool(img.find("alt")) if hasattr(img, "find") else True
             for img in soup.find_all("img", src=True)[:5]
         )
-        note = "" if has else "No structured image — AI may not display product image"
+        note = "" if has else "Add '\"image\": [\"https://...\"]' with product image URLs to your JSON-LD"
         if has and not alt_ok:
             note = "Images present but may lack alt text"
         results.append(SchemaFieldResult(
@@ -333,9 +333,9 @@ class SchemaDetector:
         if has_price:
             note = f"${offers.get('price')} {offers.get('priceCurrency', '')}"
         elif has_offer:
-            note = "Offer present but no price"
+            note = "Offer present but no price — add '\"price\": \"29.99\"' inside offers"
         else:
-            note = "Missing — AI cannot display price"
+            note = "Add '\"offers\": {\"@type\": \"Offer\", \"price\": \"29.99\", \"priceCurrency\": \"USD\"}' to JSON-LD"
         results.append(SchemaFieldResult(
             field="offers", present=has_price, value=note, note=""
         ))
@@ -353,7 +353,7 @@ class SchemaDetector:
             val = None
         results.append(SchemaFieldResult(
             field="brand", present=has_brand, value=val,
-            note="" if has_brand else "Missing — AI may not associate with brand"
+            note="" if has_brand else "Add '\"brand\": {\"@type\": \"Brand\", \"name\": \"Your Brand\"}' to JSON-LD"
         ))
 
         # aggregateRating
@@ -362,7 +362,7 @@ class SchemaDetector:
         results.append(SchemaFieldResult(
             field="aggregateRating", present=has_agg,
             value=f"{agg.get('ratingValue')}/5 ({agg.get('reviewCount', '?')} reviews)" if has_agg else None,
-            note="" if has_agg else "Missing — affects AI trust signal"
+            note="" if has_agg else "Add '\"aggregateRating\": {\"ratingValue\": \"4.5\", \"reviewCount\": \"100\"}' to JSON-LD (boosts AI trust)"
         ))
 
         # review
@@ -373,7 +373,7 @@ class SchemaDetector:
         results.append(SchemaFieldResult(
             field="review", present=has_review,
             value=f"{len(reviews)} structured review(s)" if has_review else None,
-            note="" if has_review else "Missing — AI prefers products with structured reviews"
+            note="" if has_review else "Add '\"review\": [{\"@type\": \"Review\", \"reviewBody\": \"...\", \"author\": {...}}]' to JSON-LD"
         ))
 
         # sku
@@ -381,7 +381,7 @@ class SchemaDetector:
         results.append(SchemaFieldResult(
             field="sku", present=has,
             value=product_data.get("sku", "") if has else None,
-            note="" if has else "Missing — harder for AI to identify exact product"
+            note="" if has else "Add '\"sku\": \"SKU-12345\"' so AI can identify your exact product variant"
         ))
 
         # gtin (UPC/EAN)
@@ -390,7 +390,7 @@ class SchemaDetector:
         results.append(SchemaFieldResult(
             field="gtin", present=has,
             value=gtin if has else None,
-            note="" if has else "Missing — AI cannot match with external databases"
+            note="" if has else "Add '\"gtin\": \"0123456789012\"' (UPC/EAN) so AI can cross-reference your product"
         ))
 
         # itemCondition
@@ -398,7 +398,7 @@ class SchemaDetector:
         results.append(SchemaFieldResult(
             field="itemCondition", present=has,
             value=product_data.get("itemCondition", "") if has else None,
-            note="" if has else "Missing — new/used not structured"
+            note="" if has else "Add '\"itemCondition\": \"https://schema.org/NewCondition\"' to your JSON-LD"
         ))
 
         # availability
@@ -407,7 +407,7 @@ class SchemaDetector:
         results.append(SchemaFieldResult(
             field="availability", present=bool(val),
             value=val if val else None,
-            note="" if val else "Missing — AI cannot tell if product is in stock"
+            note="" if val else "Add '\"availability\": \"https://schema.org/InStock\"' so AI shows stock status"
         ))
 
         # shippingDetails
@@ -415,40 +415,44 @@ class SchemaDetector:
         results.append(SchemaFieldResult(
             field="shippingDetails", present=has,
             value=None,
-            note="" if has else "Missing — AI cannot extract shipping info"
+            note="" if has else "Add '\"shippingDetails\": {\"shippingRate\": {\"shippingDestination\": {...}}}' to JSON-LD"
         ))
 
         return results
 
     def _score_content(
-        self, soup: BeautifulSoup, product_data: dict
+        self, soup: BeautifulSoup, product_data: dict, schema_field_count: int = 0
     ) -> tuple[int, list[str]]:
-        score = 50  # baseline
+        # Schema completeness: 40% of total score
+        schema_score = min(40, schema_field_count * 40 // 12)
+        # Content quality: 60% of total score
+        content_score = 30  # baseline
+
         issues = []
 
         # Description in Schema
         desc = product_data.get("description", "")
         if len(desc) >= 200:
-            score += 15
+            content_score += 10
         elif len(desc) >= 100:
-            score += 8
+            content_score += 5
         else:
-            issues.append("Product description too short (<100 chars in Schema)")
+            issues.append("Product description too short (<100 chars in Schema) — add a detailed 200+ char description to your JSON-LD")
 
         # Meta description
         meta_desc = soup.find("meta", attrs={"name": "description"})
         if meta_desc and meta_desc.get("content"):
             if len(meta_desc["content"]) >= 120:
-                score += 5
+                content_score += 5
         else:
-            issues.append("Missing meta description")
+            issues.append("Missing meta description — add <meta name='description' content='...'> to your <head>")
 
         # H1
         h1 = soup.find("h1")
         if h1:
-            score += 5
+            content_score += 5
         else:
-            issues.append("Missing H1 tag")
+            issues.append("Missing H1 tag — add a clear product title as <h1>")
 
         # Image alt text
         imgs = soup.find_all("img", src=True)
@@ -456,32 +460,30 @@ class SchemaDetector:
         if imgs:
             alt_ratio = imgs_with_alt / len(imgs)
             if alt_ratio > 0.8:
-                score += 10
+                content_score += 5
             elif alt_ratio > 0.5:
-                score += 5
+                content_score += 3
             else:
-                issues.append(f"Only {imgs_with_alt}/{len(imgs)} images have alt text")
+                issues.append(f"Only {imgs_with_alt}/{len(imgs)} images have alt text — add alt='...' to product images")
         else:
             issues.append("No images found on page")
 
         # FAQ presence
-        faq_elements = soup.find_all(
-            class_=re.compile(r'faq|question|accordion', re.I)
-        )
+        faq_elements = soup.find_all(class_=re.compile(r'faq|question|accordion', re.I))
         if faq_elements:
-            score += 10
+            content_score += 5
         else:
-            issues.append("No FAQ section — FAQs boost AI recommendation probability ~40%")
+            issues.append("No FAQ section — add FAQPage JSON-LD schema to boost AI recommendation rates ~40%")
 
         # Word count
         text = soup.get_text(separator=" ", strip=True)
         words = len(text.split())
         if words > 500:
-            score += 5
+            content_score += 5
         elif words < 200:
-            issues.append(f"Too little content ({words} words), AI has insufficient context")
+            issues.append(f"Too little content ({words} words) — AI needs at least 500 words to understand your product")
 
-        return min(score, 100), issues
+        return min(schema_score + content_score, 100), issues
 
     # ── Site-level audit ──
 
