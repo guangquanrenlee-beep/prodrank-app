@@ -55,9 +55,12 @@ export default function DashboardPage() {
 
   // Load sites on mount + when user changes
   useEffect(() => {
-    if (user) loadSites(user.id);
-    const last = localStorage.getItem("prodrank_last_domain");
-    if (last && !domain) setDomain(last);
+    if (user) {
+      loadSites(user.id);
+      const key = `prodrank_last_domain_${user.id}`;
+      const last = localStorage.getItem(key);
+      if (last && !domain) setDomain(last);
+    }
   }, [user]);
 
   const loadSites = async (uid: string) => {
@@ -150,7 +153,7 @@ export default function DashboardPage() {
         const sd: ScoreData = await scoreRes.json();
         setScore(sd);
         setDomain(cleanDomain);
-        localStorage.setItem("prodrank_last_domain", cleanDomain);
+        localStorage.setItem(`prodrank_last_domain_${user.id}`, cleanDomain);
 
         // Save FULL score data including breakdown
         await saveScoreToDB(cleanDomain, sd);

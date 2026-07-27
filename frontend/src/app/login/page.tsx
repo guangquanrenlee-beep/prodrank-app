@@ -70,7 +70,7 @@ export default function LoginPage() {
             {error && <p className="text-red-400 text-xs text-center">{error}</p>}
             <div className="flex justify-between text-xs">
                <button type="button" onClick={handleMagicLink} className="text-zinc-500 hover:text-emerald-400 transition">Send magic link instead</button>
-               <Link href="/signup" className="text-emerald-400 hover:text-emerald-300">Create account</Link>
+               <span className="text-zinc-700 cursor-not-allowed select-none" title="Closed beta">Create account</span>
             </div>
           </form>
         )}

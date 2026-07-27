@@ -23,9 +23,9 @@ const USE_CASES = [
 ];
 
 const PRICING = [
-  { name: "Free", price: "$0", period: "", cta: "Get Started", href: "/signup", features: ["1 site audit", "3 product audits", "Basic Schema check", "AI visibility quick scan"], featured: false },
-  { name: "Pro", price: "$79", period: "/mo", cta: "Start Free Trial", href: "/signup", features: ["Unlimited site audits", "50 product audits/mo", "20 keyword AI tracking", "Shopify/WP/inject.js", "Schema optimization", "14-day trial"], featured: true },
-  { name: "Growth", price: "$199", period: "/mo", cta: "Start Free Trial", href: "/signup", features: ["Everything in Pro", "100 keyword tracking", "Competitor comparison", "Citation tracking", "Reason Engine", "Entity intelligence"], featured: false },
+  { name: "Free", price: "$0", period: "", cta: "Get Started", href: "#", features: ["1 site audit", "3 product audits", "Basic Schema check", "AI visibility quick scan"], featured: false },
+  { name: "Pro", price: "$79", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Unlimited site audits", "50 product audits/mo", "20 keyword AI tracking", "Shopify/WP/inject.js", "Schema optimization", "14-day trial"], featured: true },
+  { name: "Growth", price: "$199", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Everything in Pro", "100 keyword tracking", "Competitor comparison", "Citation tracking", "Reason Engine", "Entity intelligence"], featured: false },
   { name: "Agency", price: "$499", period: "/mo", cta: "Contact Us", href: "mailto:sales@prodrank.app", features: ["Everything in Growth", "500 keyword tracking", "Multi-brand", "API access", "White-label", "Dedicated support"], featured: false },
 ];
 
@@ -68,6 +68,7 @@ export default function HomePage() {
     e.preventDefault(); if (!domain.trim()) return;
     setLoading(true);
     const d = domain.trim().replace(/^https?:\/\//, "").split("/")[0];
+    if (user) localStorage.setItem(`prodrank_last_domain_${user.id}`, d);
     localStorage.setItem("prodrank_last_domain", d);
     router.push(`/analytics?domain=${encodeURIComponent(d)}`);
   };
@@ -100,8 +101,8 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-              <Link href="/login" className="text-zinc-400 hover:text-zinc-200 transition">Sign in</Link>
-              <Link href="/signup" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition">Get started free</Link>
+              <Link href="/login" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition">Sign in</Link>
+              <span className="px-4 py-2 bg-zinc-800 text-zinc-600 rounded-lg text-sm cursor-not-allowed select-none" title="Closed beta — new signups temporarily disabled">Get started free</span>
             </>
           )}
         </div>
@@ -209,7 +210,7 @@ export default function HomePage() {
                     {tier.features.map(f => <li key={f} className="text-sm text-zinc-400 flex items-start gap-2"><span className="text-emerald-400 mt-0.5 shrink-0">✓</span>{f}</li>)}
                   </ul>
                 </div>
-                <Link href={tier.href} className={`block text-center py-2 rounded-lg text-sm font-medium transition ${tier.featured ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"}`}>{tier.cta}</Link>
+                <span className="block text-center py-2 rounded-lg text-sm font-medium bg-zinc-800 text-zinc-600 cursor-not-allowed select-none" title="Closed beta — signups temporarily disabled">{tier.cta}</span>
               </div>
             ))}
           </div>
@@ -267,7 +268,7 @@ export default function HomePage() {
       <section className="border-t border-zinc-800 py-16 text-center space-y-4">
         <h2 className="text-3xl font-bold text-white">Ready to be seen by AI?</h2>
         <p className="text-zinc-400">Free for your first 3 products. No credit card.</p>
-        <Link href="/signup" className="inline-block px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition text-lg">Get started free →</Link>
+        <span className="inline-block px-8 py-3 bg-zinc-800 text-zinc-600 rounded-lg font-medium text-lg cursor-not-allowed select-none" title="Closed beta — new signups temporarily disabled">Get started free (Closed Beta)</span>
       </section>
     </main>
   );
