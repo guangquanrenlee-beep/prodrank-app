@@ -332,7 +332,7 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <div className="text-xs text-zinc-500 capitalize">
-                        {s.platform || (mode === "saas" ? "SaaS Site" : "Web Store")}
+                        {(s.platform && s.platform !== "unknown") ? s.platform : (isSaaS ? "SaaS Site" : "Web Store")}
                         {s.score_data?.analyzed_at && <span className="ml-2 text-zinc-600">· {timeAgo(s.score_data.analyzed_at)}</span>}
                         {s.last_ping_at && <span className="ml-2 text-zinc-600">· Ping: {timeAgo(s.last_ping_at)}</span>}
                       </div>
