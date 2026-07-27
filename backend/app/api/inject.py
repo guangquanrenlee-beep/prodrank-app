@@ -60,10 +60,8 @@ async def serve_inject_saas_js():
     )
 
 
-@router.post("/ping")
-async def receive_audit_ping(request: Request):
-    """Receive silent audit pings from sites using inject.js/inject-saas.js.
-    Records which sites have Schema injected and updates inject status in DB."""
+async def _handle_ping(request: Request):
+    """Shared ping handler for both /api/ping and legacy /api/inject/ping."""
     try:
         body = await request.json()
     except Exception:
@@ -87,3 +85,15 @@ async def receive_audit_ping(request: Request):
         print(f"[ProdRank] {site} — {product} — already has Schema, skipped")
 
     return {"status": "ok"}
+
+
+@router.post("/ping")
+async def receive_audit_ping(request: Request):
+    """Receive silent audit pings from sites using inject.js/inject-saas.js (v2 URL)."""
+    return await _handle_ping(request)
+
+
+@router.post("/inject/ping")
+async def receive_audit_ping_legacy(request: Request):
+    """Legacy compatibility: v1 inject scripts pinged to /api/inject/ping."""
+    return await _handle_ping(request)
