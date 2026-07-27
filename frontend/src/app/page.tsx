@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { TOOLS } from "@/lib/content";
 
 const FEATURES = [
   { icon: "🔍", title: "Schema Audit", desc: "12-field JSON-LD check across every product page. See exactly what AI crawlers see." },
@@ -169,6 +170,23 @@ export default function HomePage() {
               <h3 className="font-semibold text-zinc-200 mb-1">{uc.title}</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">{uc.desc}</p>
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ===== Free Tools ===== */}
+      <section className="max-w-6xl mx-auto px-4 pb-20">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-white">Free AI Tools</h2>
+          <p className="text-zinc-400 mt-2">6 free tools to check your AI visibility. No sign-up required. 3 uses per day.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {TOOLS.map(tool => (
+            <a key={tool.slug} href={`/tools/${tool.slug}`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-5 transition group">
+              <div className="text-2xl mb-2">{tool.icon}</div>
+              <h3 className="font-semibold text-zinc-200 group-hover:text-emerald-400 transition">{tool.title}</h3>
+              <p className="text-xs text-zinc-500 mt-1">{tool.desc}</p>
+            </a>
           ))}
         </div>
       </section>

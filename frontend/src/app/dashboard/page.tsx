@@ -9,6 +9,7 @@ interface CMSData { domain: string; platform: string; confidence: number; recomm
 interface ScoreData { ai_visibility_score: number; label: string; breakdown: Record<string, { score: number; weight: number }>; recommendation: string; analyzed_at?: string; }
 
 const NAV = [
+  { label: "🏠 Home", href: "/", icon: "" },
   { label: "Dashboard", href: "/dashboard", icon: "📊", active: true },
   { label: "Products", href: "/products", icon: "📦" },
   { label: "AI Visibility", href: "/visibility", icon: "👁" },
@@ -25,6 +26,7 @@ const NAV = [
   { label: "AI Timeline", href: "/timeline", icon: "🕐" },
   { label: "Reports", href: "/reports", icon: "📋" },
   { label: "Integrations", href: "/integrations", icon: "🔌" },
+  { label: "Free Tools", href: "/tools/schema-validator", icon: "🛠️" },
   { label: "Settings", href: "/settings", icon: "⚙️" },
 ];
 

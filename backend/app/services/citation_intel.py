@@ -91,13 +91,19 @@ class CitationEngine:
 
         for line in raw_response.split("\n"):
             line = line.strip().lower()
-            if not line or " " in line:
+            if not line:
                 continue
+            # Strip common list formatting: "1.", "1)", "-", "*", "•"
+            line = re.sub(r'^[\d]+[\.\)]\s*', '', line)
+            line = re.sub(r'^[-*•]\s*', '', line)
             # Remove common artifacts (brackets, quotes — NOT dots)
             for ch in ",;:()[]<>\"'":
                 line = line.replace(ch, "")
             # Strip trailing dots/commas from the END only
             line = line.rstrip(".,;: ")
+            # If line still has spaces after cleanup, it's a sentence, not a domain
+            if " " in line:
+                continue
             if not line or len(line) < 6:
                 continue
             # Auto-complete .com for bare names like "rtings"
@@ -223,20 +229,24 @@ class CitationEngine:
 
         all_sources = []
         agents = [
-            ("chatgpt", self.model),
-            ("gemini", self.model),
+            ("chatgpt", "google/gemini-3.6-flash"),
+            ("gemini", "anthropic/claude-haiku-4.5"),
         ]
 
         async def query_agent(agent_name: str, model: str, combined_kws: str):
             prompt = (
-                f"For these product categories: {combined_kws}\n"
-                f"Name exactly 5 authoritative review websites. Output ONLY the full domain, "
-                f"one per line. Example output:\nrtings.com\nsoundguys.com\nwhathifi.com"
+                f"You are an expert product reviewer. A user wants to know which websites are the most "
+                f"authoritative and trusted sources for product reviews and buying guides in this category: {combined_kws}.\n\n"
+                f"Think about real websites that actually exist and are well-known for reviewing these products. "
+                f"Even if you're not 100% sure they review this exact category, list sites that are commonly "
+                f"cited by consumers and experts for product advice.\n\n"
+                f"Output ONLY domain names, one per line. Do NOT use numbers or bullets. Example:\n"
+                f"rtings.com\nwirecutter.com"
             )
             try:
                 resp = await self.client.chat.completions.create(
                     model=model, messages=[{"role": "user", "content": prompt}],
-                    temperature=0.3, max_tokens=600, timeout=30.0,
+                    temperature=0.6, max_tokens=600, timeout=30.0,
                 )
                 raw = resp.choices[0].message.content or ""
                 citations = self.extract_citations(raw, agent_name, combined_kws, category)
