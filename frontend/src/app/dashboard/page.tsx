@@ -255,7 +255,7 @@ export default function DashboardPage() {
                 )}
                 <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
                 {cms && (
-                  <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full capitalize">{cms.platform}</span>
+                  <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full capitalize">{cms.platform === "unknown" && isSaaS ? "SaaS Site" : cms.platform}</span>
                 )}
                 {lastAnalyzed && (
                   <span className="text-xs text-zinc-600">Analyzed {timeAgo(lastAnalyzed)}</span>
@@ -332,7 +332,7 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <div className="text-xs text-zinc-500 capitalize">
-                        {s.platform || "unknown"}
+                        {s.platform || (mode === "saas" ? "SaaS Site" : "Web Store")}
                         {s.score_data?.analyzed_at && <span className="ml-2 text-zinc-600">· {timeAgo(s.score_data.analyzed_at)}</span>}
                         {s.last_ping_at && <span className="ml-2 text-zinc-600">· Ping: {timeAgo(s.last_ping_at)}</span>}
                       </div>
