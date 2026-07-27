@@ -30,7 +30,7 @@ const PRICING = [
 
 const FAQS = [
   { q: "What can I do for free?", a: "You get 1 full site audit plus 3 product audits per day — including AI visibility score, Schema check, and basic ranking. No credit card needed." },
-  { q: "How do I connect my store?", a: "Shopify: install our official App. WooCommerce: upload our plugin. Any other platform: paste one line of JavaScript (<code>inject.js</code>). No developer needed." },
+  { q: "How do I connect my store?", a: 'Shopify: install our <a href="/integrations" class="text-emerald-400 hover:text-emerald-300 underline">official App</a>. WooCommerce: upload our <a href="/wordpress" class="text-emerald-400 hover:text-emerald-300 underline">plugin</a>. Any other platform: paste one line of <a href="/inject-guide" class="text-emerald-400 hover:text-emerald-300 underline">inject.js</a>. No developer needed.' },
   { q: "How often do AI recommendations update?", a: "AI agent rankings can shift weekly as models retrain and new content is indexed. Pro and Growth plans include automated daily tracking so you never miss a change." },
   { q: "What if I'm not satisfied?", a: "All paid plans come with a 14-day money-back guarantee. Email support@prodrank.app and we'll refund you — no questions asked." },
   { q: "How is this different from SEO tools?", a: "SEO tools optimize for Google's algorithm. We optimize for AI agents. You can rank #1 on Google and still be invisible to ChatGPT, Gemini, or Claude. We fix that gap." },

@@ -99,10 +99,10 @@ function AnalyticsContent() {
 
       {/* Quick actions bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Link href={`/optimize`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 text-center transition"><div className="text-xl mb-1">🔧</div><div className="text-xs font-medium text-zinc-200">Auto-Fix Schema</div></Link>
+        <Link href={`/optimize?domain=${encodeURIComponent(domain)}`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 text-center transition"><div className="text-xl mb-1">🔧</div><div className="text-xs font-medium text-zinc-200">Auto-Fix Schema</div></Link>
+        <Link href={`/audit/site?domain=${encodeURIComponent(domain)}`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 text-center transition"><div className="text-xl mb-1">🏪</div><div className="text-xs font-medium text-zinc-200">Full Site Audit</div></Link>
         <Link href={`/monitoring`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 text-center transition"><div className="text-xl mb-1">📡</div><div className="text-xs font-medium text-zinc-200">Track Rankings</div></Link>
-        <Link href={`/compare`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 text-center transition"><div className="text-xl mb-1">⚔️</div><div className="text-xs font-medium text-zinc-200">Compare Competitors</div></Link>
-        <Link href={`/cite`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 text-center transition"><div className="text-xl mb-1">📰</div><div className="text-xs font-medium text-zinc-200">Citation Intelligence</div></Link>
+        <Link href={`/verify`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 text-center transition"><div className="text-xl mb-1">📈</div><div className="text-xs font-medium text-zinc-200">Verify Impact</div></Link>
       </div>
     </div>)}
   </main>);

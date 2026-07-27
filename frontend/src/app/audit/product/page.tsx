@@ -144,6 +144,19 @@ function ProductAuditContent() {
         <p className="text-zinc-500 text-sm truncate">{data.url}</p>
       </div>
 
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-3">
+        <a href={`/optimize?url=${encodeURIComponent(data.url)}`} className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition text-sm">
+          🔧 Fix Schema Issues
+        </a>
+        <a href={`/verify`} className="flex items-center gap-2 px-5 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium rounded-lg transition text-sm">
+          📈 Verify After Fixing
+        </a>
+        <a href={`/inject-guide`} className="flex items-center gap-2 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-lg transition text-sm">
+          ⚡ Install inject.js
+        </a>
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
