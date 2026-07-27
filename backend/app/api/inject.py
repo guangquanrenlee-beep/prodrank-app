@@ -62,18 +62,24 @@ async def serve_inject_saas_js():
 
 @router.post("/ping")
 async def receive_audit_ping(request: Request):
-    """Receive silent audit pings from sites using inject.js.
-    Records which sites have Schema injected and which still need it."""
+    """Receive silent audit pings from sites using inject.js/inject-saas.js.
+    Records which sites have Schema injected and updates inject status in DB."""
     try:
         body = await request.json()
     except Exception:
         return {"status": "ignored"}
 
-    # In production: store ping data for analytics
-    # For now: log and acknowledge
     site = body.get("site", "unknown")
     has_schema = body.get("has_schema", False)
     product = body.get("product_name", "?")
+
+    # Persist inject status to Supabase
+    try:
+        from app.services.db import DB
+        db = DB()
+        db.update_inject_status(site, active=True)
+    except Exception:
+        pass
 
     if not has_schema:
         print(f"[ProdRank] {site} — {product} — Schema injected for first time")

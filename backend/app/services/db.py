@@ -48,6 +48,17 @@ class DB:
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", site_id).execute()
 
+    def update_inject_status(self, domain: str, active: bool = True):
+        """Update inject.js/inject-saas.js ping status for a site by domain."""
+        try:
+            self.client.table("sites").update({
+                "inject_active": active,
+                "last_ping_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("domain", domain).execute()
+        except Exception:
+            pass  # silently ignore — column might not exist yet
+
     # ── Products ──
 
     def save_product(self, site_id: str, title: str, url: str = "",

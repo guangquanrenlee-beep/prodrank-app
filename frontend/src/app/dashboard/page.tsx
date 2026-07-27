@@ -323,10 +323,18 @@ export default function DashboardPage() {
                     className={`bg-zinc-800/50 hover:bg-zinc-800 rounded-lg p-4 flex items-center justify-between transition border text-left ${s.domain === domain ? "border-emerald-700 ring-1 ring-emerald-700/50" : "border-transparent"}`}
                   >
                     <div>
-                      <div className="font-medium text-zinc-200">{s.domain}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-zinc-200">{s.domain}</span>
+                        {s.inject_active ? (
+                          <span className="text-xs text-emerald-400" title={`Last ping: ${new Date(s.last_ping_at).toLocaleString()}`}>● Active</span>
+                        ) : (
+                          <span className="text-xs text-zinc-600" title="Inject script not detected. Install inject.js or inject-saas.js.">○ Not tracked</span>
+                        )}
+                      </div>
                       <div className="text-xs text-zinc-500 capitalize">
                         {s.platform || "unknown"}
                         {s.score_data?.analyzed_at && <span className="ml-2 text-zinc-600">· {timeAgo(s.score_data.analyzed_at)}</span>}
+                        {s.last_ping_at && <span className="ml-2 text-zinc-600">· Ping: {timeAgo(s.last_ping_at)}</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
