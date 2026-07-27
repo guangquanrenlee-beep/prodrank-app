@@ -27,6 +27,8 @@ const NAV = [
   { label: "Reports", href: "/reports", icon: "📋" },
   { label: "Integrations", href: "/integrations", icon: "🔌" },
   { label: "Free Tools", href: "/tools/schema-validator", icon: "🛠️" },
+  { label: "SaaS Schema Audit", href: "/saas-audit", icon: "💻" },
+  { label: "SaaS Optimize", href: "/saas-optimize", icon: "🔧" },
   { label: "Settings", href: "/settings", icon: "⚙️" },
 ];
 
@@ -44,6 +46,7 @@ function timeAgo(iso: string): string {
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
+  const [mode, setMode] = useState<"ecommerce" | "saas">("ecommerce");
   const [domain, setDomain] = useState("");
   const [cms, setCms] = useState<CMSData | null>(null);
   const [score, setScore] = useState<ScoreData | null>(null);
@@ -60,8 +63,12 @@ export default function DashboardPage() {
       const key = `prodrank_last_domain_${user.id}`;
       const last = localStorage.getItem(key);
       if (last && !domain) setDomain(last);
+      const savedMode = localStorage.getItem("prodrank_dashboard_mode");
+      if (savedMode === "saas" || savedMode === "ecommerce") setMode(savedMode);
     }
   }, [user]);
+
+  const isSaaS = mode === "saas";
 
   const loadSites = async (uid: string) => {
     const { data } = await supabase
@@ -239,13 +246,14 @@ export default function DashboardPage() {
                 {domain ? (
                   <span>{domain} <span className="text-lg font-normal text-zinc-500">Dashboard</span></span>
                 ) : (
-                  "AI Shopping Index"
+                  isSaaS ? "AI Visibility Score" : "AI Shopping Index"
                 )}
               </h1>
               <div className="flex items-center gap-3 mt-1">
                 {domain && (
-                  <span className="text-sm text-zinc-400">AI Shopping Index</span>
+                  <span className="text-sm text-zinc-400">{isSaaS ? "AI Visibility Score" : "AI Shopping Index"}</span>
                 )}
+                <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
                 {cms && (
                   <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full capitalize">{cms.platform}</span>
                 )}
@@ -279,11 +287,23 @@ export default function DashboardPage() {
               <div className="text-5xl">👋</div>
               <h3 className="text-xl font-semibold text-white">Welcome to ProdRank!</h3>
               <p className="text-zinc-400 text-sm max-w-md mx-auto">
-                Enter your store domain above and we&apos;ll check if AI agents can see your products. Your store will be saved and ready every time you return.
+                {isSaaS
+                  ? "Enter your SaaS domain above and we'll check if AI agents know about your software. Your site will be saved and ready every time you return."
+                  : "Enter your store domain above and we'll check if AI agents can see your products. Your store will be saved and ready every time you return."
+                }
               </p>
               <div className="flex justify-center gap-3 pt-2">
-                <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Quick Start Guide →</Link>
-                <Link href="/pricing" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-lg transition">See Plans →</Link>
+                {isSaaS ? (
+                  <>
+                    <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Get inject-saas.js →</Link>
+                    <Link href="/knowledge-graph" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-lg transition">Knowledge Graph →</Link>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Quick Start Guide →</Link>
+                    <Link href="/pricing" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-lg transition">See Plans →</Link>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -292,8 +312,8 @@ export default function DashboardPage() {
           {sites.length > 0 && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-lg">Your Stores</h3>
-                <span className="text-xs text-zinc-500">{sites.length} store{sites.length > 1 ? "s" : ""}</span>
+                <h3 className="font-semibold text-lg">{isSaaS ? "Your Sites" : "Your Stores"}</h3>
+                <span className="text-xs text-zinc-500">{sites.length} site{sites.length > 1 ? "s" : ""}</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sites.map((s: any) => (
@@ -394,10 +414,21 @@ export default function DashboardPage() {
 
               {/* Quick actions */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <QuickAction icon="🔧" label="Auto-Fix Schema" href={`/optimize?url=${encodeURIComponent(`https://${domain}`)}`} />
-                <QuickAction icon="📡" label="Track Rankings" href={`/monitoring`} />
-                <QuickAction icon="⚔️" label="Compare Competitors" href={`/compare`} />
-                <QuickAction icon="📋" label="View Reports" href={`/reports`} />
+                {isSaaS ? (
+                  <>
+                    <QuickAction icon="💻" label="SaaS Schema Audit" href={`/saas-audit`} />
+                    <QuickAction icon="🔧" label="Generate Schema" href={`/saas-optimize`} />
+                    <QuickAction icon="🏆" label="AI Recommendations" href={`/rank`} />
+                    <QuickAction icon="📈" label="Verify Impact" href={`/verify`} />
+                  </>
+                ) : (
+                  <>
+                    <QuickAction icon="🔧" label="Auto-Fix Schema" href={`/optimize?url=${encodeURIComponent(`https://${domain}`)}`} />
+                    <QuickAction icon="📡" label="Track Rankings" href={`/monitoring`} />
+                    <QuickAction icon="⚔️" label="Compare Competitors" href={`/compare`} />
+                    <QuickAction icon="📋" label="View Reports" href={`/reports`} />
+                  </>
+                )}
               </div>
             </>
           )}

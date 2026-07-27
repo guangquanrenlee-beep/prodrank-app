@@ -34,9 +34,12 @@ export default function KnowledgeGraphPage() {
 
   // Load taxonomy on mount
   useEffect(() => {
-    fetch("/api/calculate/entity-taxonomy")
+    fetch("/api/entity-taxonomy")
       .then(r => r.json())
-      .then(d => { setTaxonomy(d.taxonomy || d); })
+      .then(d => {
+        const list = d?.taxonomy;
+        if (Array.isArray(list) && list.length > 0) setTaxonomy(list);
+      })
       .catch(() => {});
   }, []);
 
