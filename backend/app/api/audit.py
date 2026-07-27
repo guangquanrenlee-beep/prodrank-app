@@ -280,10 +280,12 @@ async def audit_saas(req: AuditProductRequest, request: Request):
     if len(body_text) < 300:
         issues.append("Page has very little text content — AI needs substance to evaluate")
 
+    schema_coverage = round(present_count / len(SAAS_FIELDS) * 100)
     content_score = min(100, max(0,
-        (30 if len(body_text) > 500 else len(body_text) // 17) +
-        (25 if has_software else 0) + (20 if has_org else 0) +
-        (15 if has_faq else 0) + (10 if len(desc) > 50 else 0)
+        (20 if len(body_text) > 500 else len(body_text) // 25) +
+        (15 if has_software else 0) + (15 if has_org else 0) +
+        (10 if has_faq else 0) + (10 if len(desc) > 50 else 0) +
+        (30 * present_count // len(SAAS_FIELDS))  # schema completeness weighted at 30%
     ))
 
     return {
@@ -300,16 +302,16 @@ async def audit_saas(req: AuditProductRequest, request: Request):
 
 def _saas_note(field: str) -> str:
     return {
-        "name": "AI needs to know your software's name to recommend it.",
-        "description": "Without a description, AI can't explain what your software does.",
-        "applicationCategory": "Tells AI which category (CRM, Accounting, etc.) — critical for matching.",
-        "operatingSystem": "Specify 'Web', 'Windows', 'Mac' etc.",
-        "url": "AI can't link users to your product.",
-        "offers.price": "Pricing helps AI compare and recommend.",
-        "offers.priceCurrency": "Currency needed for AI pricing display.",
-        "aggregateRating.ratingValue": "Ratings increase AI recommendation confidence.",
-        "aggregateRating.reviewCount": "Review count signals credibility.",
-        "screenshot": "Screenshot helps AI understand your UI.",
-        "featureList": "AI matches features against user queries.",
-        "datePublished": "Freshness signal — outdated software is less recommended.",
+        "name": "Add '\"name\": \"Your Software\"' to your SoftwareApplication JSON-LD.",
+        "description": "Add '\"description\": \"What your software does...\"' with 100+ chars to your JSON-LD.",
+        "applicationCategory": "Add '\"applicationCategory\": \"BusinessApplication\"' (pick from schema.org).",
+        "operatingSystem": "Add '\"operatingSystem\": \"Web\"' (or Windows/Mac/iOS/Android).",
+        "url": "Add '\"url\": \"https://yourdomain.com\"' matching your canonical URL.",
+        "offers.price": "Add '\"offers\": {\"@type\": \"Offer\", \"price\": \"29\"}' to your JSON-LD.",
+        "offers.priceCurrency": "Add '\"priceCurrency\": \"USD\"' inside your offers block.",
+        "aggregateRating.ratingValue": "Add '\"aggregateRating\": {\"ratingValue\": \"4.5\"}' with real rating.",
+        "aggregateRating.reviewCount": "Add '\"reviewCount\": \"120\"' inside the aggregateRating block.",
+        "screenshot": "Add '\"screenshot\": \"https://yoursite.com/screenshot.png\"' pointing to a real image URL.",
+        "featureList": "Add '\"featureList\": \"Feature A. Feature B. Feature C.\"' listing top 5-10 features.",
+        "datePublished": "Add '\"datePublished\": \"2024-01-15\"' with your software's original launch date.",
     }.get(field, "")
