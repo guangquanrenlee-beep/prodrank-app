@@ -49,15 +49,18 @@ class DB:
         }).eq("id", site_id).execute()
 
     def update_inject_status(self, domain: str, active: bool = True):
-        """Update inject.js/inject-saas.js ping status for a site by domain."""
+        """Update inject.js/inject-saas.js ping status for a site by domain.
+        If no site record exists yet, the ping is ignored (user must Analyze first)."""
         try:
-            self.client.table("sites").update({
+            result = self.client.table("sites").update({
                 "inject_active": active,
                 "last_ping_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }).eq("domain", domain).execute()
-        except Exception:
-            pass  # silently ignore — column might not exist yet
+            if not result.data:
+                print(f"[ProdRank] Ping from {domain} — no site record yet, skipping (user needs to Analyze in dashboard first)")
+        except Exception as e:
+            print(f"[ProdRank] Ping from {domain} — DB update failed: {e}")
 
     # ── Products ──
 
