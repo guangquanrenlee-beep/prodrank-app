@@ -61,7 +61,7 @@ def _get_user_id(request: Request) -> str | None:
         return None
     try:
         db = DB()
-        user = db.client.rpc("get_user_id_by_email", {"email": email}).execute()
+        user = db.client.rpc("get_user_id_by_email", {"p_email": email}).execute()
         if user.data:
             uid = user.data[0]
             if isinstance(uid, dict):

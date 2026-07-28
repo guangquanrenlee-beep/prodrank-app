@@ -167,7 +167,7 @@ def _get_user_id(request: Request) -> str | None:
             from app.services.db import DB
             db = DB()
             # Method 1: Try RPC (requires migration 007)
-            data = db.client.rpc("get_user_id_by_email", {"email": email}).execute()
+            data = db.client.rpc("get_user_id_by_email", {"p_email": email}).execute()
             user_id = (data.data or [None])[0]
             if isinstance(user_id, dict):
                 user_id = user_id.get("id") or user_id.get("user_id")
