@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -11,8 +11,20 @@ const AGENT_COLORS: Record<string, { color: string; icon: string }> = {
   grok: { color: "text-purple-400", icon: "⚡" },
 };
 
+const SAAS_DIRECTORIES = [
+  { name: "G2", url: "https://g2.com", why: "Largest B2B software marketplace — cited by AI for enterprise tool comparisons" },
+  { name: "Capterra", url: "https://capterra.com", why: "Gartner-owned — AI trusts it for SMB software recommendations" },
+  { name: "Product Hunt", url: "https://producthunt.com", why: "Launch platform — AI cites for new, innovative tools" },
+  { name: "Trustpilot", url: "https://trustpilot.com", why: "Consumer trust signal — AI uses ratings in recommendations" },
+  { name: "GetApp", url: "https://getapp.com", why: "Gartner's SMB platform — complementary to Capterra in AI citations" },
+  { name: "TrustRadius", url: "https://trustradius.com", why: "In-depth reviews — AI values detailed user experiences" },
+];
+
 export default function CitePage() {
   const { user, loading: authLoading } = useAuth();
+  const [domain, setDomain] = useState("");
+  const [mode, setMode] = useState<"saas" | "ecommerce">("ecommerce");
+  const isSaaS = mode === "saas";
   const [category, setCategory] = useState("");
   const [keywords, setKeywords] = useState("");
   const [data, setData] = useState<any>(null);
@@ -21,6 +33,16 @@ export default function CitePage() {
   const [chainUrl, setChainUrl] = useState("");
   const [chainData, setChainData] = useState<any>(null);
   const [chainLoading, setChainLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      const key = `prodrank_last_domain_${user.id}`;
+      const last = localStorage.getItem(key);
+      if (last) setDomain(last);
+      const savedMode = localStorage.getItem("prodrank_dashboard_mode");
+      if (savedMode === "saas" || savedMode === "ecommerce") setMode(savedMode);
+    }
+  }, [user]);
 
   const runReport = async () => {
     if (!category.trim()) return;
@@ -57,18 +79,33 @@ export default function CitePage() {
     <main className="min-h-screen max-w-5xl mx-auto px-4 py-10 space-y-8">
       <div>
         <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 text-sm">← Dashboard</Link>
-        <h1 className="text-3xl font-bold mt-1">Citation Intelligence</h1>
-        <p className="text-zinc-400 text-sm mt-1">Track which sources AI agents cite, who they trust, and how influence flows in your category.</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold mt-1">Citation Intelligence</h1>
+          <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full mt-1">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
+        </div>
+        <p className="text-zinc-400 text-sm mt-1">
+          {isSaaS
+            ? "Find out which review sites and directories AI agents cite when recommending software like yours."
+            : "Track which sources AI agents cite, who they trust, and how influence flows in your category."}
+        </p>
       </div>
 
       {/* Search */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-3">
         <div className="flex gap-3">
-          <input value={category} onChange={e => setCategory(e.target.value)} placeholder="Category (e.g. headphones)" className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          <input value={keywords} onChange={e => setKeywords(e.target.value)} placeholder="Price range or keywords (optional)" className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <input value={category} onChange={e => setCategory(e.target.value)}
+            placeholder={isSaaS ? "e.g. invoicing software, CRM tools" : "Category (e.g. headphones)"}
+            className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <input value={keywords} onChange={e => setKeywords(e.target.value)}
+            placeholder={isSaaS ? "e.g. cheap, small business, best" : "Price range or keywords (optional)"}
+            className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           <button onClick={runReport} disabled={loading || !category.trim()} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-medium rounded-lg transition">{loading ? "Scanning..." : "Scan"}</button>
         </div>
-        <p className="text-xs text-zinc-600">We ask ChatGPT and Gemini which sources they consider authoritative. Results show what AI agents trust in this category.</p>
+        <p className="text-xs text-zinc-600">
+          {isSaaS
+            ? "We ask ChatGPT and Gemini which sources they trust for software recommendations. Use this to identify which directories you need to be listed on."
+            : "We ask ChatGPT and Gemini which sources they consider authoritative. Results show what AI agents trust in this category."}
+        </p>
       </div>
 
       {/* Source Influence */}
@@ -181,15 +218,33 @@ export default function CitePage() {
         )}
       </div>
 
-      {/* No results */}
+      {/* No results */ }
       {!loading && !data && !influence && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center space-y-4">
           <div className="text-5xl">📰</div>
-          <h3 className="text-lg font-semibold text-zinc-300">Discover who AI trusts in your category</h3>
+          <h3 className="text-lg font-semibold text-zinc-300">
+            {isSaaS ? "Get cited by AI when users ask about software" : "Discover who AI trusts in your category"}
+          </h3>
           <p className="text-sm text-zinc-500 max-w-md mx-auto">
-            Enter a product category and optional price range above. We&apos;ll ask ChatGPT and Gemini which review sites
-            and sources they consider authoritative — revealing exactly where you need to be featured to get AI recommendations.
+            {isSaaS
+              ? `Enter your software category above (e.g. "invoicing software") and we'll show you exactly which review sites AI agents cite. Then get listed on those sites.`
+              : "Enter a product category and optional price range above. We'll ask ChatGPT and Gemini which review sites and sources they consider authoritative."}
           </p>
+
+          {isSaaS && (
+            <div className="max-w-lg mx-auto pt-4">
+              <div className="text-xs font-medium text-zinc-500 mb-3 uppercase text-left">📋 Key directories to get listed on:</div>
+              <div className="grid grid-cols-2 gap-2">
+                {SAAS_DIRECTORIES.map(d => (
+                  <a key={d.name} href={d.url} target="_blank" rel="noopener"
+                    className="text-left bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 rounded-lg p-3 transition group">
+                    <div className="text-sm font-medium text-zinc-200 group-hover:text-emerald-400">{d.name}</div>
+                    <div className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{d.why}</div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </main>

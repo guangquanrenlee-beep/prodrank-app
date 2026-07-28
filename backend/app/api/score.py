@@ -49,9 +49,8 @@ async def calculate_score(req: ScoreRequest, request: Request):
         citation_count=len(rank_data.get("all_cited_sources", [])) if rank_data else 0,
     )
 
-    return {
-        "url": req.url,
-        "title": audit.title,
+    result = {
+        "url": req.url, "title": audit.title,
         "ai_visibility_score": score.overall,
         "label": score.label,
         "breakdown": {
@@ -64,6 +63,28 @@ async def calculate_score(req: ScoreRequest, request: Request):
         },
         "recommendation": score.recommendation,
     }
+
+    # Save snapshot for trend tracking
+    try:
+        from app.services.db import DB
+        db = DB()
+        # Find existing site
+        sites = db.client.table("sites").select("id,user_id").eq("domain", req.url.replace("https://", "").replace("http://", "").split("/")[0]).execute().data
+        if sites:
+            site = sites[0]
+            db.client.table("score_snapshots").insert({
+                "site_id": site["id"],
+                "user_id": site["user_id"],
+                "domain": req.url.replace("https://", "").replace("http://", "").split("/")[0],
+                "ai_visibility_score": score.overall,
+                "breakdown": result["breakdown"],
+                "label": score.label,
+                "recommendation": score.recommendation,
+            }).execute()
+    except Exception:
+        pass  # silently skip if snapshots table doesn't exist yet
+
+    return result
 
 
 @router.get("/entity-taxonomy")
@@ -133,6 +154,134 @@ async def question_library(
     # List all categories
     stats = qlib.stats()
     return {"categories": stats["largest_categories"], **stats}
+
+
+@router.get("/history")
+async def score_history(domain: str = Query(default=""), days: int = Query(default=30)):
+    """Get score trend history for a domain. Returns daily snapshots for charting."""
+    if not domain:
+        return {"snapshots": [], "trend": "flat"}
+    try:
+        from app.services.db import DB
+        db = DB()
+        snapshots = db.client.table("score_snapshots") \
+            .select("snapshot_date,ai_visibility_score,label") \
+            .eq("domain", domain) \
+            .gte("snapshot_date", f"now()-{days}d") \
+            .order("snapshot_date", desc=False) \
+            .limit(days) \
+            .execute().data or []
+
+        scores = [s["ai_visibility_score"] for s in snapshots]
+        trend = "flat"
+        if len(scores) >= 2:
+            first_week = sum(scores[:min(7, len(scores))]) / min(7, len(scores))
+            last_week = sum(scores[-min(7, len(scores)):]) / min(7, len(scores))
+            diff = last_week - first_week
+            trend = "up" if diff > 3 else "down" if diff < -3 else "flat"
+            if len(scores) >= 3:
+                yesterday = scores[-2] if len(scores) >= 2 else scores[0]
+                today = scores[-1]
+                trend = "up" if today > yesterday else "down" if today < yesterday else trend
+
+        return {
+            "domain": domain,
+            "snapshots": [{"date": s["snapshot_date"], "score": s["ai_visibility_score"], "label": s.get("label", "")} for s in snapshots],
+            "trend": trend,
+            "latest": scores[-1] if scores else None,
+            "change": scores[-1] - scores[0] if len(scores) >= 2 else 0,
+        }
+    except Exception:
+        return {"snapshots": [], "trend": "flat", "error": "History not available yet"}
+
+
+class CompetitorRequest(BaseModel):
+    domain: str
+    name: str = ""
+
+@router.post("/competitors/detect")
+async def detect_competitors(req: CompetitorRequest):
+    """Use AI to detect real competitors for a SaaS product."""
+    from openai import AsyncOpenAI
+    from app.core.config import get_settings
+    settings = get_settings()
+    client = AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+
+    prompt = f"""List the top 5 software competitors of "{req.name or req.domain}". These are tools that customers compare or switch between.
+Return a JSON array of objects with: name, domain (just the domain, not full URL), why (one sentence why they compete).
+Example: [{{"name":"FreshBooks","domain":"freshbooks.com","why":"Direct competitor in small business invoicing and bookkeeping"}}]
+Return ONLY the JSON array, no other text."""
+
+    try:
+        resp = await client.chat.completions.create(
+            model="google/gemini-3.6-flash",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3, max_tokens=800, timeout=15.0,
+        )
+        import json
+        competitors = json.loads(resp.choices[0].message.content)
+        return {"domain": req.domain, "competitors": competitors}
+    except Exception:
+        return {"domain": req.domain, "competitors": []}
+
+@router.post("/competitors/compare")
+async def compare_competitors(req: CompetitorRequest):
+    """Compare your site vs competitors on key SaaS metrics."""
+    import httpx, json
+    from bs4 import BeautifulSoup
+
+    competitors = []
+    # First detect competitors
+    names = [req.name or req.domain]
+    domains_to_check = [req.domain]
+
+    try:
+        detect = await detect_competitors(req)
+        for c in (detect.get("competitors") or [])[:4]:
+            names.append(c.get("name", ""))
+            domains_to_check.append(c.get("domain", ""))
+    except Exception:
+        pass
+
+    results = []
+    for i, d in enumerate(domains_to_check):
+        try:
+            url = f"https://{d}" if not d.startswith("http") else d
+            resp = httpx.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; ProdRank/1.0)"}, follow_redirects=True, timeout=12)
+            soup = BeautifulSoup(resp.text, "lxml")
+            text = soup.get_text()
+
+            # Check schema
+            scripts = soup.find_all("script", type="application/ld+json")
+            has_software = False; has_org = False; has_faq = False; field_count = 0
+            for s in scripts:
+                try:
+                    data = json.loads(s.string or "{}")
+                    items = data if isinstance(data, list) else [data]
+                    if isinstance(data, dict) and "@graph" in data: items = data["@graph"]
+                    for item in items:
+                        t = item.get("@type", "") if isinstance(item, dict) else ""
+                        if t == "SoftwareApplication": has_software = True; field_count = len([k for k in item if k not in ("@context","@type")])
+                        elif t == "Organization": has_org = True
+                        elif t == "FAQPage": has_faq = True
+                except: pass
+
+            # Quick score estimate
+            est_score = min(85, (20 if has_software else 0) + (15 if has_org else 0) + (10 if has_faq else 0) +
+                           (len(text.split()) // 50 if len(text.split()) > 200 else 0) + (field_count * 3))
+
+            results.append({
+                "name": names[i] if i < len(names) else d,
+                "domain": d, "is_you": i == 0,
+                "has_software_schema": has_software, "has_org_schema": has_org, "has_faq_schema": has_faq,
+                "schema_fields": field_count,
+                "word_count": len(text.split()),
+                "estimated_score": est_score,
+            })
+        except Exception:
+            results.append({"name": names[i] if i < len(names) else d, "domain": d, "is_you": i == 0, "error": "Could not fetch"})
+
+    return {"your_domain": req.domain, "compared_at": __import__("datetime").datetime.now().isoformat(), "results": results}
 
 
 class AddQuestionsRequest(BaseModel):

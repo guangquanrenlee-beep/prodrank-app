@@ -1,61 +1,196 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+
+interface Competitor {
+  name: string; domain: string; is_you: boolean;
+  has_software_schema?: boolean; has_org_schema?: boolean; has_faq_schema?: boolean;
+  schema_fields?: number; word_count?: number; estimated_score?: number;
+  error?: string;
+}
 
 export default function ComparePage() {
-  const [url1, setUrl1] = useState("");
-  const [url2, setUrl2] = useState("");
-  const [url3, setUrl3] = useState("");
-  const [results, setResults] = useState<any[]>([]);
-  const [bestIdx, setBestIdx] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
+  return <Suspense fallback={<div className="p-10 text-zinc-400">Loading...</div>}><CompareContent /></Suspense>;
+}
 
-  const compare = async () => {
-    const urls = [url1, url2, url3].filter(u => u.trim());
-    if (urls.length < 2) return;
-    setLoading(true);
+function CompareContent() {
+  const params = useSearchParams();
+  const urlParam = params.get("domain") || "";
+  const { user, loading: authLoading } = useAuth();
+  const [domain, setDomain] = useState(urlParam);
+  const [results, setResults] = useState<Competitor[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [mode, setMode] = useState<"saas" | "ecommerce">("ecommerce");
+  const isSaaS = mode === "saas";
+
+  useEffect(() => {
+    if (user) {
+      if (!domain) {
+        const last = localStorage.getItem(`prodrank_last_domain_${user.id}`);
+        if (last) setDomain(last);
+      }
+      const savedMode = localStorage.getItem("prodrank_dashboard_mode");
+      if (savedMode === "saas" || savedMode === "ecommerce") setMode(savedMode);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (urlParam && !domain) setDomain(urlParam);
+  }, [urlParam]);
+
+  const runCompare = async () => {
+    if (!domain.trim()) return;
+    setLoading(true); setError("");
     try {
-      const res = await fetch("/api/audit/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ urls }) });
+      const clean = domain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
+      const res = await fetch("/api/score/competitors/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: clean, name: clean }),
+      });
+      if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setResults(data.products || []);
-      setBestIdx(data.best_index);
-    } catch {}
+      setResults(data.results || []);
+    } catch (err: any) {
+      setError(err.message || "Comparison failed");
+    }
     setLoading(false);
   };
 
+  const sc = (s: number) => s >= 70 ? "text-emerald-400" : s >= 40 ? "text-amber-400" : "text-red-400";
+  const sb = (s: number) => s >= 70 ? "bg-emerald-500" : s >= 40 ? "bg-amber-500" : "bg-red-500";
+
+  if (authLoading) return <main className="min-h-screen bg-zinc-950 flex items-center justify-center"><div className="animate-spin h-5 w-5 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full" /></main>;
+  if (!user) return <main className="min-h-screen bg-zinc-950 flex items-center justify-center"><div className="text-center space-y-4"><p className="text-zinc-400">Sign in to access</p><Link href="/login" className="text-emerald-400">Sign in →</Link></div></main>;
+
   return (
-    <main className="min-h-screen max-w-5xl mx-auto px-4 py-10 space-y-8">
-      <div>
-        <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 text-sm">← Dashboard</Link>
-        <h1 className="text-3xl font-bold mt-1">Competitor Comparison</h1>
-        <p className="text-zinc-400 text-sm mt-1">Compare your product pages against competitors side-by-side.</p>
-      </div>
-
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
-        <input value={url1} onChange={e => setUrl1(e.target.value)} placeholder="URL 1 (e.g. your product)" className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-        <input value={url2} onChange={e => setUrl2(e.target.value)} placeholder="URL 2 (competitor)" className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-        <input value={url3} onChange={e => setUrl3(e.target.value)} placeholder="URL 3 (optional)" className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-        <button onClick={compare} disabled={loading || !url1.trim() || !url2.trim()} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-medium rounded-lg transition">{loading ? "Comparing..." : "Compare"}</button>
-      </div>
-
-      {results.length >= 2 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {results.map((p, i) => (
-            <div key={i} className={`bg-zinc-900 border rounded-xl p-5 ${i === bestIdx ? "border-emerald-600 ring-1 ring-emerald-600/30" : "border-zinc-800"}`}>
-              {i === bestIdx && <span className="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full mb-2 inline-block">🏆 Best</span>}
-              <div className="text-sm font-medium text-zinc-200 truncate mb-3">{p.title || p.url?.split("/").pop()}</div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-zinc-500">Schema</span><span className={p.field_count >= 8 ? "text-emerald-400" : p.field_count >= 4 ? "text-yellow-400" : "text-red-400"}>{p.field_count || 0}/12</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Content</span><span className={(p.content_quality_score || 0) >= 60 ? "text-emerald-400" : (p.content_quality_score || 0) >= 30 ? "text-yellow-400" : "text-red-400"}>{p.content_quality_score || 0}/100</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">Schema?</span><span>{p.has_product_schema ? "✅" : "❌"}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-500">FAQ?</span><span>{p.has_faq_schema ? "✅" : "❌"}</span></div>
-              </div>
-              {p.content_issues?.length > 0 && <div className="mt-3 pt-3 border-t border-zinc-800"><div className="text-xs text-zinc-500 mb-1">Issues:</div>{p.content_issues.slice(0, 3).map((iss: string, j: number) => <div key={j} className="text-xs text-red-400">• {iss}</div>)}</div>}
-            </div>
-          ))}
+    <main className="min-h-screen bg-zinc-950">
+      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+        <div>
+          <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 text-sm">← Dashboard</Link>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold mt-1">⚔️ Competitor Monitor</h1>
+            <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full mt-1">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
+          </div>
+          <p className="text-zinc-400 text-sm mt-1">
+            {isSaaS
+              ? "We auto-detect your top 4 competitors using AI, then compare schema, content, and estimated AI visibility side by side."
+              : "Compare your product pages against competitors."}
+          </p>
         </div>
-      )}
+
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
+          <div className="flex gap-3">
+            <input
+              value={domain}
+              onChange={e => setDomain(e.target.value)}
+              placeholder="yourdomain.com"
+              className="flex-1 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            <button
+              onClick={runCompare}
+              disabled={loading || !domain.trim()}
+              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-medium rounded-lg transition whitespace-nowrap">
+              {loading ? "Analyzing…" : "⚔️ Compare vs Competitors"}
+            </button>
+          </div>
+          <p className="text-xs text-zinc-500">
+            {isSaaS
+              ? "AI will detect your top competitors, then we compare schema completeness, content depth, and estimated AI visibility scores."
+              : "Paste product URLs to compare schema and content quality."}
+          </p>
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+        </div>
+
+        {loading && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-20 text-center">
+            <div className="animate-spin h-8 w-8 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-zinc-400">Detecting competitors and analyzing their sites…</p>
+          </div>
+        )}
+
+        {results.length >= 2 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-500 text-xs">
+                  <th className="text-left py-3 px-4 font-medium">Site</th>
+                  <th className="text-center py-3 px-3 font-medium">AI Score (est.)</th>
+                  <th className="text-center py-3 px-3 font-medium">Schema Fields</th>
+                  <th className="text-center py-3 px-3 font-medium">Software?</th>
+                  <th className="text-center py-3 px-3 font-medium">Org?</th>
+                  <th className="text-center py-3 px-3 font-medium">FAQ?</th>
+                  <th className="text-center py-3 px-3 font-medium">Word Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((r, i) => (
+                  <tr key={i} className={`border-b border-zinc-800/50 ${r.is_you ? "bg-emerald-900/10" : ""}`}>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-zinc-200">{r.name}</span>
+                        {r.is_you && <span className="text-xs bg-emerald-900/50 text-emerald-400 px-1.5 py-0.5 rounded">You</span>}
+                      </div>
+                      <div className="text-xs text-zinc-500">{r.domain}</div>
+                      {r.error && <div className="text-xs text-red-400">{r.error}</div>}
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className={`font-bold ${sc(r.estimated_score || 0)}`}>{r.estimated_score ?? "—"}</span>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className={r.schema_fields ? sc(r.schema_fields * 10) : "text-zinc-600"}>{r.schema_fields ?? "—"}/12</span>
+                    </td>
+                    <td className="py-3 px-3 text-center">{r.has_software_schema ? "✅" : "❌"}</td>
+                    <td className="py-3 px-3 text-center">{r.has_org_schema ? "✅" : "❌"}</td>
+                    <td className="py-3 px-3 text-center">{r.has_faq_schema ? "✅" : "❌"}</td>
+                    <td className="py-3 px-3 text-center text-zinc-400">{(r.word_count || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Insights */}
+        {results.length >= 2 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {(() => {
+              const you = results.find(r => r.is_you);
+              const best = results.filter(r => !r.is_you && !r.error).sort((a, b) => (b.estimated_score || 0) - (a.estimated_score || 0))[0];
+              const worst = results.filter(r => !r.error).sort((a, b) => (a.estimated_score || 0) - (b.estimated_score || 0))[0];
+              return <>
+                {you && best && (
+                  <div className="bg-red-900/10 border border-red-800 rounded-xl p-5">
+                    <div className="text-xs text-red-400 font-medium mb-1">📉 Gap to Beat</div>
+                    <div className="text-lg font-bold text-red-400">{(best.estimated_score || 0) - (you.estimated_score || 0)} pts</div>
+                    <div className="text-xs text-zinc-500 mt-1">Behind {best.name} — add schema + content to close the gap</div>
+                  </div>
+                )}
+                <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-5">
+                  <div className="text-xs text-emerald-400 font-medium mb-1">🎯 Quick Wins</div>
+                  <div className="text-sm text-zinc-300">
+                    {results.filter(r => !r.has_software_schema).length > 0
+                      ? `${results.filter(r => !r.has_software_schema).length} competitors lack SoftwareApplication schema — you're ahead`
+                      : "All competitors have schema — improve your content to differentiate"}
+                  </div>
+                </div>
+                <div className="bg-blue-900/10 border border-blue-800 rounded-xl p-5">
+                  <div className="text-xs text-blue-400 font-medium mb-1">💡 What to Do</div>
+                  <div className="text-xs text-zinc-400">
+                    {isSaaS
+                      ? "1. Match the top schema count  2. Exceed their word count by 2x  3. Get listed on directories they're on"
+                      : "1. Match best schema coverage  2. Add FAQ if they have it  3. Write longer descriptions"}
+                  </div>
+                </div>
+              </>;
+            })()}
+          </div>
+        )}
+      </div>
     </main>
   );
 }
