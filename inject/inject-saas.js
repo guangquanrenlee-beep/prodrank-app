@@ -274,7 +274,7 @@
     // Check backend for optimized schema (from Auto-Fix)
     let optimizedSchema = null;
     try {
-      const checkRes = await fetch(API + "/saas/auto-fix?url=" + encodeURIComponent(location.href), {
+      const checkRes = await fetch(API + "/audit/saas/auto-fix?url=" + encodeURIComponent(location.href), {
         headers: { "Accept": "application/json" }
       });
       if (checkRes.ok) {

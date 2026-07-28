@@ -283,6 +283,32 @@ async def audit_saas(req: AuditProductRequest, request: Request):
     if len(body_text) < 300:
         issues.append("Page has very little text content — AI needs substance to evaluate")
 
+    # Check DB for Auto-Fix optimized schema — if present, use it for field counts
+    optimized = None
+    try:
+        from app.services.db import DB
+        db = DB()
+        opt_data = db.client.table("sites").select("optimized_schema").eq("domain", url.split("//")[-1].split("/")[0]).execute().data
+        if opt_data and opt_data[0].get("optimized_schema"):
+            optimized = opt_data[0]["optimized_schema"]
+            # Recalculate field counts from optimized schema
+            opt_present = 0
+            for field in SAAS_FIELDS:
+                if _is_present(optimized, field):
+                    opt_present += 1
+            # Use the higher of page vs optimized
+            if opt_present > present_count:
+                present_count = opt_present
+                # Add optimized-only fields to the fields list
+                for field in SAAS_FIELDS:
+                    if _is_present(optimized, field) and not any(f["field"] == field and f["present"] for f in fields):
+                        val = optimized.get(field.split(".")[0], "")
+                        if isinstance(val, dict):
+                            val = str(val.get(field.split(".")[-1], ""))
+                        fields.append({"field": field, "present": True, "value": str(val)[:100], "note": "✓ Auto-Fix optimized"})
+    except Exception:
+        pass
+
     schema_coverage = round(present_count / len(SAAS_FIELDS) * 100)
     content_score = min(100, max(0,
         (20 if len(body_text) > 500 else len(body_text) // 25) +

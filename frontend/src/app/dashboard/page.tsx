@@ -257,6 +257,7 @@ export default function DashboardPage() {
                   <>
                     <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">1. Install inject-saas.js →</Link>
                     <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">2. Analyze above ↑</span>
+                    <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">3. Auto-Fix ↓</span>
                   </>
                 ) : (
                   <>
@@ -280,8 +281,37 @@ export default function DashboardPage() {
           {score && (
             <>
 
+              {/* ===== POST-ANALYZE NEXT STEPS ===== */}
+              {isSaaS && scoreHistory.length < 2 && (
+                <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-5">
+                  <h3 className="font-semibold mb-3">✅ First analysis done. Here's what to do next:</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`}
+                      className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
+                      <div className="text-lg mb-1">🔧</div>
+                      <div className="text-sm font-medium text-emerald-400">1. Run Auto-Fix</div>
+                      <div className="text-xs text-zinc-400 mt-1">AI fills all 12 SoftwareApplication schema fields — instant, one click.</div>
+                    </Link>
+                    <button onClick={async () => {
+                      const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
+                      window.location.href = `/compare?domain=${encodeURIComponent(clean)}`;
+                    }}
+                      className="bg-blue-900/20 border border-blue-800 rounded-lg p-4 hover:border-blue-600 transition text-left">
+                      <div className="text-lg mb-1">⚔️</div>
+                      <div className="text-sm font-medium text-blue-400">2. Check Competitors</div>
+                      <div className="text-xs text-zinc-400 mt-1">AI auto-detects your top competitors and compares your scores.</div>
+                    </button>
+                    <div className="bg-zinc-800/30 border border-zinc-700 rounded-lg p-4">
+                      <div className="text-lg mb-1">✋</div>
+                      <div className="text-sm font-medium text-zinc-300">3. Register on directories</div>
+                      <div className="text-xs text-zinc-400 mt-1">G2, Capterra, Product Hunt — the checklist below.</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ===== THIS WEEK SUMMARY ===== */}
-              {isSaaS && (
+              {isSaaS && scoreHistory.length >= 2 && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold flex items-center gap-2"><span>📈</span> This Week</h3>
@@ -295,22 +325,21 @@ export default function DashboardPage() {
                         {scoreChange !== 0 ? (
                           <span className={`text-sm font-medium ${scoreChange > 0 ? "text-emerald-400" : "text-red-400"}`}>{scoreChange > 0 ? `▲ +${scoreChange}` : `▼ ${scoreChange}`}</span>
                         ) : (
-                          <span className="text-xs text-zinc-500">No change yet</span>
+                          <span className="text-xs text-zinc-500">No change</span>
                         )}
                       </div>
-                      {scoreHistory.length < 2 && <div className="text-xs text-zinc-600 mt-1">Analyze again tomorrow to see trend</div>}
                     </div>
                     <div className="bg-zinc-800/30 rounded-lg p-4">
-                      <div className="text-xs text-zinc-500 mb-1">{scoreHistory.length >= 2 ? "Biggest Mover" : "Top Priority"}</div>
+                      <div className="text-xs text-zinc-500 mb-1">Biggest Mover</div>
                       {hasBreakdown && dims.length > 0 ? <>
                         <div className="flex items-center gap-2"><span className={`text-2xl font-bold ${sc(dims[0][1].score)}`}>{dims[0][1].score}</span><span className="text-xs text-zinc-400">/100</span></div>
                         <div className="text-xs text-zinc-500 mt-0.5 capitalize">{dims[0][0].replace(/_/g, " ")}</div>
-                      </> : <div className="text-zinc-600 text-sm">Analyze to see</div>}
+                      </> : <div className="text-zinc-600 text-sm">N/A</div>}
                     </div>
                     <div className="bg-zinc-800/30 rounded-lg p-4">
-                      <div className="text-xs text-zinc-500 mb-1">Auto-Fix</div>
+                      <div className="text-xs text-zinc-500 mb-1">Schema</div>
                       <div className="flex items-center gap-2"><span className="text-emerald-400 font-bold">12/12</span><span className="text-xs text-emerald-400">fields</span></div>
-                      <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:underline mt-1 inline-block">View details →</Link>
+                      <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:underline mt-1 inline-block">Re-check →</Link>
                     </div>
                   </div>
                 </div>
@@ -507,24 +536,7 @@ export default function DashboardPage() {
 
               {/* ===== COMPETITOR MONITOR ===== */}
               {isSaaS && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold flex items-center gap-2"><span className="text-blue-400">⚔️</span> Competitor Monitor</h3>
-                    <Link href={`/compare?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:text-emerald-300">View full comparison →</Link>
-                  </div>
-                  <p className="text-xs text-zinc-500 mb-4">
-                    We auto-detect your top competitors using AI and compare their schema, content, and estimated AI visibility. Updated every time you Analyze.
-                  </p>
-                  <button
-                    onClick={async () => {
-                      if (!domain) return;
-                      const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
-                      window.location.href = `/compare?domain=${encodeURIComponent(clean)}`;
-                    }}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition">
-                    ⚔️ Run Competitor Analysis →
-                  </button>
-                </div>
+                <CompetitorMonitor domain={domain} />
               )}
 
               {/* ===== PRIORITY FIXES ===== */}
@@ -561,6 +573,73 @@ export default function DashboardPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+function CompetitorMonitor({ domain }: { domain: string }) {
+  const [competitors, setCompetitors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!domain || loaded) return;
+    const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
+    setLoading(true);
+    fetch("/api/score/competitors/compare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain: clean, name: clean }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.results?.length >= 2) setCompetitors(d.results);
+      })
+      .catch(() => {})
+      .finally(() => { setLoading(false); setLoaded(true); });
+  }, [domain]);
+
+  if (loading) return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="flex items-center gap-2"><div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" /><span className="text-sm text-zinc-500">Detecting competitors…</span></div>
+    </div>
+  );
+
+  if (competitors.length < 2) return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <h3 className="font-semibold flex items-center gap-2 mb-2"><span className="text-blue-400">⚔️</span> Competitor Monitor</h3>
+      <p className="text-xs text-zinc-500">Competitor data will load automatically on your next Analyze.</p>
+    </div>
+  );
+
+  const you = competitors.find((c: any) => c.is_you);
+  const others = competitors.filter((c: any) => !c.is_you && !c.error).sort((a: any, b: any) => (b.estimated_score || 0) - (a.estimated_score || 0));
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold flex items-center gap-2"><span className="text-blue-400">⚔️</span> Competitor Monitor</h3>
+        <Link href={`/compare?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:text-emerald-300">Full comparison →</Link>
+      </div>
+      <div className="flex items-end gap-2 mb-4">
+        {[you, ...others].filter(Boolean).slice(0, 5).map((c: any, i: number) => {
+          const h = Math.max(8, ((c.estimated_score || 0) / 100) * 80);
+          return (
+            <div key={i} className="flex-1 text-center">
+              <div className="text-xs font-bold text-zinc-200 mb-1">{c.estimated_score || "—"}</div>
+              <div className={`w-full rounded-t-md mx-auto ${c.is_you ? "bg-emerald-500" : "bg-zinc-600"}`} style={{ height: `${h}px`, maxWidth: "40px", margin: "0 auto" }} />
+              <div className="text-xs text-zinc-500 mt-1.5 truncate" title={c.name}>{c.is_you ? "You" : c.name?.split(" ")[0]}</div>
+            </div>
+          );
+        })}
+      </div>
+      {others.length > 0 && you && (
+        <div className="text-xs text-zinc-500 text-center">
+          {you.estimated_score >= (others[0]?.estimated_score || 0)
+            ? "🎉 You're leading! Keep going."
+            : `📉 ${others[0].name} leads by ${(others[0].estimated_score || 0) - (you.estimated_score || 0)} pts — improve schema + content to catch up.`}
+        </div>
+      )}
     </div>
   );
 }
