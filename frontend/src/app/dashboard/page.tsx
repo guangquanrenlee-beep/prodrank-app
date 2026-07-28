@@ -280,6 +280,42 @@ export default function DashboardPage() {
           {score && (
             <>
 
+              {/* ===== THIS WEEK SUMMARY ===== */}
+              {isSaaS && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold flex items-center gap-2"><span>📈</span> This Week</h3>
+                    <span className="text-xs text-zinc-500">{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-zinc-800/30 rounded-lg p-4">
+                      <div className="text-xs text-zinc-500 mb-1">Your Score</div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-2xl font-bold ${sc(score.ai_visibility_score)}`}>{score.ai_visibility_score}</span>
+                        {scoreChange !== 0 ? (
+                          <span className={`text-sm font-medium ${scoreChange > 0 ? "text-emerald-400" : "text-red-400"}`}>{scoreChange > 0 ? `▲ +${scoreChange}` : `▼ ${scoreChange}`}</span>
+                        ) : (
+                          <span className="text-xs text-zinc-500">No change yet</span>
+                        )}
+                      </div>
+                      {scoreHistory.length < 2 && <div className="text-xs text-zinc-600 mt-1">Analyze again tomorrow to see trend</div>}
+                    </div>
+                    <div className="bg-zinc-800/30 rounded-lg p-4">
+                      <div className="text-xs text-zinc-500 mb-1">{scoreHistory.length >= 2 ? "Biggest Mover" : "Top Priority"}</div>
+                      {hasBreakdown && dims.length > 0 ? <>
+                        <div className="flex items-center gap-2"><span className={`text-2xl font-bold ${sc(dims[0][1].score)}`}>{dims[0][1].score}</span><span className="text-xs text-zinc-400">/100</span></div>
+                        <div className="text-xs text-zinc-500 mt-0.5 capitalize">{dims[0][0].replace(/_/g, " ")}</div>
+                      </> : <div className="text-zinc-600 text-sm">Analyze to see</div>}
+                    </div>
+                    <div className="bg-zinc-800/30 rounded-lg p-4">
+                      <div className="text-xs text-zinc-500 mb-1">Auto-Fix</div>
+                      <div className="flex items-center gap-2"><span className="text-emerald-400 font-bold">12/12</span><span className="text-xs text-emerald-400">fields</span></div>
+                      <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:underline mt-1 inline-block">View details →</Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ===== HERO + PROGRESS ===== */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Score */}
