@@ -20,7 +20,10 @@ from app.services.db import DB
 
 # ── Constants ──
 
-REDDIT_SEARCH_URL = "https://www.reddit.com/search.json"
+REDDIT_SEARCH_URLS = [
+    "https://old.reddit.com/search.json",
+    "https://www.reddit.com/search.json",
+]
 REDDIT_USER_AGENT = "Mozilla/5.0 (compatible; ProdRankBot/1.0; +https://prodrank.app)"
 QUESTION_MARKERS = [
     "recommend", "suggest", "looking for", "best", "which", "what", "how",
@@ -118,32 +121,40 @@ class SocialListener:
         return list(set(queries))[:10]
 
     async def _search_reddit(self, query: str) -> list[dict]:
-        """Call Reddit JSON search API. Returns list of raw post dicts."""
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                REDDIT_SEARCH_URL,
-                params={"q": query, "sort": "new", "t": "week", "limit": 25, "restrict_sr": "off"},
-                headers={"User-Agent": REDDIT_USER_AGENT},
-                timeout=15,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            children = data.get("data", {}).get("children", [])
-            posts = []
-            for c in children:
-                d = c["data"]
-                posts.append({
-                    "id": d.get("id", ""),
-                    "title": d.get("title", ""),
-                    "body": d.get("selftext", ""),
-                    "url": f"https://www.reddit.com{d.get('permalink', '')}",
-                    "author": d.get("author", ""),
-                    "subreddit": d.get("subreddit_name_prefixed", d.get("subreddit", "")),
-                    "upvotes": d.get("ups", 0) or d.get("score", 0),
-                    "comment_count": d.get("num_comments", 0),
-                    "posted_at": datetime.fromtimestamp(d.get("created_utc", 0), tz=timezone.utc).isoformat(),
-                })
-            return posts
+        """Call Reddit JSON search API. Tries old.reddit.com first, falls back to www."""
+        for url in REDDIT_SEARCH_URLS:
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        url,
+                        params={"q": query, "sort": "new", "t": "week", "limit": 25, "restrict_sr": "off"},
+                        headers={"User-Agent": REDDIT_USER_AGENT},
+                        timeout=20,
+                    )
+                    if resp.status_code != 200:
+                        continue
+                    data = resp.json()
+                    children = data.get("data", {}).get("children", [])
+                    if not children:
+                        continue
+                    posts = []
+                    for c in children:
+                        d = c["data"]
+                        posts.append({
+                            "id": d.get("id", ""),
+                            "title": d.get("title", ""),
+                            "body": d.get("selftext", ""),
+                            "url": f"https://www.reddit.com{d.get('permalink', '')}",
+                            "author": d.get("author", ""),
+                            "subreddit": d.get("subreddit_name_prefixed", d.get("subreddit", "")),
+                            "upvotes": d.get("ups", 0) or d.get("score", 0),
+                            "comment_count": d.get("num_comments", 0),
+                            "posted_at": datetime.fromtimestamp(d.get("created_utc", 0), tz=timezone.utc).isoformat(),
+                        })
+                    return posts
+            except Exception:
+                continue
+        return []
 
     def _match_keywords(self, post: dict, kw_set: dict) -> tuple[list[str], str]:
         """Check which keywords match the post. Returns (matched_list, matched_type)."""
