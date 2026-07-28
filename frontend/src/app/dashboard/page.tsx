@@ -270,7 +270,7 @@ export default function DashboardPage() {
                   <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">1. Install inject-saas.js →</Link>
                 ) : (
                   <>
-                    <a href="/api/shopify/install?shop=yourstore.myshopify.com" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">🛒 Shopify App →</a>
+                    <a href="https://api.prodrank.app/api/shopify/install?shop=yourstore.myshopify.com" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">🛒 Shopify App →</a>
                     <Link href="/wordpress" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition">🧩 WordPress Plugin →</Link>
                     <Link href="/inject-guide" className="px-4 py-2 bg-zinc-600 hover:bg-zinc-500 text-white text-sm font-medium rounded-lg transition">&lt;/&gt; inject.js →</Link>
                   </>
@@ -460,7 +460,7 @@ export default function DashboardPage() {
                           <div className="text-xs text-zinc-500">
                             {(s.platform && s.platform !== "unknown") ? s.platform : (isSaaS ? "SaaS Site" : "Web Store")}
                             {!s.inject_active && !isSaaS && s.platform === "shopify" && (
-                              <a href={`/api/shopify/install?shop=${s.domain}`} className="ml-2 text-emerald-400 hover:underline">Install App →</a>
+                              <a href={`https://api.prodrank.app/api/shopify/install?shop=${s.domain}`} className="ml-2 text-emerald-400 hover:underline">Install App →</a>
                             )}
                             {!s.inject_active && !isSaaS && (s.platform === "wordpress" || s.platform === "woocommerce") && (
                               <Link href="/wordpress" className="ml-2 text-emerald-400 hover:underline">Get Plugin →</Link>

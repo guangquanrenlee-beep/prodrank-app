@@ -8,6 +8,10 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - shopify_client_id=${SHOPIFY_CLIENT_ID}
+      - shopify_client_secret=${SHOPIFY_CLIENT_SECRET}
+      - RESEND_API_KEY=${RESEND_API_KEY}
     volumes:
       - question_data:/app/data
 
