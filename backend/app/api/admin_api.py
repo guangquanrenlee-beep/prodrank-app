@@ -13,6 +13,21 @@ class SetupEnvRequest(BaseModel):
     RESEND_API_KEY: str = ""
 
 
+@router.post("/deploy")
+async def trigger_deploy():
+    """Pull latest code and rebuild Docker (instant deploy after git push)."""
+    import subprocess, os
+    try:
+        project_dir = "/opt/prodrank"
+        r1 = subprocess.run(["git", "pull"], cwd=project_dir, capture_output=True, text=True, timeout=30)
+        if r1.returncode != 0:
+            return {"status": "error", "message": f"git pull failed: {r1.stderr}"}
+        r2 = subprocess.run(["docker", "compose", "up", "-d", "--build"], cwd=project_dir, capture_output=True, text=True, timeout=120)
+        return {"status": "deployed", "git": r1.stdout.strip(), "build": r2.stdout.strip()[-200:]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @router.post("/setup-env")
 async def setup_env(req: SetupEnvRequest, request: Request):
     """Write API keys to .env file on the server. Restarts the server after."""
