@@ -240,11 +240,17 @@ export default function DashboardPage() {
         <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
 
           {/* ===== HEADER ===== */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 className="text-2xl font-bold">{domain || (isSaaS ? "AI Visibility Score" : "AI Shopping Index")}</h1>
-              <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
+                {!isSaaS && cms?.platform === "shopify" && (
+                  <a href={`https://api.prodrank.app/api/shopify/install?shop=${domain}`} target="_blank" rel="noopener" className="text-xs bg-green-900/30 text-green-400 px-2 py-0.5 rounded-full hover:underline">🛒 Install App ↗</a>
+                )}
+                {!isSaaS && cms?.platform === "shopify" && (
+                  <span className="text-xs bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full">Shopify detected</span>
+                )}
                 {lastAnalyzed && <span className="text-xs text-zinc-600">Analyzed {timeAgo(lastAnalyzed)}</span>}
               </div>
             </div>
@@ -262,22 +268,34 @@ export default function DashboardPage() {
               <h3 className="text-xl font-semibold text-white">Welcome to ProdRank!</h3>
               <p className="text-zinc-400 text-sm max-w-lg mx-auto">
                 {isSaaS
-                  ? "Step 1: Install inject-saas.js on your site (1 line of code). Step 2: Enter your domain above. Step 3: Click Auto-Fix. That's it — we handle the rest."
-                  : "Step 1: Install ProdRank on your store. Step 2: Enter your domain above. Step 3: Run Auto-Fix to complete your Product schema."}
+                  ? "Step 1: Install inject-saas.js. Step 2: Enter your domain above. Step 3: Auto-Fix."
+                  : "How is your store built? Pick your platform — we'll show you the fastest install."}
               </p>
-              <div className="flex justify-center gap-3 pt-2 flex-wrap">
-                {isSaaS ? (
+              {isSaaS ? (
+                <div className="flex justify-center gap-3 pt-2">
                   <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">1. Install inject-saas.js →</Link>
-                ) : (
-                  <>
-                    <a href="https://api.prodrank.app/api/shopify/install?shop=yourstore.myshopify.com" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">🛒 Shopify App →</a>
-                    <Link href="/wordpress" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition">🧩 WordPress Plugin →</Link>
-                    <Link href="/inject-guide" className="px-4 py-2 bg-zinc-600 hover:bg-zinc-500 text-white text-sm font-medium rounded-lg transition">&lt;/&gt; inject.js →</Link>
-                  </>
-                )}
-                <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">2. Analyze ↑</span>
-                <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">3. Auto-Fix ↓</span>
-              </div>
+                  <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">2. Analyze ↑</span>
+                  <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">3. Auto-Fix →</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 max-w-2xl mx-auto text-left">
+                  <ShopifyInstallCard domain={domain || 'yourstore.myshopify.com'} />
+                  <a href="https://wordpress.org/plugins/search/prodrank/" target="_blank" rel="noopener"
+                    className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 hover:border-emerald-600 transition group">
+                    <div className="text-2xl mb-2">🧩</div>
+                    <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">WordPress / WooCommerce</div>
+                    <div className="text-xs text-zinc-500 mt-1">Search "ProdRank" in Plugins → Add New, or download the zip. Works with Yoast SEO.</div>
+                    <div className="text-xs text-emerald-400 mt-2 group-hover:underline">Search Plugin →</div>
+                  </a>
+                  <Link href="/inject-guide"
+                    className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 hover:border-emerald-600 transition group">
+                    <div className="text-2xl mb-2">🌐</div>
+                    <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">Other / Custom</div>
+                    <div className="text-xs text-zinc-500 mt-1">One line of inject.js. Works with React, Vue, PHP, any platform. Copy → paste → done.</div>
+                    <div className="text-xs text-emerald-400 mt-2 group-hover:underline">Get inject.js →</div>
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -293,19 +311,65 @@ export default function DashboardPage() {
           {score && (
             <>
 
+              {/* ===== PLATFORM INSTALL OPTIONS (ecommerce) ===== */}
+              {!isSaaS && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+                  <h3 className="text-sm font-semibold mb-3">🔌 Install ProdRank on your store</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <a href={`https://api.prodrank.app/api/shopify/install?shop=${domain || 'yourstore.myshopify.com'}`} target="_blank" rel="noopener"
+                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-emerald-600 transition group">
+                      <div className="text-xl mb-1">🛒</div>
+                      <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">Shopify</div>
+                      <div className="text-xs text-zinc-500 mt-1">OAuth install. Auto-injects Product Schema.</div>
+                      <div className="text-xs text-emerald-400 mt-1 group-hover:underline">Install App →</div>
+                    </a>
+                    <a href="https://wordpress.org/plugins/search/prodrank/" target="_blank" rel="noopener"
+                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-emerald-600 transition group">
+                      <div className="text-xl mb-1">🧩</div>
+                      <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">WordPress / WooCommerce</div>
+                      <div className="text-xs text-zinc-500 mt-1">Search "ProdRank" in Plugins, or download zip.</div>
+                      <div className="text-xs text-emerald-400 mt-1 group-hover:underline">Search Plugin →</div>
+                    </a>
+                    <Link href="/inject-guide"
+                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-emerald-600 transition group">
+                      <div className="text-xl mb-1">🌐</div>
+                      <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">Other / Custom</div>
+                      <div className="text-xs text-zinc-500 mt-1">One line of inject.js. Any platform.</div>
+                      <div className="text-xs text-emerald-400 mt-1 group-hover:underline">Get inject.js →</div>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               {/* ===== POST-ANALYZE NEXT STEPS ===== */}
               {scoreHistory.length < 2 && (
                 <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-5">
                   <h3 className="font-semibold mb-3">✅ First analysis done. Here's what to do next:</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`}
-                      className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
-                      <div className="text-lg mb-1">🔧</div>
-                      <div className="text-sm font-medium text-emerald-400">1. Run Auto-Fix</div>
-                      <div className="text-xs text-zinc-400 mt-1">
-                        {isSaaS ? "AI fills all 12 SoftwareApplication schema fields — instant, one click." : "AI fills all 12 Product schema fields — instant, one click."}
-                      </div>
-                    </Link>
+                    {!isSaaS && (cms?.platform === "shopify") ? (
+                      <a href={`https://api.prodrank.app/api/shopify/install?shop=${domain}`} target="_blank" rel="noopener"
+                        className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
+                        <div className="text-lg mb-1">🛒</div>
+                        <div className="text-sm font-medium text-emerald-400">1. Install Shopify App</div>
+                        <div className="text-xs text-zinc-400 mt-1">One-click OAuth — auto-injects Product Schema on all pages.</div>
+                      </a>
+                    ) : !isSaaS && (cms?.platform === "woocommerce" || cms?.platform === "wordpress") ? (
+                      <Link href="/wordpress"
+                        className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
+                        <div className="text-lg mb-1">🧩</div>
+                        <div className="text-sm font-medium text-emerald-400">1. Install WordPress Plugin</div>
+                        <div className="text-xs text-zinc-400 mt-1">Upload prodrank-ai-seo.zip — auto-injects Schema.</div>
+                      </Link>
+                    ) : (
+                      <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`}
+                        className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
+                        <div className="text-lg mb-1">🔧</div>
+                        <div className="text-sm font-medium text-emerald-400">1. Run Auto-Fix</div>
+                        <div className="text-xs text-zinc-400 mt-1">
+                          {isSaaS ? "AI fills all 12 SoftwareApplication schema fields — instant, one click." : "AI fills all 12 Product schema fields — instant, one click."}
+                        </div>
+                      </Link>
+                    )}
                     <button onClick={async () => {
                       const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
                       window.location.href = `/compare?domain=${encodeURIComponent(clean)}`;
@@ -352,7 +416,13 @@ export default function DashboardPage() {
                     </div>
                     <div className="bg-zinc-800/30 rounded-lg p-4">
                       <div className="text-xs text-zinc-500 mb-1">Schema</div>
-                      <div className="flex items-center gap-2"><span className="text-emerald-400 font-bold">12/12</span><span className="text-xs text-emerald-400">fields</span></div>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const sc = score?.breakdown?.product_completeness?.score;
+                          const fieldsEst = sc != null ? Math.round(sc * 12 / 100) : 0;
+                          return <><span className={`font-bold ${(sc ?? 0) >= 70 ? "text-emerald-400" : (sc ?? 0) >= 40 ? "text-amber-400" : "text-red-400"}`}>~{fieldsEst}/12</span><span className="text-xs text-zinc-500">fields</span></>;
+                        })()}
+                      </div>
                       <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:underline mt-1 inline-block">Re-check →</Link>
                     </div>
                   </div>
@@ -602,6 +672,36 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+function ShopifyInstallCard({ domain }: { domain: string }) {
+  const [shopDomain, setShopDomain] = useState("");
+  const [showInput, setShowInput] = useState(false);
+  if (showInput) {
+    return (
+      <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+        <div className="text-xs text-zinc-400 mb-2">Enter your .myshopify.com domain:</div>
+        <input value={shopDomain} onChange={e => setShopDomain(e.target.value)}
+          placeholder="yourstore.myshopify.com"
+          className="w-full px-2 py-1.5 bg-zinc-700 border border-zinc-600 rounded text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 mb-2" />
+        <div className="flex gap-2">
+          <a href={`https://api.prodrank.app/api/shopify/install?shop=${shopDomain || domain}`} target="_blank" rel="noopener"
+            className="flex-1 text-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition">Install →</a>
+          <button onClick={() => setShowInput(false)} className="px-3 py-1.5 bg-zinc-600 hover:bg-zinc-500 text-zinc-300 text-xs rounded">Cancel</button>
+        </div>
+        <div className="text-xs text-zinc-600 mt-2">Find it: Shopify Admin → Settings → Domains</div>
+      </div>
+    );
+  }
+  return (
+    <button onClick={() => setShowInput(true)}
+      className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-emerald-600 transition group text-left w-full">
+      <div className="text-xl mb-1">🛒</div>
+      <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">Shopify</div>
+      <div className="text-xs text-zinc-500 mt-1">OAuth install. Need your .myshopify.com URL.</div>
+      <div className="text-xs text-emerald-400 mt-1 group-hover:underline">Connect Store →</div>
+    </button>
   );
 }
 

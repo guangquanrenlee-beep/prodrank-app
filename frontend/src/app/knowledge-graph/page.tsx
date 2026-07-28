@@ -50,16 +50,16 @@ const PRODUCT_CATEGORIES: Record<string, string[]> = {
 const SAAS_FIELDS = [
   { key: "name", label: "Software Name", desc: "AI needs to know your exact product name to recommend it" },
   { key: "description", label: "Description", desc: "What does your software do? Must be clear, specific, and keyword-rich" },
-  { key: "applicationCategory", label: "Category", desc: "e.g. CRMSoftware, AccountingSoftware — AI uses this to match user intent" },
+  { key: "applicationCategory", label: "Category", desc: "e.g. BusinessApplication, CRMSoftware — AI uses this to match user intent" },
   { key: "operatingSystem", label: "Platform", desc: "Web, iOS, Android — AI filters by platform availability" },
   { key: "url", label: "Website URL", desc: "Must match your canonical domain for AI trust signals" },
-  { key: "offers", label: "Pricing", desc: "AI shoppers frequently ask 'cheap X tool' or 'X under $Y/mo'" },
-  { key: "aggregateRating", label: "Ratings & Reviews", desc: "AI heavily weights social proof when ranking recommendations" },
+  { key: "offers.price", label: "Price", desc: "AI shoppers frequently ask 'cheap X tool' or 'X under \\$Y/mo'" },
+  { key: "offers.priceCurrency", label: "Currency", desc: "USD, EUR, etc. — AI needs to know which currency your price is in" },
+  { key: "aggregateRating.ratingValue", label: "Rating Score", desc: "AI heavily weights social proof when ranking — 4.0+ recommended" },
+  { key: "aggregateRating.reviewCount", label: "Review Count", desc: "Number of reviews — more reviews = more AI trust" },
   { key: "screenshot", label: "Screenshots", desc: "Visual proof increases AI confidence in your product" },
   { key: "featureList", label: "Feature List", desc: "AI matches features to user needs — missing features = missed matches" },
   { key: "datePublished", label: "Launch Date", desc: "Older, established software gets higher AI trust" },
-  { key: "author", label: "Company Name", desc: "Brand authority signal for AI ranking" },
-  { key: "softwareVersion", label: "Version", desc: "Active development signal — AI prefers maintained software" },
 ];
 
 export default function KnowledgeGraphPage() {

@@ -161,19 +161,30 @@ async def trigger_weekly_report(request: Request):
 
 def _get_user_id(request: Request) -> str | None:
     """Extract user ID from request context (set by middleware or header)."""
-    # Try header first (set by frontend proxy)
     email = request.headers.get("X-User-Email", "")
     if email:
         try:
             from app.services.db import DB
             db = DB()
-            # Get user by email from auth or sites
+            # Method 1: Try RPC (requires migration 007)
             data = db.client.rpc("get_user_id_by_email", {"email": email}).execute()
             user_id = (data.data or [None])[0]
             if isinstance(user_id, dict):
                 user_id = user_id.get("id") or user_id.get("user_id")
             if user_id:
                 return str(user_id)
+        except Exception:
+            pass
+
+        try:
+            # Method 2: Try Supabase Auth Admin API (uses service_role key)
+            from app.services.db import DB
+            db = DB()
+            auth_resp = db.client.auth.admin.list_users(page=1, per_page=50)
+            if auth_resp and hasattr(auth_resp, 'users'):
+                for u in auth_resp.users:
+                    if u.email == email:
+                        return u.id
         except Exception:
             pass
     return None

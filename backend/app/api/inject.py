@@ -7,10 +7,10 @@ from fastapi.responses import FileResponse
 router = APIRouter()
 
 INJECT_JS_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "inject", "inject.js"
+    os.path.dirname(__file__), "..", "..", "inject", "inject.js"
 )
 INJECT_SAAS_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "inject", "inject-saas.js"
+    os.path.dirname(__file__), "..", "..", "inject", "inject-saas.js"
 )
 
 

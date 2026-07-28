@@ -68,14 +68,16 @@ async def calculate_score(req: ScoreRequest, request: Request):
     try:
         from app.services.db import DB
         db = DB()
+        # Normalize domain once
+        clean_domain = req.url.replace("https://", "").replace("http://", "").split("/")[0]
         # Find existing site
-        sites = db.client.table("sites").select("id,user_id").eq("domain", req.url.replace("https://", "").replace("http://", "").split("/")[0]).execute().data
+        sites = db.client.table("sites").select("id,user_id").eq("domain", clean_domain).execute().data
         if sites:
             site = sites[0]
             db.client.table("score_snapshots").insert({
                 "site_id": site["id"],
                 "user_id": site["user_id"],
-                "domain": req.url.replace("https://", "").replace("http://", "").split("/")[0],
+                "domain": clean_domain,
                 "ai_visibility_score": score.overall,
                 "breakdown": result["breakdown"],
                 "label": score.label,
@@ -174,15 +176,16 @@ async def score_history(domain: str = Query(default=""), days: int = Query(defau
 
         scores = [s["ai_visibility_score"] for s in snapshots]
         trend = "flat"
-        if len(scores) >= 2:
-            first_week = sum(scores[:min(7, len(scores))]) / min(7, len(scores))
-            last_week = sum(scores[-min(7, len(scores)):]) / min(7, len(scores))
-            diff = last_week - first_week
+        if len(scores) >= 7:
+            # 7+ days: use 7-day moving averages for stable trend signal
+            first_week_avg = sum(scores[:7]) / 7
+            last_week_avg = sum(scores[-7:]) / 7
+            diff = last_week_avg - first_week_avg
             trend = "up" if diff > 3 else "down" if diff < -3 else "flat"
-            if len(scores) >= 3:
-                yesterday = scores[-2] if len(scores) >= 2 else scores[0]
-                today = scores[-1]
-                trend = "up" if today > yesterday else "down" if today < yesterday else trend
+        elif len(scores) >= 2:
+            # 2-6 days: use simple first-vs-last comparison
+            diff = scores[-1] - scores[0]
+            trend = "up" if diff > 3 else "down" if diff < -3 else "flat"
 
         return {
             "domain": domain,
