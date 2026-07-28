@@ -39,13 +39,16 @@ async def calculate_score(req: ScoreRequest, request: Request):
             "all_cited_sources": report.cited_sources,
         }
 
-    # 3. Calculate score
+    # 3. Calculate score with new 4-pillar model
     score = engine.score_product(
         schema_field_count=audit.field_count,
         max_fields=audit.max_fields,
+        has_product_schema=audit.has_product_schema,
+        has_faq_schema=audit.has_faq_schema,
         content_quality_score=audit.content_quality_score,
         ai_mentioned=bool(rank_data and rank_data.get("mentioned_by")),
-        total_agents=2,
+        agents_mentioned=len(rank_data.get("mentioned_by", [])) if rank_data else 0,
+        total_agents=4,
         citation_count=len(rank_data.get("all_cited_sources", [])) if rank_data else 0,
     )
 
@@ -54,12 +57,10 @@ async def calculate_score(req: ScoreRequest, request: Request):
         "ai_visibility_score": score.overall,
         "label": score.label,
         "breakdown": {
-            "knowledge_coverage": {"score": score.knowledge_coverage, "weight": 25},
-            "question_coverage": {"score": score.question_coverage, "weight": 20},
-            "citation_authority": {"score": score.citation_authority, "weight": 20},
-            "recommendation_frequency": {"score": score.recommendation_frequency, "weight": 15},
-            "external_evidence": {"score": score.external_evidence, "weight": 10},
-            "product_completeness": {"score": score.product_completeness, "weight": 10},
+            "discover": {"score": score.discover, "weight": 25, "label": "Discover", "desc": "Can AI find your products?"},
+            "understand": {"score": score.understand, "weight": 25, "label": "Understand", "desc": "Does AI correctly understand them?"},
+            "trust": {"score": score.trust, "weight": 25, "label": "Trust", "desc": "Does AI believe in them?"},
+            "recommend": {"score": score.recommend, "weight": 25, "label": "Recommend", "desc": "Will AI recommend them?"},
         },
         "recommendation": score.recommendation,
     }

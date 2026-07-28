@@ -6,11 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
 interface CMSData { domain: string; platform: string; confidence: number; recommended_action: string; auth_method: string; }
-interface ScoreData { ai_visibility_score: number; label: string; breakdown: Record<string, { score: number; weight: number }>; recommendation: string; analyzed_at?: string; }
-
-interface ManualTask {
-  id: string; label: string; points: number; time: string; link?: string;
-  approval?: string; // e.g. "7-14 days for approval"
+interface ScoreData {
+  ai_visibility_score: number; label: string;
+  breakdown: Record<string, { score: number; weight: number; label?: string; desc?: string }>;
+  recommendation: string; analyzed_at?: string; title?: string;
 }
 
 const NAV_ECOMMERCE = [
@@ -24,10 +23,9 @@ const NAV_ECOMMERCE = [
   { label: "Source Marketplace", href: "/marketplace", icon: "🏪" },
   { label: "Action Center", href: "/actions", icon: "⚡" },
   { label: "Optimization Center", href: "/optimize", icon: "🔧" },
-  { label: "Impact", href: "/verify", icon: "📈" },
+  { label: "Verification", href: "/verify", icon: "📈" },
   { label: "Monitoring", href: "/monitoring", icon: "📡" },
   { label: "Integrations", href: "/integrations", icon: "🔌" },
-  { label: "Free Tools", href: "/tools/schema-validator", icon: "🛠️" },
   { label: "Settings", href: "/settings", icon: "⚙️" },
 ];
 
@@ -40,34 +38,8 @@ const NAV_SAAS = [
   { label: "Social Listening", href: "/social-listening", icon: "👂" },
   { label: "Source Marketplace", href: "/marketplace", icon: "🏪" },
   { label: "Monitoring", href: "/monitoring", icon: "📡" },
-  { label: "SaaS Optimize", href: "/saas-optimize", icon: "🔧" },
   { label: "Integrations", href: "/integrations", icon: "🔌" },
   { label: "Settings", href: "/settings", icon: "⚙️" },
-];
-
-const SAAS_MANUAL_TASKS: ManualTask[] = [
-  { id: "g2", label: "List on G2", points: 8, time: "30 min", approval: "7-14 days", link: "https://g2.com" },
-  { id: "capterra", label: "List on Capterra", points: 8, time: "20 min", approval: "3-7 days", link: "https://capterra.com" },
-  { id: "producthunt", label: "Launch on Product Hunt", points: 5, time: "1 hour", approval: "1-2 days", link: "https://producthunt.com" },
-  { id: "comparison", label: "Add comparison page (vs competitors)", points: 10, time: "1-2 hours", link: "/actions" },
-  { id: "usecases", label: "Build use case pages", points: 8, time: "2-3 hours", link: "/actions" },
-  { id: "pricing", label: "Publish transparent pricing", points: 5, time: "30 min", link: "/actions" },
-  { id: "content", label: "Expand site content to 500+ words", points: 8, time: "2 hours", link: "/knowledge-graph" },
-  { id: "trustpilot", label: "Create Trustpilot page", points: 2, time: "10 min", approval: "instant, reviews take weeks", link: "https://trustpilot.com" },
-  { id: "getapp", label: "Submit to GetApp", points: 2, time: "15 min", approval: "7-14 days", link: "https://getapp.com" },
-  { id: "backlinks", label: "Get backlinks from partner blogs", points: 10, time: "ongoing", link: "/cite" },
-];
-
-const ECOMMERCE_MANUAL_TASKS: ManualTask[] = [
-  { id: "desc", label: "Write product descriptions (200+ chars)", points: 10, time: "30 min per product", link: "/actions" },
-  { id: "images", label: "Add alt text to all product images", points: 8, time: "1 hour", link: "/actions" },
-  { id: "faq", label: "Add FAQPage schema to product pages", points: 10, time: "20 min", link: "/knowledge-graph" },
-  { id: "reviews", label: "Add structured reviews (aggregateRating)", points: 8, time: "Setup once", link: "/actions" },
-  { id: "meta", label: "Add meta descriptions to all products", points: 5, time: "1 hour", link: "/actions" },
-  { id: "shipping", label: "Add shippingDetails to Product schema", points: 5, time: "10 min", link: "/knowledge-graph" },
-  { id: "sku", label: "Add SKU/GTIN to product pages", points: 5, time: "1 hour", link: "/actions" },
-  { id: "h1", label: "Ensure every product has one H1 tag", points: 3, time: "30 min", link: "/actions" },
-  { id: "breadcrumb", label: "Add BreadcrumbList schema", points: 3, time: "15 min", link: "/knowledge-graph" },
 ];
 
 function timeAgo(iso: string): string {
@@ -82,6 +54,12 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
+const GREETINGS = ["Good Morning", "Good Afternoon", "Good Evening"];
+function getGreeting() {
+  const h = new Date().getHours();
+  return h < 12 ? GREETINGS[0] : h < 18 ? GREETINGS[1] : GREETINGS[2];
+}
+
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<"ecommerce" | "saas">("ecommerce");
@@ -93,7 +71,6 @@ export default function DashboardPage() {
   const [sites, setSites] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [refreshingScore, setRefreshingScore] = useState(false);
-  const [doneTasks, setDoneTasks] = useState<Set<string>>(new Set());
   const [scoreHistory, setScoreHistory] = useState<{date:string;score:number}[]>([]);
   const [scoreTrend, setScoreTrend] = useState<"up"|"down"|"flat">("flat");
   const [scoreChange, setScoreChange] = useState(0);
@@ -107,12 +84,9 @@ export default function DashboardPage() {
       if (last && !domain) setDomain(last);
       const savedMode = localStorage.getItem("prodrank_dashboard_mode");
       if (savedMode === "saas" || savedMode === "ecommerce") setMode(savedMode);
-      const saved = localStorage.getItem(`prodrank_tasks_${user.id}`);
-      if (saved) setDoneTasks(new Set(JSON.parse(saved)));
     }
   }, [user]);
 
-  // Fetch score history when domain or score changes
   useEffect(() => {
     if (!domain || !score) return;
     const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
@@ -124,12 +98,10 @@ export default function DashboardPage() {
           setScoreTrend(d.trend || "flat");
           setScoreChange(d.change || 0);
         }
-        // Generate alerts from breakdown changes
         const newAlerts: string[] = [];
-        if (score?.breakdown && hasBreakdown) {
-          const dims = Object.entries(score.breakdown) as [string, {score:number;weight:number}][];
-          for (const [key, val] of dims) {
-            if (val.score < 20) newAlerts.push(`${key.replace(/_/g, " ")} critically low at ${val.score}/100 — needs immediate attention`);
+        if (score?.breakdown) {
+          for (const [key, val] of Object.entries(score.breakdown)) {
+            if (val.score < 20) newAlerts.push(`${val.label || key} critically low at ${val.score}/100 — needs immediate attention`);
           }
         }
         if (d.trend === "down") newAlerts.push(`Score trending down over ${d.snapshots.length} days — check what changed`);
@@ -140,13 +112,6 @@ export default function DashboardPage() {
 
   const isSaaS = mode === "saas";
   const hasBreakdown = score && Object.keys(score.breakdown || {}).length > 0;
-
-  const toggleTask = (id: string) => {
-    const next = new Set(doneTasks);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setDoneTasks(next);
-    localStorage.setItem(`prodrank_tasks_${user!.id}`, JSON.stringify([...next]));
-  };
 
   const loadSites = async (uid: string) => {
     const { data } = await supabase.from("sites").select("*").eq("user_id", uid).order("updated_at", { ascending: false });
@@ -196,26 +161,20 @@ export default function DashboardPage() {
   if (authLoading) return (<main className="min-h-screen flex items-center justify-center bg-zinc-950"><div className="animate-spin h-5 w-5 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full" /></main>);
   if (!user) return (<main className="min-h-screen flex items-center justify-center bg-zinc-950"><div className="text-center space-y-4"><p className="text-zinc-400">Sign in to see your dashboard</p><Link href="/login" className="text-emerald-400">Sign in →</Link></div></main>);
 
-  const sc = (s: number) => s >= 70 ? "text-emerald-400" : s >= 40 ? "text-yellow-400" : "text-red-400";
-  const sb = (s: number) => s >= 70 ? "bg-emerald-500" : s >= 40 ? "bg-yellow-500" : "bg-red-500";
+  const sc = (s: number) => s >= 70 ? "text-emerald-400" : s >= 40 ? "text-amber-400" : "text-red-400";
+  const sb = (s: number) => s >= 70 ? "bg-emerald-500" : s >= 40 ? "bg-amber-500" : "bg-red-500";
   const lastAnalyzed = score?.analyzed_at || null;
   const hasNoSites = sites.length === 0;
-  const doneCount = doneTasks.size;
-  const totalTasks = isSaaS ? SAAS_MANUAL_TASKS.length : ECOMMERCE_MANUAL_TASKS.length;
-  const manualTasks = isSaaS ? SAAS_MANUAL_TASKS : ECOMMERCE_MANUAL_TASKS;
-  const progressPct = Math.round((doneCount / totalTasks) * 100);
 
-  // Build today's priority — lowest scoring dimension
-  const dims = hasBreakdown ? (Object.entries(score!.breakdown) as [string, { score: number; weight: number }][]).sort((a, b) => a[1].score - b[1].score) : [];
-  const todayDim = dims[0];
+  // Today's priority: weakest scoring dimension
+  const dims = hasBreakdown ? (Object.entries(score!.breakdown) as [string, { score: number; weight: number; label?: string; desc?: string }][]).sort((a, b) => a[1].score - b[1].score) : [];
+  const weakest = dims[0];
 
-  const ACTION_MAP: Record<string, { icon: string; action: string; link: string; desc: string }> = {
-    product_completeness: { icon: "🔧", action: "Complete your Schema (Auto-Fix)", link: `/knowledge-graph?domain=${encodeURIComponent(domain)}`, desc: "Click Auto-Fix to fill in all 12 SoftwareApplication schema fields. Instant — no manual work." },
-    knowledge_coverage: { icon: "📝", action: "Expand your page content to 500+ words", link: `/knowledge-graph?domain=${encodeURIComponent(domain)}`, desc: "AI needs substance to understand your software. Add detailed feature descriptions, use cases, and integration info." },
-    question_coverage: { icon: "❓", action: "Add FAQ content to your site", link: `/knowledge-graph?domain=${encodeURIComponent(domain)}`, desc: "AI shoppers ask about pricing, features, integrations, and how you compare. Your site should answer these." },
-    citation_authority: { icon: "📰", action: "Get listed on G2, Capterra, Product Hunt", link: "/cite", desc: "AI agents cite external sources when recommending software. Register on the top 3 directories below." },
-    recommendation_frequency: { icon: "📈", action: "Improve overall AI presence", link: "/actions", desc: "This dimension improves as you fix Schema, content, and citations. Keep going — it compounds." },
-    external_evidence: { icon: "🌐", action: "Build external validation", link: "/cite", desc: "Get listed on review sites, directories, and partner blogs. AI weights third-party proof heavily." },
+  const PILLAR_ACTIONS: Record<string, { icon: string; action: string; link: string }> = {
+    discover: { icon: "🔍", action: "Fix Schema — Run Auto-Fix", link: `/knowledge-graph?domain=${encodeURIComponent(domain)}` },
+    understand: { icon: "🧠", action: "Expand Product Content & Descriptions", link: `/knowledge-graph?domain=${encodeURIComponent(domain)}` },
+    trust: { icon: "🛡️", action: "Build Trust — Reviews, Citations, PR", link: "/cite" },
+    recommend: { icon: "🚀", action: "Check Competitor Rankings", link: `/compare?domain=${encodeURIComponent(domain)}` },
   };
 
   return (
@@ -243,18 +202,13 @@ export default function DashboardPage() {
       <main className="flex-1 overflow-auto">
         <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
 
-          {/* ===== HEADER ===== */}
+          {/* ===== HEADER: Greeting + Domain input ===== */}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-bold">{domain || (isSaaS ? "AI Visibility Score" : "AI Shopping Index")}</h1>
+              <h1 className="text-2xl font-bold">{getGreeting()}, {user.email?.split("@")[0]}</h1>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
-                {!isSaaS && cms?.platform === "shopify" && (
-                  <a href={`https://api.prodrank.app/api/shopify/install?shop=${domain}`} target="_blank" rel="noopener" className="text-xs bg-green-900/30 text-green-400 px-2 py-0.5 rounded-full hover:underline">🛒 Install App ↗</a>
-                )}
-                {!isSaaS && cms?.platform === "shopify" && (
-                  <span className="text-xs bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full">Shopify detected</span>
-                )}
+                {domain && <span className="text-xs text-zinc-500">{domain}</span>}
                 {lastAnalyzed && <span className="text-xs text-zinc-600">Analyzed {timeAgo(lastAnalyzed)}</span>}
               </div>
             </div>
@@ -271,35 +225,8 @@ export default function DashboardPage() {
               <div className="text-4xl">👋</div>
               <h3 className="text-xl font-semibold text-white">Welcome to ProdRank!</h3>
               <p className="text-zinc-400 text-sm max-w-lg mx-auto">
-                {isSaaS
-                  ? "Step 1: Install inject-saas.js. Step 2: Enter your domain above. Step 3: Auto-Fix."
-                  : "How is your store built? Pick your platform — we'll show you the fastest install."}
+                Enter your store domain above to see your AI Shopping Score. No setup required — we analyze everything automatically.
               </p>
-              {isSaaS ? (
-                <div className="flex justify-center gap-3 pt-2">
-                  <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">1. Install inject-saas.js →</Link>
-                  <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">2. Analyze ↑</span>
-                  <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">3. Auto-Fix →</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 max-w-2xl mx-auto text-left">
-                  <ShopifyInstallCard domain={domain || 'yourstore.myshopify.com'} />
-                  <a href="https://wordpress.org/plugins/search/prodrank/" target="_blank" rel="noopener"
-                    className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 hover:border-emerald-600 transition group">
-                    <div className="text-2xl mb-2">🧩</div>
-                    <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">WordPress / WooCommerce</div>
-                    <div className="text-xs text-zinc-500 mt-1">Search "ProdRank" in Plugins → Add New, or download the zip. Works with Yoast SEO.</div>
-                    <div className="text-xs text-emerald-400 mt-2 group-hover:underline">Search Plugin →</div>
-                  </a>
-                  <Link href="/inject-guide"
-                    className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 hover:border-emerald-600 transition group">
-                    <div className="text-2xl mb-2">🌐</div>
-                    <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">Other / Custom</div>
-                    <div className="text-xs text-zinc-500 mt-1">One line of inject.js. Works with React, Vue, PHP, any platform. Copy → paste → done.</div>
-                    <div className="text-xs text-emerald-400 mt-2 group-hover:underline">Get inject.js →</div>
-                  </Link>
-                </div>
-              )}
             </div>
           )}
 
@@ -314,199 +241,72 @@ export default function DashboardPage() {
           {/* ===== SCORE LOADED ===== */}
           {score && (
             <>
-
-              {/* ===== PLATFORM INSTALL OPTIONS (ecommerce) ===== */}
-              {!isSaaS && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-                  <h3 className="text-sm font-semibold mb-3">🔌 Install ProdRank on your store</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <a href={`https://api.prodrank.app/api/shopify/install?shop=${domain || 'yourstore.myshopify.com'}`} target="_blank" rel="noopener"
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-emerald-600 transition group">
-                      <div className="text-xl mb-1">🛒</div>
-                      <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">Shopify</div>
-                      <div className="text-xs text-zinc-500 mt-1">OAuth install. Auto-injects Product Schema.</div>
-                      <div className="text-xs text-emerald-400 mt-1 group-hover:underline">Install App →</div>
-                    </a>
-                    <a href="https://wordpress.org/plugins/search/prodrank/" target="_blank" rel="noopener"
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-emerald-600 transition group">
-                      <div className="text-xl mb-1">🧩</div>
-                      <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">WordPress / WooCommerce</div>
-                      <div className="text-xs text-zinc-500 mt-1">Search "ProdRank" in Plugins, or download zip.</div>
-                      <div className="text-xs text-emerald-400 mt-1 group-hover:underline">Search Plugin →</div>
-                    </a>
-                    <Link href="/inject-guide"
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-emerald-600 transition group">
-                      <div className="text-xl mb-1">🌐</div>
-                      <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">Other / Custom</div>
-                      <div className="text-xs text-zinc-500 mt-1">One line of inject.js. Any platform.</div>
-                      <div className="text-xs text-emerald-400 mt-1 group-hover:underline">Get inject.js →</div>
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              {/* ===== POST-ANALYZE NEXT STEPS ===== */}
-              {scoreHistory.length < 2 && (
-                <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-5">
-                  <h3 className="font-semibold mb-3">✅ First analysis done. Here's what to do next:</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {!isSaaS && (cms?.platform === "shopify") ? (
-                      <a href={`https://api.prodrank.app/api/shopify/install?shop=${domain}`} target="_blank" rel="noopener"
-                        className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
-                        <div className="text-lg mb-1">🛒</div>
-                        <div className="text-sm font-medium text-emerald-400">1. Install Shopify App</div>
-                        <div className="text-xs text-zinc-400 mt-1">One-click OAuth — auto-injects Product Schema on all pages.</div>
-                      </a>
-                    ) : !isSaaS && (cms?.platform === "woocommerce" || cms?.platform === "wordpress") ? (
-                      <Link href="/wordpress"
-                        className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
-                        <div className="text-lg mb-1">🧩</div>
-                        <div className="text-sm font-medium text-emerald-400">1. Install WordPress Plugin</div>
-                        <div className="text-xs text-zinc-400 mt-1">Upload prodrank-ai-seo.zip — auto-injects Schema.</div>
-                      </Link>
-                    ) : (
-                      <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`}
-                        className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
-                        <div className="text-lg mb-1">🔧</div>
-                        <div className="text-sm font-medium text-emerald-400">1. Run Auto-Fix</div>
-                        <div className="text-xs text-zinc-400 mt-1">
-                          {isSaaS ? "AI fills all 12 SoftwareApplication schema fields — instant, one click." : "AI fills all 12 Product schema fields — instant, one click."}
-                        </div>
-                      </Link>
-                    )}
-                    <button onClick={async () => {
-                      const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
-                      window.location.href = `/compare?domain=${encodeURIComponent(clean)}`;
-                    }}
-                      className="bg-blue-900/20 border border-blue-800 rounded-lg p-4 hover:border-blue-600 transition text-left">
-                      <div className="text-lg mb-1">⚔️</div>
-                      <div className="text-sm font-medium text-blue-400">2. Check Competitors</div>
-                      <div className="text-xs text-zinc-400 mt-1">AI auto-detects your top competitors and compares scores side by side.</div>
-                    </button>
-                    <div className="bg-zinc-800/30 border border-zinc-700 rounded-lg p-4">
-                      <div className="text-lg mb-1">✋</div>
-                      <div className="text-sm font-medium text-zinc-300">3. Fix the checklist</div>
-                      <div className="text-xs text-zinc-400 mt-1">{isSaaS ? "G2, Capterra, Product Hunt" : "Descriptions, alt text, FAQs"} — see below.</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ===== THIS WEEK SUMMARY ===== */}
-              {scoreHistory.length >= 2 && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold flex items-center gap-2"><span>📈</span> This Week</h3>
-                    <span className="text-xs text-zinc-500">{new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-zinc-800/30 rounded-lg p-4">
-                      <div className="text-xs text-zinc-500 mb-1">Your Score</div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-2xl font-bold ${sc(score.ai_visibility_score)}`}>{score.ai_visibility_score}</span>
-                        {scoreChange !== 0 ? (
-                          <span className={`text-sm font-medium ${scoreChange > 0 ? "text-emerald-400" : "text-red-400"}`}>{scoreChange > 0 ? `▲ +${scoreChange}` : `▼ ${scoreChange}`}</span>
-                        ) : (
-                          <span className="text-xs text-zinc-500">No change</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="bg-zinc-800/30 rounded-lg p-4">
-                      <div className="text-xs text-zinc-500 mb-1">Biggest Mover</div>
-                      {hasBreakdown && dims.length > 0 ? <>
-                        <div className="flex items-center gap-2"><span className={`text-2xl font-bold ${sc(dims[0][1].score)}`}>{dims[0][1].score}</span><span className="text-xs text-zinc-400">/100</span></div>
-                        <div className="text-xs text-zinc-500 mt-0.5 capitalize">{dims[0][0].replace(/_/g, " ")}</div>
-                      </> : <div className="text-zinc-600 text-sm">N/A</div>}
-                    </div>
-                    <div className="bg-zinc-800/30 rounded-lg p-4">
-                      <div className="text-xs text-zinc-500 mb-1">Schema</div>
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const sc = score?.breakdown?.product_completeness?.score;
-                          const fieldsEst = sc != null ? Math.round(sc * 12 / 100) : 0;
-                          return <><span className={`font-bold ${(sc ?? 0) >= 70 ? "text-emerald-400" : (sc ?? 0) >= 40 ? "text-amber-400" : "text-red-400"}`}>~{fieldsEst}/12</span><span className="text-xs text-zinc-500">fields</span></>;
-                        })()}
-                      </div>
-                      <Link href={`/knowledge-graph?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:underline mt-1 inline-block">Re-check →</Link>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ===== HERO + PROGRESS ===== */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Score */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center relative">
-                  <button onClick={handleRefresh} disabled={refreshingScore} className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-xs rounded-lg transition">
-                    <span className={refreshingScore ? "animate-spin" : ""}>🔄</span>
-                  </button>
-                  <div className={`text-7xl font-bold tracking-tight ${sc(score.ai_visibility_score || 0)}`}>{score.ai_visibility_score}</div>
-                  <div className="flex items-center justify-center gap-2 mt-1">
-                    <span className="text-sm text-zinc-500">AI Visibility Score</span>
-                    {scoreHistory.length >= 2 && (
-                      <span className={`text-xs font-medium ${scoreTrend === "up" ? "text-emerald-400" : scoreTrend === "down" ? "text-red-400" : "text-zinc-500"}`}>
-                        {scoreTrend === "up" ? `▲ +${scoreChange}` : scoreTrend === "down" ? `▼ ${scoreChange}` : "—"}
-                      </span>
-                    )}
-                  </div>
-                  <div className={`inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full text-xs font-medium ${score.ai_visibility_score >= 60 ? "bg-emerald-900/30 text-emerald-400" : "bg-amber-900/30 text-amber-400"}`}>{score.label}</div>
-                  {scoreHistory.length >= 2 && (
-                    <div className="mt-3 flex items-end justify-center gap-0.5 h-10">
-                      {scoreHistory.slice(-14).map((s, i) => {
-                        const h = Math.max(4, (s.score / 100) * 40);
-                        return <div key={i} className="w-2 bg-emerald-500/60 rounded-t-sm" style={{ height: `${h}px` }} title={`${s.date}: ${s.score}`} />;
-                      })}
-                    </div>
-                  )}
-                  {lastAnalyzed && <div className="text-xs text-zinc-600 mt-2">Last analyzed: {new Date(lastAnalyzed).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>}
-                </div>
-
-                {/* Progress + Today */}
-                <div className="md:col-span-2 space-y-4">
-                  {/* Progress Bar */}
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold">📋 Optimization Progress</h3>
-                      <span className="text-xs text-zinc-500">{doneCount}/{totalTasks} tasks done</span>
-                    </div>
-                    <div className="w-full bg-zinc-800 rounded-full h-3">
-                      <div className="bg-emerald-500 h-3 rounded-full transition-all" style={{ width: `${Math.max(progressPct, 5)}%` }} />
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-2">
-                      {progressPct < 30 ? "Getting started — tackle the first task below!" :
-                       progressPct < 60 ? "Making progress — keep going!" :
-                       progressPct < 100 ? "Almost there — finish the remaining tasks!" :
-                       "All tasks done! Monitor your score and keep content fresh."}
-                    </p>
-                  </div>
-
-                  {/* Today's Priority */}
-                  {todayDim && (
-                    <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-xs text-emerald-400 font-medium mb-1">🎯 TODAY'S PRIORITY</div>
-                          <div className="text-sm font-semibold text-white">{ACTION_MAP[todayDim[0]]?.action || `Improve ${todayDim[0].replace(/_/g, " ")}`}</div>
-                          <div className="text-xs text-zinc-400 mt-1">{ACTION_MAP[todayDim[0]]?.desc}</div>
-                        </div>
-                        <Link href={ACTION_MAP[todayDim[0]]?.link || "/actions"} className="flex-shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Fix Now →</Link>
-                      </div>
-                    </div>
+              {/* Overal Score Hero */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center relative">
+                <button onClick={handleRefresh} disabled={refreshingScore} className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 text-xs rounded-lg"><span className={refreshingScore ? "animate-spin" : ""}>🔄</span></button>
+                <div className="text-xs text-zinc-500 mb-2">AI Recommendation Readiness</div>
+                <div className={`text-8xl font-bold tracking-tight ${sc(score.ai_visibility_score || 0)}`}>{score.ai_visibility_score}</div>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  {scoreChange !== 0 ? (
+                    <span className={`text-sm font-medium ${scoreChange > 0 ? "text-emerald-400" : "text-red-400"}`}>{scoreChange > 0 ? `▲ +${scoreChange}` : `▼ ${scoreChange}`} from last report</span>
+                  ) : (
+                    <span className="text-sm text-zinc-500">No change from last report</span>
                   )}
                 </div>
+                <div className={`inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-medium ${score.ai_visibility_score >= 60 ? "bg-emerald-900/30 text-emerald-400" : "bg-amber-900/30 text-amber-400"}`}>{score.label}</div>
+                {scoreHistory.length >= 2 && (
+                  <div className="mt-4 flex items-end justify-center gap-0.5 h-10">
+                    {scoreHistory.slice(-14).map((s, i) => { const h = Math.max(4, (s.score / 100) * 40); return <div key={i} className="w-2 bg-emerald-500/60 rounded-t-sm" style={{ height: `${h}px` }} title={`${s.date}: ${s.score}`} />; })}
+                  </div>
+                )}
               </div>
 
-              {/* ===== QUICK STATS (3 only) ===== */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Four Pillars */}
+              <div className="grid grid-cols-4 gap-3">
+                {hasBreakdown && Object.entries(score.breakdown).map(([key, val]) => (
+                  <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center">
+                    <div className={`text-3xl font-bold ${sc(val.score)}`}>{val.score}</div>
+                    <div className="text-xs text-zinc-400 mt-1">{val.label || key}</div>
+                    <div className="text-xs text-zinc-600 mt-0.5">{val.desc || ""}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Today's Priority — weakest pillar */}
+              {weakest && (
+                <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-emerald-400 font-medium mb-1">⭐ TODAY'S PRIORITY</div>
+                      <div className="text-lg font-semibold text-white">
+                        {PILLAR_ACTIONS[weakest[0]]?.action || `Improve ${weakest[1].label || weakest[0]}`}
+                      </div>
+                      <div className="text-xs text-zinc-400 mt-1">
+                        Expected Gain: +{Math.round((100 - weakest[1].score) * 0.25)} pts &nbsp;|&nbsp; Time: ~5 min
+                      </div>
+                    </div>
+                    <Link href={PILLAR_ACTIONS[weakest[0]]?.link || "/knowledge-graph"} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition whitespace-nowrap">
+                      Fix Now →
+                    </Link>
+                  </div>
+                  <div className="mt-3 w-full bg-zinc-800 rounded-full h-2">
+                    <div className={`h-2 rounded-full ${sb(weakest[1].score)}`} style={{ width: `${Math.max(weakest[1].score, 5)}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Quick stats row */}
+              <div className="grid grid-cols-4 gap-3">
                 {[
-                  { label: "Schema Health", val: hasBreakdown ? `${score.breakdown?.product_completeness?.score || "—"}/100` : "—", hint: "Field completeness" },
-                  { label: "Citation Authority", val: hasBreakdown ? `${score.breakdown?.citation_authority?.score || "—"}/100` : "—", hint: "External trust" },
-                  { label: "Top Gain", val: todayDim ? `+${Math.round((100 - todayDim[1].score) * todayDim[1].weight / 100)}` : "—", hint: todayDim ? todayDim[0].replace(/_/g, " ") : "Analyze first" },
+                  { label: "Products Analyzed", value: sites.length || 1, sub: `${sites.length || 1} site${sites.length !== 1 ? "s" : ""}` },
+                  { label: "Schema Health", value: hasBreakdown ? `${score.breakdown?.discover?.score || "—"}/100` : "—", sub: "Discover Score" },
+                  { label: "Competitors Tracked", value: "Auto", sub: "Refreshed with each scan" },
+                  { label: "Alerts", value: alerts.length, sub: alerts.length > 0 ? `${alerts.length} need attention` : "All clear" },
                 ].map((s, i) => (
                   <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
-                    <div className={`text-xl font-bold ${sc(i === 2 ? 100 : (hasBreakdown ? score.breakdown?.[i === 0 ? 'product_completeness' : 'citation_authority']?.score || 0 : 0))}`}>{s.val}</div>
+                    <div className="text-xl font-bold text-emerald-400">{s.value}</div>
                     <div className="text-xs text-zinc-500 mt-0.5">{s.label}</div>
-                    <div className="text-xs text-zinc-600">{s.hint}</div>
+                    <div className="text-xs text-zinc-600">{s.sub}</div>
                   </div>
                 ))}
               </div>
@@ -526,24 +326,14 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-zinc-200">{s.domain}</span>
                             {s.inject_active ? (
-                              <span className="text-xs text-emerald-400" title={`Last ping: ${new Date(s.last_ping_at).toLocaleString()}`}>● Active</span>
+                              <span className="text-xs text-emerald-400">● Active</span>
                             ) : (
-                              <span className="text-xs text-zinc-600" title="Inject script not detected.">○ Not tracked</span>
+                              <span className="text-xs text-zinc-600">○ Not tracked</span>
                             )}
                           </div>
                           <div className="text-xs text-zinc-500">
                             {(s.platform && s.platform !== "unknown") ? s.platform : (isSaaS ? "SaaS Site" : "Web Store")}
-                            {!s.inject_active && !isSaaS && s.platform === "shopify" && (
-                              <a href={`https://api.prodrank.app/api/shopify/install?shop=${s.domain}`} className="ml-2 text-emerald-400 hover:underline">Install App →</a>
-                            )}
-                            {!s.inject_active && !isSaaS && (s.platform === "wordpress" || s.platform === "woocommerce") && (
-                              <Link href="/wordpress" className="ml-2 text-emerald-400 hover:underline">Get Plugin →</Link>
-                            )}
-                            {!s.inject_active && !isSaaS && s.platform !== "shopify" && s.platform !== "wordpress" && s.platform !== "woocommerce" && (
-                              <Link href="/inject-guide" className="ml-2 text-emerald-400 hover:underline">Install inject.js →</Link>
-                            )}
                             {s.score_data?.analyzed_at && <span className="ml-2 text-zinc-600">· {timeAgo(s.score_data.analyzed_at)}</span>}
-                            {s.last_ping_at && <span className="ml-2 text-zinc-600">· Ping: {timeAgo(s.last_ping_at)}</span>}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -556,80 +346,15 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* ===== TWO COLUMN: AUTO + MANUAL ===== */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Auto column */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2"><span className="text-emerald-400">🤖</span> Automatic — Already Working</h3>
-                  <div className="space-y-3">
-                    {(isSaaS ? [
-                      { label: "Schema injection", status: sites.some(s => s.inject_active) ? "Active" : "Inactive", ok: sites.some(s => s.inject_active) },
-                      { label: "Daily score monitoring", status: "Active", ok: true },
-                      { label: "SoftwareApplication JSON-LD", status: "Auto-generated", ok: true },
-                      { label: "Organization JSON-LD", status: "Auto-generated", ok: true },
-                      { label: "FAQPage JSON-LD", status: "Auto-generated", ok: true },
-                      { label: "Schema Auto-Fix", status: "Available", ok: true },
-                    ] : [
-                      { label: "Schema injection", status: sites.some(s => s.inject_active) ? "Active" : "Inactive", ok: sites.some(s => s.inject_active) },
-                      { label: "Daily score monitoring", status: "Active", ok: true },
-                      { label: "Product JSON-LD", status: "Auto-generated", ok: true },
-                      { label: "Organization JSON-LD", status: "Auto-generated", ok: true },
-                      { label: "FAQPage JSON-LD", status: "Auto-generated", ok: true },
-                      { label: "Schema Auto-Fix", status: "Available", ok: true },
-                    ]).map((item, i) => (
-                      <div key={i} className="flex items-center justify-between text-sm">
-                        <span className="text-zinc-300">{item.label}</span>
-                        <span className={`text-xs ${item.ok ? "text-emerald-400" : "text-zinc-600"}`}>{item.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-zinc-600 mt-4 pt-3 border-t border-zinc-800">
-                    These run automatically. No action needed — they keep your site visible to AI 24/7.
-                  </p>
-                </div>
-
-                {/* Manual column */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2"><span className="text-amber-400">✋</span> Manual — Needs Your Action</h3>
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                    {manualTasks.map(task => {
-                      const done = doneTasks.has(task.id);
-                      return (
-                        <div key={task.id} className={`flex items-center gap-3 rounded-lg p-2.5 border transition ${done ? "border-emerald-800/30 bg-emerald-900/5 opacity-60" : "border-zinc-700/50 bg-zinc-800/20 hover:border-zinc-600"}`}>
-                          <button onClick={() => toggleTask(task.id)} className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition ${done ? "bg-emerald-500 border-emerald-500" : "border-zinc-600 hover:border-emerald-500"}`}>
-                            {done && <span className="text-white text-xs">✓</span>}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm ${done ? "text-zinc-500 line-through" : "text-zinc-200"}`}>{task.label}</span>
-                              <span className="text-xs bg-emerald-900/50 text-emerald-400 px-1.5 py-0.5 rounded font-medium">+{task.points}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
-                              <span>⏱ {task.time}</span>
-                              {task.approval && <span className="text-amber-500">⚠ {task.approval}</span>}
-                            </div>
-                          </div>
-                          {task.link && !done && (
-                            <a href={task.link} target={task.link.startsWith("http") ? "_blank" : undefined} rel="noopener" className="text-xs text-emerald-400 hover:text-emerald-300 flex-shrink-0">Go →</a>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-zinc-600 mt-4 pt-3 border-t border-zinc-800">
-                    {isSaaS
-                      ? "⚠ Directories like G2, Capterra, and GetApp take 3-14 days for approval. Start these early."
-                      : "Focus on the high-point tasks first — descriptions and FAQ schema give the biggest boost."}
-                  </p>
-                </div>
-              </div>
+              {/* ===== COMPETITOR MONITOR ===== */}
+              <CompetitorMonitor domain={domain} />
 
               {/* ===== ALERTS ===== */}
               {alerts.length > 0 && (
                 <div className="bg-zinc-900 border border-red-800/50 rounded-xl p-6">
-                  <h3 className="font-semibold mb-3 flex items-center gap-2"><span className="text-red-400">🔔</span> Alerts</h3>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2"><span className="text-red-400">🔔</span> Recent Alerts</h3>
                   <div className="space-y-2">
-                    {alerts.map((a, i) => (
+                    {alerts.slice(0, 5).map((a, i) => (
                       <div key={i} className="flex items-start gap-2 text-sm text-zinc-300 bg-red-900/10 border border-red-800/30 rounded-lg px-4 py-2.5">
                         <span className="text-red-400 mt-0.5">⚠</span><span>{a}</span>
                       </div>
@@ -638,36 +363,24 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* ===== COMPETITOR MONITOR ===== */}
-              <CompetitorMonitor domain={domain} />
-
-              {/* ===== PRIORITY FIXES ===== */}
-              {hasBreakdown && dims.length > 0 && (
+              {/* ===== LATEST OPTIMIZATIONS ===== */}
+              {scoreHistory.length >= 3 && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                  <h3 className="font-semibold mb-1">🎯 Score Breakdown & Fixes</h3>
-                  <p className="text-xs text-zinc-500 mb-4">Ranked by impact — lowest scoring dimensions first</p>
-                  <div className="space-y-3">
-                    {dims.slice(0, 4).map(([key, val]) => {
-                      const plan = ACTION_MAP[key] || { icon: "📌", action: `Improve ${key.replace(/_/g, " ")}`, link: "/actions", desc: "This dimension needs attention." };
-                      const gain = Math.round((100 - val.score) * val.weight / 100);
+                  <h3 className="font-semibold mb-3">📈 Score Trend</h3>
+                  <div className="flex items-end justify-between gap-2 h-20">
+                    {scoreHistory.map((s, i) => {
+                      const h = Math.max(4, (s.score / 100) * 80);
                       return (
-                        <Link key={key} href={plan.link} className="block rounded-lg p-4 border border-zinc-700 bg-zinc-800/20 hover:border-emerald-600 transition">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">{plan.icon}</span>
-                              <span className="text-sm font-medium text-zinc-200">{plan.action}</span>
-                            </div>
-                            <span className="text-xs bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded-full font-medium">+{gain} pts</span>
-                          </div>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-xs text-zinc-500 capitalize">{key.replace(/_/g, " ")}:</span>
-                            <div className="flex-1 max-w-[80px] bg-zinc-700 rounded-full h-1.5"><div className={`h-1.5 rounded-full ${sb(val.score)}`} style={{ width: `${Math.max(val.score, 5)}%` }} /></div>
-                            <span className={`text-xs ${sc(val.score)}`}>{val.score}/100</span>
-                          </div>
-                          <p className="text-xs text-zinc-500">{plan.desc}</p>
-                        </Link>
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                          <span className="text-xs text-zinc-600">{s.score}</span>
+                          <div className="w-full bg-emerald-500/60 rounded-t-sm" style={{ height: `${h}px` }} />
+                          <span className="text-xs text-zinc-700">{s.date?.slice(5)}</span>
+                        </div>
                       );
                     })}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-3 text-center">
+                    {scoreTrend === "up" ? "Trending up — keep going!" : scoreTrend === "down" ? "Trending down — check what changed" : "Steady — monitor for changes"}
                   </div>
                 </div>
               )}
@@ -676,36 +389,6 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
-  );
-}
-
-function ShopifyInstallCard({ domain }: { domain: string }) {
-  const [shopDomain, setShopDomain] = useState("");
-  const [showInput, setShowInput] = useState(false);
-  if (showInput) {
-    return (
-      <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
-        <div className="text-xs text-zinc-400 mb-2">Enter your .myshopify.com domain:</div>
-        <input value={shopDomain} onChange={e => setShopDomain(e.target.value)}
-          placeholder="yourstore.myshopify.com"
-          className="w-full px-2 py-1.5 bg-zinc-700 border border-zinc-600 rounded text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 mb-2" />
-        <div className="flex gap-2">
-          <a href={`https://api.prodrank.app/api/shopify/install?shop=${shopDomain || domain}`} target="_blank" rel="noopener"
-            className="flex-1 text-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition">Install →</a>
-          <button onClick={() => setShowInput(false)} className="px-3 py-1.5 bg-zinc-600 hover:bg-zinc-500 text-zinc-300 text-xs rounded">Cancel</button>
-        </div>
-        <div className="text-xs text-zinc-600 mt-2">Find it: Shopify Admin → Settings → Domains</div>
-      </div>
-    );
-  }
-  return (
-    <button onClick={() => setShowInput(true)}
-      className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 hover:border-emerald-600 transition group text-left w-full">
-      <div className="text-xl mb-1">🛒</div>
-      <div className="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400">Shopify</div>
-      <div className="text-xs text-zinc-500 mt-1">OAuth install. Need your .myshopify.com URL.</div>
-      <div className="text-xs text-emerald-400 mt-1 group-hover:underline">Connect Store →</div>
-    </button>
   );
 }
 
@@ -719,14 +402,11 @@ function CompetitorMonitor({ domain }: { domain: string }) {
     const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
     setLoading(true);
     fetch("/api/score/competitors/compare", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ domain: clean, name: clean }),
     })
       .then(r => r.json())
-      .then(d => {
-        if (d.results?.length >= 2) setCompetitors(d.results);
-      })
+      .then(d => { if (d.results?.length >= 2) setCompetitors(d.results); })
       .catch(() => {})
       .finally(() => { setLoading(false); setLoaded(true); });
   }, [domain]);
@@ -736,13 +416,7 @@ function CompetitorMonitor({ domain }: { domain: string }) {
       <div className="flex items-center gap-2"><div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" /><span className="text-sm text-zinc-500">Detecting competitors…</span></div>
     </div>
   );
-
-  if (competitors.length < 2) return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-      <h3 className="font-semibold flex items-center gap-2 mb-2"><span className="text-blue-400">⚔️</span> Competitor Monitor</h3>
-      <p className="text-xs text-zinc-500">Competitor data will load automatically on your next Analyze.</p>
-    </div>
-  );
+  if (competitors.length < 2) return null;
 
   const you = competitors.find((c: any) => c.is_you);
   const others = competitors.filter((c: any) => !c.is_you && !c.error).sort((a: any, b: any) => (b.estimated_score || 0) - (a.estimated_score || 0));
@@ -750,17 +424,17 @@ function CompetitorMonitor({ domain }: { domain: string }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold flex items-center gap-2"><span className="text-blue-400">⚔️</span> Competitor Monitor</h3>
+        <h3 className="font-semibold">⚔️ Competitor Monitor</h3>
         <Link href={`/compare?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:text-emerald-300">Full comparison →</Link>
       </div>
-      <div className="flex items-end gap-2 mb-4">
+      <div className="flex items-end gap-2 mb-3">
         {[you, ...others].filter(Boolean).slice(0, 5).map((c: any, i: number) => {
-          const h = Math.max(8, ((c.estimated_score || 0) / 100) * 80);
+          const h = Math.max(8, ((c.estimated_score || 0) / 100) * 60);
           return (
             <div key={i} className="flex-1 text-center">
               <div className="text-xs font-bold text-zinc-200 mb-1">{c.estimated_score || "—"}</div>
               <div className={`w-full rounded-t-md mx-auto ${c.is_you ? "bg-emerald-500" : "bg-zinc-600"}`} style={{ height: `${h}px`, maxWidth: "40px", margin: "0 auto" }} />
-              <div className="text-xs text-zinc-500 mt-1.5 truncate" title={c.name}>{c.is_you ? "You" : c.name?.split(" ")[0]}</div>
+              <div className="text-xs text-zinc-500 mt-1 truncate" title={c.name}>{c.is_you ? "You" : c.name?.split(" ")[0]}</div>
             </div>
           );
         })}
