@@ -266,27 +266,55 @@
 
   // ═══ Main ═══
 
-  function main() {
+  async function main() {
     log(`Page type: ${isPricingPage() ? "pricing" : isFeaturesPage() ? "features" : isHomePage() ? "home" : "other"}`);
 
     const data = extractSiteData();
 
-    if (!hasExistingSchema("Organization")) {
-      injectSchema(generateOrganizationSchema(data), "prodrank-org");
-    } else {
-      log("Organization Schema already exists, skipping");
-    }
+    // Check backend for optimized schema (from Auto-Fix)
+    let optimizedSchema = null;
+    try {
+      const checkRes = await fetch(API + "/saas/auto-fix?url=" + encodeURIComponent(location.href), {
+        headers: { "Accept": "application/json" }
+      });
+      if (checkRes.ok) {
+        const result = await checkRes.json();
+        if (result.status === "optimized" && result.copy_paste) {
+          const blocks = result.copy_paste.split("\n").filter(b => b.trim().startsWith("{"));
+          optimizedSchema = blocks.map(b => JSON.parse(b));
+          log("Using optimized schema from backend");
+        }
+      }
+    } catch (_) { /* Silently fall back to auto-detection */ }
 
-    if (!hasExistingSchema("SoftwareApplication")) {
-      injectSchema(generateSoftwareAppSchema(data), "prodrank-software");
+    if (optimizedSchema && optimizedSchema.length > 0) {
+      // Use backend-optimized schemas
+      optimizedSchema.forEach(s => {
+        const type = s["@type"];
+        const id = type === "SoftwareApplication" ? "prodrank-software" :
+                   type === "Organization" ? "prodrank-org" :
+                   type === "FAQPage" ? "prodrank-faq" : "prodrank-auto";
+        injectSchema(s, id);
+      });
     } else {
-      log("SoftwareApplication Schema already exists, skipping");
-    }
+      // Fallback: auto-detect and generate
+      if (!hasExistingSchema("Organization")) {
+        injectSchema(generateOrganizationSchema(data), "prodrank-org");
+      } else {
+        log("Organization Schema already exists, skipping");
+      }
 
-    if (!hasExistingSchema("FAQPage")) {
-      injectSchema(generateFAQSchema(data), "prodrank-faq");
-    } else {
-      log("FAQPage Schema already exists, skipping");
+      if (!hasExistingSchema("SoftwareApplication")) {
+        injectSchema(generateSoftwareAppSchema(data), "prodrank-software");
+      } else {
+        log("SoftwareApplication Schema already exists, skipping");
+      }
+
+      if (!hasExistingSchema("FAQPage")) {
+        injectSchema(generateFAQSchema(data), "prodrank-faq");
+      } else {
+        log("FAQPage Schema already exists, skipping");
+      }
     }
 
     sendAuditPing(data);

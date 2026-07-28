@@ -212,17 +212,50 @@ export default function KnowledgeGraphPage() {
 
               {/* Missing fields summary */}
               {saasReport.schema_fields.filter(f => !f.present).length > 0 && (
-                <div className="mt-5 p-4 bg-amber-900/10 border border-amber-800 rounded-lg">
-                  <div className="text-sm font-medium text-amber-400 mb-2">
-                    🔧 {saasReport.schema_fields.filter(f => !f.present).length} missing fields — fix in 2 minutes
+                <div className="mt-5 space-y-3">
+                  <div className="p-4 bg-amber-900/10 border border-amber-800 rounded-lg">
+                    <div className="text-sm font-medium text-amber-400 mb-2">
+                      🔧 {saasReport.schema_fields.filter(f => !f.present).length} missing fields
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={async () => {
+                        if (!domain) return;
+                        setLoading(true);
+                        try {
+                          const clean = domain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
+                          const res = await fetch("/api/audit/saas/auto-fix", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ url: `https://${clean}` }),
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            // Re-scan to show updated results
+                            const reRes = await fetch("/api/audit/saas", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ url: `https://${clean}` }),
+                            });
+                            if (reRes.ok) setSaasReport(await reRes.json());
+                          } else {
+                            alert("Auto-fix failed. Try manual fix instead.");
+                          }
+                        } catch { alert("Network error. Try again."); }
+                        setLoading(false);
+                      }}
+                        disabled={loading}
+                        className="flex-1 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition text-center">
+                        ⚡ Auto-Fix (1 Click) →
+                      </button>
+                      <Link href={`/saas-optimize?url=${encodeURIComponent(`https://${domain}`)}`}
+                        className="flex-1 px-5 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-lg transition text-center">
+                        🔧 Manual Fix →
+                      </Link>
+                    </div>
                   </div>
-                  <p className="text-xs text-zinc-400 mb-3">
-                    Click the button below to open the schema generator. Fill in the missing values, copy the JSON-LD, and paste it into your site's &lt;head&gt;. No coding needed.
+                  <p className="text-xs text-zinc-500 text-center">
+                    Auto-Fix: AI fills in the missing fields, stores on server. Your inject-saas.js script auto-loads it on next page visit.
                   </p>
-                  <Link href={`/saas-optimize?url=${encodeURIComponent(`https://${domain}`)}`}
-                    className="inline-block px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">
-                    🔧 Generate Complete Schema (Manual, ~2 min) →
-                  </Link>
                 </div>
               )}
             </div>
