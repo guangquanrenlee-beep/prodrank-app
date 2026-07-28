@@ -36,7 +36,8 @@ class SourceMarketplace:
         user = db.client.rpc("get_user_id_by_email", {"p_email": email}).execute()
         if not user.data:
             return []
-        user_id = str(user.data[0]["id"])
+        uid = user.data[0]
+        user_id = uid.get("id", uid) if isinstance(uid, dict) else str(uid)
 
         sites = db.client.table("sites") \
             .select("domain,platform") \
@@ -178,7 +179,8 @@ class SourceMarketplace:
         user = db.client.rpc("get_user_id_by_email", {"p_email": email}).execute()
         if not user.data:
             return {}
-        user_id = str(user.data[0]["id"])
+        uid = user.data[0]
+        user_id = uid.get("id", uid) if isinstance(uid, dict) else str(uid)
 
         source = db.client.table("marketplace_sources") \
             .select("*") \
