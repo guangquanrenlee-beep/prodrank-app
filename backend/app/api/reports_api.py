@@ -47,10 +47,11 @@ async def report_history(request: Request, days: int = Query(default=90)):
 
         domain = sites[0]["domain"]
 
+        from_date = (datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)).strftime("%Y-%m-%d")
         raw = db.client.table("score_snapshots") \
             .select("snapshot_date,ai_visibility_score") \
             .eq("domain", domain) \
-            .gte("snapshot_date", f"now()-{days}d") \
+            .gte("snapshot_date", from_date) \
             .order("snapshot_date", desc=False) \
             .execute().data or []
 
@@ -111,11 +112,13 @@ async def weekly_report(request: Request):
         breakdown = score_data.get("breakdown", {}) if isinstance(score_data, dict) else {}
 
         # Last week avg
+        week_ago = (datetime.now(timezone.utc) - __import__('datetime').timedelta(days=7)).strftime("%Y-%m-%d")
+        two_weeks_ago = (datetime.now(timezone.utc) - __import__('datetime').timedelta(days=14)).strftime("%Y-%m-%d")
         last_week = db.client.table("score_snapshots") \
             .select("ai_visibility_score") \
             .eq("domain", domain) \
-            .gte("snapshot_date", "now()-14d") \
-            .lte("snapshot_date", "now()-7d") \
+            .gte("snapshot_date", two_weeks_ago) \
+            .lte("snapshot_date", week_ago) \
             .execute().data or []
         prev_avg = round(sum(s["ai_visibility_score"] for s in last_week) / len(last_week)) if last_week else None
 
@@ -123,7 +126,7 @@ async def weekly_report(request: Request):
         this_week = db.client.table("score_snapshots") \
             .select("snapshot_date,ai_visibility_score") \
             .eq("domain", domain) \
-            .gte("snapshot_date", "now()-7d") \
+            .gte("snapshot_date", week_ago) \
             .order("snapshot_date", desc=False) \
             .execute().data or []
 
