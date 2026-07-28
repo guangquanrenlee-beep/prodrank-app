@@ -20,11 +20,7 @@ from app.services.db import DB
 
 # ── Constants ──
 
-REDDIT_SEARCH_URLS = [
-    "https://old.reddit.com/search.json",
-    "https://www.reddit.com/search.json",
-]
-REDDIT_USER_AGENT = "Mozilla/5.0 (compatible; ProdRankBot/1.0; +https://prodrank.app)"
+REDDIT_SEARCH_URL = "https://www.google.com/search"
 QUESTION_MARKERS = [
     "recommend", "suggest", "looking for", "best", "which", "what", "how",
     "anyone", "help", "advice", "opinion", "thoughts", "experience",
@@ -121,40 +117,71 @@ class SocialListener:
         return list(set(queries))[:10]
 
     async def _search_reddit(self, query: str) -> list[dict]:
-        """Call Reddit JSON search API. Tries old.reddit.com first, falls back to www."""
-        for url in REDDIT_SEARCH_URLS:
-            try:
-                async with httpx.AsyncClient() as client:
-                    resp = await client.get(
-                        url,
-                        params={"q": query, "sort": "new", "t": "week", "limit": 25, "restrict_sr": "off"},
-                        headers={"User-Agent": REDDIT_USER_AGENT},
-                        timeout=20,
-                    )
-                    if resp.status_code != 200:
+        """Search Reddit via Google with site:reddit.com prefix.
+        Parses Google SERP to extract Reddit post URLs, then fetches details via Reddit JSON API."""
+        posts = []
+        search_query = f"site:reddit.com {query}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
+
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                resp = await client.get(
+                    REDDIT_SEARCH_URL,
+                    params={"q": search_query, "num": 20, "tbs": "qdr:w"},
+                    headers=headers,
+                    timeout=15,
+                )
+                if resp.status_code != 200:
+                    return []
+
+                # Extract Reddit URLs from Google SERP
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(resp.text, "lxml")
+                reddit_links: set[str] = set()
+                for a in soup.select("a[href]"):
+                    href = a.get("href", "")
+                    if "/r/" in href and "reddit.com" in href:
+                        # Clean Google redirect URL
+                        if href.startswith("/url?q="):
+                            href = href.split("/url?q=")[1].split("&")[0]
+                        if "reddit.com/r/" in href and "/comments/" in href:
+                            reddit_links.add(href)
+
+                # Fetch post details from Reddit JSON (old.reddit.com still works for .json)
+                for url in list(reddit_links)[:15]:
+                    try:
+                        if "?" in url:
+                            json_url = url.split("?")[0] + ".json"
+                        else:
+                            json_url = url.rstrip("/") + ".json"
+                        r = await client.get(
+                            json_url,
+                            headers={"User-Agent": "Mozilla/5.0"},
+                            timeout=10,
+                        )
+                        if r.status_code == 200:
+                            data = r.json()
+                            post_data = data[0]["data"]["children"][0]["data"]
+                            post_id = post_data.get("id", "")
+                            permalink = post_data.get("permalink", "")
+                            posts.append({
+                                "id": post_id,
+                                "title": post_data.get("title", ""),
+                                "body": post_data.get("selftext", ""),
+                                "url": f"https://www.reddit.com{permalink}",
+                                "author": post_data.get("author", ""),
+                                "subreddit": post_data.get("subreddit_name_prefixed", ""),
+                                "upvotes": post_data.get("ups", 0) or post_data.get("score", 0),
+                                "comment_count": post_data.get("num_comments", 0),
+                                "posted_at": datetime.fromtimestamp(post_data.get("created_utc", 0), tz=timezone.utc).isoformat(),
+                            })
+                    except Exception:
                         continue
-                    data = resp.json()
-                    children = data.get("data", {}).get("children", [])
-                    if not children:
-                        continue
-                    posts = []
-                    for c in children:
-                        d = c["data"]
-                        posts.append({
-                            "id": d.get("id", ""),
-                            "title": d.get("title", ""),
-                            "body": d.get("selftext", ""),
-                            "url": f"https://www.reddit.com{d.get('permalink', '')}",
-                            "author": d.get("author", ""),
-                            "subreddit": d.get("subreddit_name_prefixed", d.get("subreddit", "")),
-                            "upvotes": d.get("ups", 0) or d.get("score", 0),
-                            "comment_count": d.get("num_comments", 0),
-                            "posted_at": datetime.fromtimestamp(d.get("created_utc", 0), tz=timezone.utc).isoformat(),
-                        })
-                    return posts
-            except Exception:
-                continue
-        return []
+
+        except Exception as e:
+            print(f"[SocialListener] Google search failed: {e}")
+
+        return posts
 
     def _match_keywords(self, post: dict, kw_set: dict) -> tuple[list[str], str]:
         """Check which keywords match the post. Returns (matched_list, matched_type)."""
