@@ -26,6 +26,7 @@ const NAV_ECOMMERCE = [
   { label: "Optimization Center", href: "/optimize", icon: "🔧" },
   { label: "Verification", href: "/verify", icon: "📈" },
   { label: "Monitoring", href: "/monitoring", icon: "📡" },
+  { label: "Reports", href: "/reports", icon: "📊" },
   { label: "Integrations", href: "/integrations", icon: "🔌" },
   { label: "Settings", href: "/settings", icon: "⚙️" },
 ];
@@ -40,6 +41,7 @@ const NAV_SAAS = [
   { label: "Social Listening", href: "/social-listening", icon: "👂" },
   { label: "Source Marketplace", href: "/marketplace", icon: "🏪" },
   { label: "Monitoring", href: "/monitoring", icon: "📡" },
+  { label: "Reports", href: "/reports", icon: "📊" },
   { label: "Integrations", href: "/integrations", icon: "🔌" },
   { label: "Settings", href: "/settings", icon: "⚙️" },
 ];
