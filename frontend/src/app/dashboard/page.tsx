@@ -54,6 +54,18 @@ const SAAS_MANUAL_TASKS: ManualTask[] = [
   { id: "backlinks", label: "Get backlinks from partner blogs", points: 10, time: "ongoing", link: "/cite" },
 ];
 
+const ECOMMERCE_MANUAL_TASKS: ManualTask[] = [
+  { id: "desc", label: "Write product descriptions (200+ chars)", points: 10, time: "30 min per product", link: "/actions" },
+  { id: "images", label: "Add alt text to all product images", points: 8, time: "1 hour", link: "/actions" },
+  { id: "faq", label: "Add FAQPage schema to product pages", points: 10, time: "20 min", link: "/knowledge-graph" },
+  { id: "reviews", label: "Add structured reviews (aggregateRating)", points: 8, time: "Setup once", link: "/actions" },
+  { id: "meta", label: "Add meta descriptions to all products", points: 5, time: "1 hour", link: "/actions" },
+  { id: "shipping", label: "Add shippingDetails to Product schema", points: 5, time: "10 min", link: "/knowledge-graph" },
+  { id: "sku", label: "Add SKU/GTIN to product pages", points: 5, time: "1 hour", link: "/actions" },
+  { id: "h1", label: "Ensure every product has one H1 tag", points: 3, time: "30 min", link: "/actions" },
+  { id: "breadcrumb", label: "Add BreadcrumbList schema", points: 3, time: "15 min", link: "/knowledge-graph" },
+];
+
 function timeAgo(iso: string): string {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
@@ -123,6 +135,7 @@ export default function DashboardPage() {
   }, [domain, score]);
 
   const isSaaS = mode === "saas";
+  const hasBreakdown = score && Object.keys(score.breakdown || {}).length > 0;
 
   const toggleTask = (id: string) => {
     const next = new Set(doneTasks);
@@ -181,11 +194,11 @@ export default function DashboardPage() {
 
   const sc = (s: number) => s >= 70 ? "text-emerald-400" : s >= 40 ? "text-yellow-400" : "text-red-400";
   const sb = (s: number) => s >= 70 ? "bg-emerald-500" : s >= 40 ? "bg-yellow-500" : "bg-red-500";
-  const hasBreakdown = score && Object.keys(score.breakdown).length > 0;
   const lastAnalyzed = score?.analyzed_at || null;
   const hasNoSites = sites.length === 0;
   const doneCount = doneTasks.size;
-  const totalTasks = isSaaS ? SAAS_MANUAL_TASKS.length : 6;
+  const totalTasks = isSaaS ? SAAS_MANUAL_TASKS.length : ECOMMERCE_MANUAL_TASKS.length;
+  const manualTasks = isSaaS ? SAAS_MANUAL_TASKS : ECOMMERCE_MANUAL_TASKS;
   const progressPct = Math.round((doneCount / totalTasks) * 100);
 
   // Build today's priority — lowest scoring dimension
@@ -250,21 +263,20 @@ export default function DashboardPage() {
               <p className="text-zinc-400 text-sm max-w-lg mx-auto">
                 {isSaaS
                   ? "Step 1: Install inject-saas.js on your site (1 line of code). Step 2: Enter your domain above. Step 3: Click Auto-Fix. That's it — we handle the rest."
-                  : "Enter your store domain above and we'll check if AI agents can see your products."}
+                  : "Step 1: Install ProdRank on your store. Step 2: Enter your domain above. Step 3: Run Auto-Fix to complete your Product schema."}
               </p>
-              <div className="flex justify-center gap-3 pt-2">
+              <div className="flex justify-center gap-3 pt-2 flex-wrap">
                 {isSaaS ? (
-                  <>
-                    <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">1. Install inject-saas.js →</Link>
-                    <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">2. Analyze above ↑</span>
-                    <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">3. Auto-Fix ↓</span>
-                  </>
+                  <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">1. Install inject-saas.js →</Link>
                 ) : (
                   <>
-                    <Link href="/inject-guide" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Quick Start Guide →</Link>
-                    <Link href="/pricing" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-lg transition">See Plans →</Link>
+                    <a href="/api/shopify/install?shop=yourstore.myshopify.com" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">🛒 Shopify App →</a>
+                    <Link href="/wordpress" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition">🧩 WordPress Plugin →</Link>
+                    <Link href="/inject-guide" className="px-4 py-2 bg-zinc-600 hover:bg-zinc-500 text-white text-sm font-medium rounded-lg transition">&lt;/&gt; inject.js →</Link>
                   </>
                 )}
+                <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">2. Analyze ↑</span>
+                <span className="px-4 py-2 bg-zinc-700 text-zinc-400 text-sm font-medium rounded-lg">3. Auto-Fix ↓</span>
               </div>
             </div>
           )}
@@ -282,7 +294,7 @@ export default function DashboardPage() {
             <>
 
               {/* ===== POST-ANALYZE NEXT STEPS ===== */}
-              {isSaaS && scoreHistory.length < 2 && (
+              {scoreHistory.length < 2 && (
                 <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-5">
                   <h3 className="font-semibold mb-3">✅ First analysis done. Here's what to do next:</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -290,7 +302,9 @@ export default function DashboardPage() {
                       className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-4 hover:border-emerald-600 transition">
                       <div className="text-lg mb-1">🔧</div>
                       <div className="text-sm font-medium text-emerald-400">1. Run Auto-Fix</div>
-                      <div className="text-xs text-zinc-400 mt-1">AI fills all 12 SoftwareApplication schema fields — instant, one click.</div>
+                      <div className="text-xs text-zinc-400 mt-1">
+                        {isSaaS ? "AI fills all 12 SoftwareApplication schema fields — instant, one click." : "AI fills all 12 Product schema fields — instant, one click."}
+                      </div>
                     </Link>
                     <button onClick={async () => {
                       const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
@@ -299,19 +313,19 @@ export default function DashboardPage() {
                       className="bg-blue-900/20 border border-blue-800 rounded-lg p-4 hover:border-blue-600 transition text-left">
                       <div className="text-lg mb-1">⚔️</div>
                       <div className="text-sm font-medium text-blue-400">2. Check Competitors</div>
-                      <div className="text-xs text-zinc-400 mt-1">AI auto-detects your top competitors and compares your scores.</div>
+                      <div className="text-xs text-zinc-400 mt-1">AI auto-detects your top competitors and compares scores side by side.</div>
                     </button>
                     <div className="bg-zinc-800/30 border border-zinc-700 rounded-lg p-4">
                       <div className="text-lg mb-1">✋</div>
-                      <div className="text-sm font-medium text-zinc-300">3. Register on directories</div>
-                      <div className="text-xs text-zinc-400 mt-1">G2, Capterra, Product Hunt — the checklist below.</div>
+                      <div className="text-sm font-medium text-zinc-300">3. Fix the checklist</div>
+                      <div className="text-xs text-zinc-400 mt-1">{isSaaS ? "G2, Capterra, Product Hunt" : "Descriptions, alt text, FAQs"} — see below.</div>
                     </div>
                   </div>
                 </div>
               )}
 
               {/* ===== THIS WEEK SUMMARY ===== */}
-              {isSaaS && scoreHistory.length >= 2 && (
+              {scoreHistory.length >= 2 && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold flex items-center gap-2"><span>📈</span> This Week</h3>
@@ -445,6 +459,15 @@ export default function DashboardPage() {
                           </div>
                           <div className="text-xs text-zinc-500">
                             {(s.platform && s.platform !== "unknown") ? s.platform : (isSaaS ? "SaaS Site" : "Web Store")}
+                            {!s.inject_active && !isSaaS && s.platform === "shopify" && (
+                              <a href={`/api/shopify/install?shop=${s.domain}`} className="ml-2 text-emerald-400 hover:underline">Install App →</a>
+                            )}
+                            {!s.inject_active && !isSaaS && (s.platform === "wordpress" || s.platform === "woocommerce") && (
+                              <Link href="/wordpress" className="ml-2 text-emerald-400 hover:underline">Get Plugin →</Link>
+                            )}
+                            {!s.inject_active && !isSaaS && s.platform !== "shopify" && s.platform !== "wordpress" && s.platform !== "woocommerce" && (
+                              <Link href="/inject-guide" className="ml-2 text-emerald-400 hover:underline">Install inject.js →</Link>
+                            )}
                             {s.score_data?.analyzed_at && <span className="ml-2 text-zinc-600">· {timeAgo(s.score_data.analyzed_at)}</span>}
                             {s.last_ping_at && <span className="ml-2 text-zinc-600">· Ping: {timeAgo(s.last_ping_at)}</span>}
                           </div>
@@ -460,68 +483,75 @@ export default function DashboardPage() {
               )}
 
               {/* ===== TWO COLUMN: AUTO + MANUAL ===== */}
-              {isSaaS && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Auto column */}
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><span className="text-emerald-400">🤖</span> Automatic — Already Working</h3>
-                    <div className="space-y-3">
-                      {[
-                        { label: "Schema injection", status: sites.some(s => s.inject_active) ? "Active" : "Inactive", ok: sites.some(s => s.inject_active) },
-                        { label: "Daily score monitoring", status: "Active", ok: true },
-                        { label: "SoftwareApplication JSON-LD", status: "Auto-generated", ok: true },
-                        { label: "Organization JSON-LD", status: "Auto-generated", ok: true },
-                        { label: "FAQPage JSON-LD", status: "Auto-generated", ok: true },
-                        { label: "Schema Auto-Fix", status: "Available", ok: true },
-                      ].map((item, i) => (
-                        <div key={i} className="flex items-center justify-between text-sm">
-                          <span className="text-zinc-300">{item.label}</span>
-                          <span className={`text-xs ${item.ok ? "text-emerald-400" : "text-zinc-600"}`}>{item.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-zinc-600 mt-4 pt-3 border-t border-zinc-800">
-                      These run automatically. No action needed — they keep your site visible to AI 24/7.
-                    </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Auto column */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2"><span className="text-emerald-400">🤖</span> Automatic — Already Working</h3>
+                  <div className="space-y-3">
+                    {(isSaaS ? [
+                      { label: "Schema injection", status: sites.some(s => s.inject_active) ? "Active" : "Inactive", ok: sites.some(s => s.inject_active) },
+                      { label: "Daily score monitoring", status: "Active", ok: true },
+                      { label: "SoftwareApplication JSON-LD", status: "Auto-generated", ok: true },
+                      { label: "Organization JSON-LD", status: "Auto-generated", ok: true },
+                      { label: "FAQPage JSON-LD", status: "Auto-generated", ok: true },
+                      { label: "Schema Auto-Fix", status: "Available", ok: true },
+                    ] : [
+                      { label: "Schema injection", status: sites.some(s => s.inject_active) ? "Active" : "Inactive", ok: sites.some(s => s.inject_active) },
+                      { label: "Daily score monitoring", status: "Active", ok: true },
+                      { label: "Product JSON-LD", status: "Auto-generated", ok: true },
+                      { label: "Organization JSON-LD", status: "Auto-generated", ok: true },
+                      { label: "FAQPage JSON-LD", status: "Auto-generated", ok: true },
+                      { label: "Schema Auto-Fix", status: "Available", ok: true },
+                    ]).map((item, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm">
+                        <span className="text-zinc-300">{item.label}</span>
+                        <span className={`text-xs ${item.ok ? "text-emerald-400" : "text-zinc-600"}`}>{item.status}</span>
+                      </div>
+                    ))}
                   </div>
-
-                  {/* Manual column */}
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><span className="text-amber-400">✋</span> Manual — Needs Your Action</h3>
-                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                      {SAAS_MANUAL_TASKS.map(task => {
-                        const done = doneTasks.has(task.id);
-                        return (
-                          <div key={task.id} className={`flex items-center gap-3 rounded-lg p-2.5 border transition ${done ? "border-emerald-800/30 bg-emerald-900/5 opacity-60" : "border-zinc-700/50 bg-zinc-800/20 hover:border-zinc-600"}`}>
-                            <button onClick={() => toggleTask(task.id)} className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition ${done ? "bg-emerald-500 border-emerald-500" : "border-zinc-600 hover:border-emerald-500"}`}>
-                              {done && <span className="text-white text-xs">✓</span>}
-                            </button>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className={`text-sm ${done ? "text-zinc-500 line-through" : "text-zinc-200"}`}>{task.label}</span>
-                                <span className="text-xs bg-emerald-900/50 text-emerald-400 px-1.5 py-0.5 rounded font-medium">+{task.points}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
-                                <span>⏱ {task.time}</span>
-                                {task.approval && <span className="text-amber-500">⚠ {task.approval}</span>}
-                              </div>
-                            </div>
-                            {task.link && !done && (
-                              <a href={task.link} target={task.link.startsWith("http") ? "_blank" : undefined} rel="noopener" className="text-xs text-emerald-400 hover:text-emerald-300 flex-shrink-0">Go →</a>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <p className="text-xs text-zinc-600 mt-4 pt-3 border-t border-zinc-800">
-                      ⚠ Directories like G2, Capterra, and GetApp take <strong>3-14 days</strong> for approval after submission. Start these early — they're the highest-scoring tasks.
-                    </p>
-                  </div>
+                  <p className="text-xs text-zinc-600 mt-4 pt-3 border-t border-zinc-800">
+                    These run automatically. No action needed — they keep your site visible to AI 24/7.
+                  </p>
                 </div>
-              )}
+
+                {/* Manual column */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2"><span className="text-amber-400">✋</span> Manual — Needs Your Action</h3>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {manualTasks.map(task => {
+                      const done = doneTasks.has(task.id);
+                      return (
+                        <div key={task.id} className={`flex items-center gap-3 rounded-lg p-2.5 border transition ${done ? "border-emerald-800/30 bg-emerald-900/5 opacity-60" : "border-zinc-700/50 bg-zinc-800/20 hover:border-zinc-600"}`}>
+                          <button onClick={() => toggleTask(task.id)} className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition ${done ? "bg-emerald-500 border-emerald-500" : "border-zinc-600 hover:border-emerald-500"}`}>
+                            {done && <span className="text-white text-xs">✓</span>}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm ${done ? "text-zinc-500 line-through" : "text-zinc-200"}`}>{task.label}</span>
+                              <span className="text-xs bg-emerald-900/50 text-emerald-400 px-1.5 py-0.5 rounded font-medium">+{task.points}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
+                              <span>⏱ {task.time}</span>
+                              {task.approval && <span className="text-amber-500">⚠ {task.approval}</span>}
+                            </div>
+                          </div>
+                          {task.link && !done && (
+                            <a href={task.link} target={task.link.startsWith("http") ? "_blank" : undefined} rel="noopener" className="text-xs text-emerald-400 hover:text-emerald-300 flex-shrink-0">Go →</a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-zinc-600 mt-4 pt-3 border-t border-zinc-800">
+                    {isSaaS
+                      ? "⚠ Directories like G2, Capterra, and GetApp take 3-14 days for approval. Start these early."
+                      : "Focus on the high-point tasks first — descriptions and FAQ schema give the biggest boost."}
+                  </p>
+                </div>
+              </div>
 
               {/* ===== ALERTS ===== */}
-              {isSaaS && alerts.length > 0 && (
+              {alerts.length > 0 && (
                 <div className="bg-zinc-900 border border-red-800/50 rounded-xl p-6">
                   <h3 className="font-semibold mb-3 flex items-center gap-2"><span className="text-red-400">🔔</span> Alerts</h3>
                   <div className="space-y-2">
@@ -535,9 +565,7 @@ export default function DashboardPage() {
               )}
 
               {/* ===== COMPETITOR MONITOR ===== */}
-              {isSaaS && (
-                <CompetitorMonitor domain={domain} />
-              )}
+              <CompetitorMonitor domain={domain} />
 
               {/* ===== PRIORITY FIXES ===== */}
               {hasBreakdown && dims.length > 0 && (

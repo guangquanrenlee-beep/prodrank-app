@@ -455,7 +455,16 @@ Return ONLY valid JSON:
         if "featureList" not in fixed:
             fixed["featureList"] = description[:200]
         if "datePublished" not in fixed:
-            fixed["datePublished"] = "2024-01-01"
+            # Try to extract real date from page
+            import re
+            copyright_match = re.search(r'(?:©|&copy;|copyright)\s*(\d{4})', html, re.I)
+            since_match = re.search(r'(?:since|founded|est\.?)\s*(\d{4})', html, re.I)
+            year = None
+            if copyright_match: year = copyright_match.group(1)
+            elif since_match: year = since_match.group(1)
+            if year:
+                fixed["datePublished"] = f"{year}-01-01"
+            # If no date found, don't fake it — leave datePublished out
 
     # Store optimized schema in DB for inject-saas.js to pull
     domain = url.split("//")[-1].split("/")[0]
@@ -511,5 +520,5 @@ def _saas_note(field: str) -> str:
         "aggregateRating.reviewCount": "Add '\"reviewCount\": \"120\"' inside the aggregateRating block.",
         "screenshot": "Add '\"screenshot\": \"https://yoursite.com/screenshot.png\"' pointing to a real image URL.",
         "featureList": "Add '\"featureList\": \"Feature A. Feature B. Feature C.\"' listing top 5-10 features.",
-        "datePublished": "Add '\"datePublished\": \"2024-01-15\"' with your software's original launch date.",
+        "datePublished": "Add '\"datePublished\": \"YYYY-MM-DD\"' with your actual launch date. Found in your footer copyright.",
     }.get(field, "")
