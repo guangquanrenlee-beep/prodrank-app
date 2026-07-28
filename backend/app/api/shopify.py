@@ -11,7 +11,7 @@ router = APIRouter()
 # In production these come from env vars (set in Shopify Partner Dashboard)
 SHOPIFY_CLIENT_ID = os.getenv("SHOPIFY_CLIENT_ID", "")
 SHOPIFY_CLIENT_SECRET = os.getenv("SHOPIFY_CLIENT_SECRET", "")
-APP_URL = os.getenv("APP_URL", "https://prodrank.app")
+APP_URL = os.getenv("APP_URL", "https://api.prodrank.app")
 
 shopify = ShopifyService(
     client_id=SHOPIFY_CLIENT_ID,
@@ -38,7 +38,8 @@ async def install_url(shop: str = Query(...)):
         )
     redirect_uri = f"{APP_URL}/api/shopify/callback"
     url = shopify.build_install_url(shop=shop, redirect_uri=redirect_uri)
-    return {"install_url": url}
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=url, status_code=302)
 
 
 @router.get("/callback")
