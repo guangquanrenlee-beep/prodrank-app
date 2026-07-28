@@ -86,6 +86,37 @@ export default function SettingsPage() {
           <button onClick={handleSave} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">{saved ? "Saved ✓" : "Save"}</button>
         </div>
 
+        {/* Email Preferences */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">📧 Email Reports</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">Weekly AI visibility reports sent every Monday. Track your score, competitors, and alerts.</p>
+            </div>
+          </div>
+          <EmailToggle label="Weekly Score Report" desc="Your AI Visibility Score, breakdown, and competitor watch — every Monday morning." storageKey="email_weekly" />
+          <EmailToggle label="Competitor Alerts" desc="Get notified when a competitor's score changes significantly." storageKey="email_competitors" />
+          <EmailToggle label="Score Drop Alerts" desc="Instant alert if your score drops more than 5 points." storageKey="email_drops" />
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/email/send-weekly", { method: "POST" });
+                if (res.ok) {
+                  const data = await res.json();
+                  alert(data.status === "sent" ? `✅ Test report sent to ${data.email}. Check your inbox!` : `⚠️ ${data.message || "Failed to send"}`);
+                } else {
+                  alert("Failed. Make sure you have at least one site analyzed and RESEND_API_KEY is set on the server.");
+                }
+              } catch { alert("Network error"); }
+            }}
+            className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-lg transition">
+            📨 Send Test Email
+          </button>
+          <p className="text-xs text-zinc-600">
+            Powered by Resend. Set <code className="bg-zinc-800 px-1 rounded">RESEND_API_KEY</code> env var on your VPS.
+          </p>
+        </div>
+
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
           <h3 className="font-semibold">Plan</h3>
           <div className="flex items-center gap-3"><span className="text-sm bg-zinc-800 px-3 py-1 rounded-full text-zinc-300">Free</span><Link href="/pricing" className="text-sm text-emerald-400 hover:text-emerald-300">Upgrade →</Link></div>
@@ -109,6 +140,35 @@ export default function SettingsPage() {
 
         <button onClick={() => supabase.auth.signOut()} className="text-sm text-red-400 hover:text-red-300">Sign out</button>
       </main>
+    </div>
+  );
+}
+
+function EmailToggle({ label, desc, storageKey }: { label: string; desc: string; storageKey: string }) {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const saved = localStorage.getItem(`prodrank_${storageKey}`);
+    if (saved === "false") setOn(false);
+  }, [storageKey]);
+
+  const toggle = () => {
+    const next = !on;
+    setOn(next);
+    localStorage.setItem(`prodrank_${storageKey}`, String(next));
+    // Sync to backend
+    fetch("/api/email/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekly_report_enabled: next }),
+    }).catch(() => {});
+  };
+
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div><div className="text-sm text-zinc-200">{label}</div><div className="text-xs text-zinc-500">{desc}</div></div>
+      <button onClick={toggle} className={`relative w-10 h-6 rounded-full transition ${on ? "bg-emerald-600" : "bg-zinc-700"}`}>
+        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on ? "translate-x-4" : ""}`} />
+      </button>
     </div>
   );
 }
