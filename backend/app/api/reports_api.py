@@ -51,7 +51,17 @@ async def report_history(request: Request, days: int = Query(default=90)):
     # Group by ISO week
     weeks: dict[str, list[dict]] = {}
     for s in snapshots:
-        d = datetime.fromisoformat(s["snapshot_date"].replace("Z", "+00:00"))
+        try:
+            date_str = str(s.get("snapshot_date", ""))
+            if not date_str:
+                continue
+            date_str = date_str.replace("Z", "+00:00").replace("T", " ")
+            d = datetime.fromisoformat(date_str)
+        except (ValueError, TypeError):
+            try:
+                d = datetime.strptime(date_str[:10], "%Y-%m-%d")
+            except Exception:
+                continue
         wk = d.strftime("%Y-W%W")
         if wk not in weeks:
             weeks[wk] = []
