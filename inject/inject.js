@@ -241,126 +241,100 @@
 
   function generateFAQSchema(data) {
     const questions = [
-      {
-        q: `What is the return policy for ${data.name || "this product"}?`,
-        a: "Please visit our Returns & Refunds page for the complete return policy and instructions.",
-      },
-      {
-        q: "How long does shipping take?",
-        a: "Shipping times vary by destination. Standard delivery typically takes 5-10 business days within the US. International orders may take longer.",
-      },
-      {
-        q: `Is ${data.name || "this product"} available in other sizes or colors?`,
-        a: "Please check our store for all available variants, including sizes, colors, and styles.",
-      },
-      {
-        q: "How do I contact customer support?",
-        a: "You can reach our support team via our Contact page. We typically respond within 24 hours.",
-      },
+      { q: `What is the return policy for ${data.name || "this product"}?`, a: "Please visit our Returns & Refunds page for the complete return policy and instructions." },
+      { q: "How long does shipping take?", a: "Shipping times vary by destination. Standard delivery typically takes 5-10 business days within the US. International orders may take longer." },
+      { q: `Is ${data.name || "this product"} available in other sizes or colors?`, a: "Please check our store for all available variants, including sizes, colors, and styles." },
+      { q: "How do I contact customer support?", a: "You can reach our support team via our Contact page. We typically respond within 24 hours." },
+      { q: `What size should I order?`, a: "Refer to our size chart on the product page for the best fit." },
     ];
-
-    return {
-      "@context": "https://schema.org/",
-      "@type": "FAQPage",
-      mainEntity: questions.map((q) => ({
-        "@type": "Question",
-        name: q.q,
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: q.a,
-        },
-      })),
-    };
+    return { "@context": "https://schema.org/", "@type": "FAQPage", mainEntity: questions.map(q=>({ "@type":"Question","name":q.q,"acceptedAnswer":{"@type":"Answer","text":q.a} })) };
   }
 
   function generateOrganizationSchema() {
-    return {
-      "@context": "https://schema.org/",
-      "@type": "Organization",
-      name: SITE,
-      url: location.origin,
-    };
+    return { "@context": "https://schema.org/", "@type": "Organization", name: SITE, url: location.origin };
   }
 
   // ═══ 4. Inject into <head> ═══
-
   function injectSchema(schema, id) {
+    if (!schema) return;
     const existing = document.getElementById(id);
     if (existing) existing.remove();
-
     const script = document.createElement("script");
-    script.id = id;
-    script.type = "application/ld+json";
+    script.id = id; script.type = "application/ld+json";
     script.textContent = JSON.stringify(schema);
     document.head.appendChild(script);
     log(`Injected: ${id}`);
   }
 
-  // ═══ 5. Has existing Schema? ═══
-
   function hasExistingProductSchema() {
-    const scripts = document.querySelectorAll(
-      'script[type="application/ld+json"]'
-    );
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
     for (const s of scripts) {
-      try {
-        const data = JSON.parse(s.textContent);
-        const type =
-          data["@type"] || (Array.isArray(data) && data[0]?.["@type"]);
-        if (type === "Product" || (Array.isArray(data) && data.some((d) => d["@type"] === "Product"))) {
-          return true;
-        }
-      } catch (e) {
-        /* ignore invalid JSON */
-      }
+      try { const data=JSON.parse(s.textContent); const type=data["@type"]||(Array.isArray(data)&&data[0]?.["@type"]); if(type==="Product"||(Array.isArray(data)&&data.some(d=>d["@type"]==="Product")))return true; } catch(e){}
     }
     return false;
   }
 
-  // ═══ 6. Send audit ping to ProdRank backend ═══
-
   function sendAuditPing(data) {
     try {
-      const payload = {
-        site: SITE,
-        url: location.href,
-        has_schema: hasExistingProductSchema(),
-        product_name: data.name,
-        price: data.price,
-        timestamp: new Date().toISOString(),
-      };
-      navigator.sendBeacon(API + "/ping", JSON.stringify(payload));
-    } catch (e) {
-      /* silent failure */
-    }
+      navigator.sendBeacon(API + "/ping", JSON.stringify({ site:SITE, url:location.href, has_schema:hasExistingProductSchema(), product_name:data.name, price:data.price, timestamp:new Date().toISOString() }));
+    } catch(e){}
+  }
+
+  // ═══ AI Enhancement ═══
+  async function fetchEnhancements(data) {
+    try {
+      const pageText = (document.body?.textContent || "").slice(0, 2000);
+      const res = await fetch(API + "/inject/enhance", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          site: SITE, url: location.href, product_name: data.name, description: data.description,
+          price: data.price, currency: data.currency, images: data.images.slice(0,3),
+          sku: data.sku, brand: data.brand, availability: data.availability,
+          rating: data.aggregateRating || null, review_count: data.reviewCount || 0, page_text: pageText,
+        }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.status === "enhanced" && result.schemas) return result.schemas;
+      }
+    } catch(e) { log("AI enhancement skipped:", e.message); }
+    return null;
   }
 
   // ═══ Main ═══
+  async function main() {
+    if (!isProductPage()) { log("Not a product page"); return; }
 
-  function main() {
-    if (!isProductPage()) {
-      log("Not a product page, skipping");
-      return;
-    }
-
-    if (hasExistingProductSchema()) {
-      log("Existing Product Schema found, skipping injection");
-      sendAuditPing(extractProductData());
-      return;
-    }
-
-    log("Product page detected, injecting Schema...");
     const data = extractProductData();
 
-    injectSchema(generateOrganizationSchema(), "prodrank-org");
-    injectSchema(generateProductSchema(data), "prodrank-product");
-    injectSchema(generateFAQSchema(data), "prodrank-faq");
+    if (hasExistingProductSchema()) {
+      log("Existing Schema found, skipping. Sending ping...");
+      sendAuditPing(data);
+      return;
+    }
+
+    log("Product page detected. Extracting data...");
+
+    // Try AI enhancement first
+    const enhanced = await fetchEnhancements(data);
+
+    if (enhanced) {
+      log("AI-enhanced schemas received!");
+      injectSchema(enhanced.organization, "prodrank-org");
+      injectSchema(enhanced.product, "prodrank-product");
+      injectSchema(enhanced.faq, "prodrank-faq");
+      injectSchema(enhanced.brand, "prodrank-brand");
+    } else {
+      log("Using basic auto-generated schemas");
+      injectSchema(generateOrganizationSchema(), "prodrank-org");
+      injectSchema(generateProductSchema(data), "prodrank-product");
+      injectSchema(generateFAQSchema(data), "prodrank-faq");
+    }
 
     sendAuditPing(data);
     log("Done!");
   }
 
-  // Run on DOM ready
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", main);
   } else {

@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import audit, rank, shopify, optimize, intelligence, recommendation, citation, inject, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api
+from app.api import audit, rank, shopify, optimize, intelligence, recommendation, citation, inject, inject_enhance, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.include_router(intelligence.router, prefix="/api/intel", tags=["Intelligence
 app.include_router(recommendation.router, prefix="/api/rec", tags=["Recommendation"])
 app.include_router(citation.router, prefix="/api/cite", tags=["Citation"])
 app.include_router(inject.router, prefix="/api", tags=["Inject"])
+app.include_router(inject_enhance.router, prefix="/api/inject", tags=["Inject AI"])
 app.include_router(detect.router, prefix="/api", tags=["Detect"])
 app.include_router(score.router, prefix="/api", tags=["Score"])
 app.include_router(integrations.router, prefix="/api/integrations", tags=["Integrations"])
