@@ -68,19 +68,27 @@ async def audit_product(req: AuditProductRequest, request: Request):
 
 
 @router.post("/site")
-async def audit_site(req: AuditSiteRequest):
+async def audit_site(req: AuditSiteRequest, request: Request):
     """Audit entire site for AI crawlability and Schema coverage. Persists results."""
     try:
         domain = str(req.domain)
         result = await detector.audit_site(domain)
-        # Persist products to Supabase if user context available
+        # Persist products to Supabase
         try:
             from app.services.db import DB
             db = DB()
-            # Save sample products (in production, use full product list)
-            # For now, mark the site as audited with score
-        except Exception:
-            pass
+            email = request.headers.get("X-User-Email", "")
+            if email:
+                user = db.client.rpc("get_user_id_by_email", {"p_email": email}).execute()
+                if user.data:
+                    user_id = user.data[0] if isinstance(user.data[0], str) else user.data[0]["id"]
+                    existing = db.client.table("sites").select("id").eq("domain", domain).execute().data
+                    site_id = existing[0]["id"] if existing else None
+                    if site_id and hasattr(result, 'sampled_products') and result.sampled_products:
+                        db.save_products_batch(site_id, result.sampled_products)
+                        print(f"[Audit] Saved {len(result.sampled_products)} products for {domain}")
+        except Exception as e:
+            print(f"[Audit] Failed to persist products: {e}")
         return {
             "url": result.url,
             "total_pages": result.total_pages,

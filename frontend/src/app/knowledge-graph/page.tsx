@@ -51,35 +51,59 @@ export default function KnowledgeGraphPage() {
     }
   }, [user]);
 
+  const isProductUrl = (raw: string) => raw.includes("/products/") || raw.includes("/product/") || raw.includes("/item/") || raw.includes("/p/");
+  const [siteAudit, setSiteAudit] = useState<any>(null);
+  const [isBulkScan, setIsBulkScan] = useState(false);
+
   const runAnalysis = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!domain.trim()) return;
-    setLoading(true); setError(""); setReport(null);
+    setLoading(true); setError(""); setReport(null); setSiteAudit(null);
     const raw = domain.trim();
-    // Accept both full URLs and bare domains
     let url: string;
-    if (raw.startsWith("http")) {
-      url = raw.replace(/\/$/, "");
+    if (raw.startsWith("http")) { url = raw.replace(/\/$/, ""); }
+    else { const clean = raw.replace(/^https?:\/\//, "").replace(/\/$/, ""); url = `https://${clean}`; }
+
+    // Route: product URL → deep analysis, domain → bulk site scan
+    if (isProductUrl(raw)) {
+      setIsBulkScan(false);
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 90000);
+        const res = await fetch("/api/intel/full", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, brand: new URL(url).hostname, category: category || "" }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (!res.ok) throw new Error(await res.text());
+        const result = await res.json();
+        setReport(result);
+        if (user) localStorage.setItem(`prodrank_last_kg_url_${user.id}`, raw);
+      } catch (err: any) {
+        if (err.name === "AbortError") setError("Analysis timed out after 90s. Try a single product URL instead.");
+        else setError(err.message || "Analysis failed. The site might be blocking our crawler.");
+      }
     } else {
-      const clean = raw.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
-      url = `https://${clean}`;
-    }
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90000);
-      const res = await fetch("/api/intel/full", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, brand: new URL(url).hostname, category: category || "" }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!res.ok) throw new Error(await res.text());
-      const result = await res.json();
-      setReport(result);
-      if (user) localStorage.setItem(`prodrank_last_kg_url_${user.id}`, url);
-    } catch (err: any) {
-      if (err.name === "AbortError") setError("Analysis timed out after 90s — the site may be too large. Try a smaller site.");
-      else setError(err.message || "Analysis failed. The site might be blocking our crawler. Try installing inject.js first.");
+      // Bulk site scan
+      setIsBulkScan(true);
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 120000);
+        const res = await fetch("/api/audit/site", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ domain: new URL(url).hostname }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (!res.ok) throw new Error(await res.text());
+        const result = await res.json();
+        setSiteAudit(result);
+        if (user) localStorage.setItem(`prodrank_last_kg_url_${user.id}`, raw);
+      } catch (err: any) {
+        if (err.name === "AbortError") setError("Bulk scan timed out. The site may have too many products or bot protection.");
+        else setError(err.message || "Bulk scan failed. Try a single product URL, or install inject.js.");
+      }
     }
     setLoading(false);
   };
@@ -120,18 +144,56 @@ export default function KnowledgeGraphPage() {
         {loading && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-20 text-center space-y-3">
             <div className="animate-spin h-8 w-8 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto" />
-            <p className="text-zinc-400 font-medium">Scanning {domain}…</p>
+            <p className="text-zinc-400 font-medium">{isBulkScan ? `Scanning all products on ${domain}…` : `Scanning ${domain}…`}</p>
             <div className="text-xs text-zinc-600 space-y-1">
-              <p>🔍 Crawling product pages &amp; reading Schema</p>
-              <p>🤖 Asking ChatGPT what it knows about your products</p>
-              <p>🔮 Asking Gemini to cross-validate</p>
-              <p>📊 Building AI Understanding report</p>
+              {isBulkScan ? <>
+                <p>🔍 Crawling sitemap to find all product pages</p>
+                <p>📄 Sampling products &amp; checking Schema coverage</p>
+                <p>📊 Calculating site-wide health score</p>
+              </> : <>
+                <p>🔍 Crawling product page &amp; reading Schema</p>
+                <p>🤖 Asking ChatGPT what it knows about your products</p>
+                <p>🔮 Asking Gemini to cross-validate</p>
+                <p>📊 Building AI Understanding report</p>
+              </>}
             </div>
-            <p className="text-xs text-zinc-500 mt-4">This takes 30-60 seconds for most sites</p>
+            <p className="text-xs text-zinc-500 mt-4">{isBulkScan ? "May take 2-5 minutes for large stores" : "30-60 seconds for most sites"}</p>
           </div>
         )}
 
-        {/* ═════════  ECOMMERCE REPORT ═══════════ */}
+        {/* ═════════ SITE AUDIT RESULTS (BULK) ═══════════ */}
+        {!loading && siteAudit && (
+          <div className="space-y-6">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center">
+              <div className={`text-8xl font-bold tracking-tight ${siteAudit.health_score >= 70 ? "text-emerald-400" : siteAudit.health_score >= 40 ? "text-amber-400" : "text-red-400"}`}>{siteAudit.health_score || 0}</div>
+              <div className="text-sm text-zinc-500 mt-1">Site Health Score</div>
+              <div className="flex justify-center gap-6 mt-4 text-xs text-zinc-500">
+                <span>{siteAudit.total_pages} pages found</span>
+                <span>{siteAudit.pages_with_product_schema} with Product Schema</span>
+                <span>{siteAudit.pages_with_faq_schema} with FAQ Schema</span>
+              </div>
+            </div>
+            {siteAudit.top_issues?.length > 0 && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h3 className="font-semibold text-lg mb-3">Top Issues Found</h3>
+                <div className="space-y-2">
+                  {siteAudit.top_issues.map((issue: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-sm text-zinc-300 bg-zinc-800/50 rounded-lg px-4 py-2.5">
+                      <span className="text-amber-400 mt-0.5">⚠</span><span>{issue}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3 justify-center">
+              <Link href="/products" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition">📦 View All Products</Link>
+              <Link href="/actions" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm rounded-lg transition">⚡ Fix Issues</Link>
+            </div>
+            <p className="text-xs text-zinc-600 text-center">💡 Enter a specific product URL above for deep AI analysis of that single product.</p>
+          </div>
+        )}
+
+        {/* ═════════ PRODUCT DEEP ANALYSIS ═══════════ */}
         {!loading && report && (
           <>
             {/* Score overview */}
@@ -298,11 +360,14 @@ export default function KnowledgeGraphPage() {
         )}
 
         {/* ═══════ EMPTY STATE ═══════ */}
-        {!loading && !report && (
+        {!loading && !report && !siteAudit && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center space-y-3">
             <div className="text-4xl">🧠</div>
-            <h3 className="text-lg font-semibold text-white">See What AI Knows About Your Products</h3>
-            <p className="text-zinc-400 text-sm max-w-md mx-auto">Enter a product page URL above. We'll ask ChatGPT, Gemini, and Claude what they know about your product — and show you the gaps.</p>
+            <h3 className="text-lg font-semibold text-white">Analyze Your Store</h3>
+            <p className="text-zinc-400 text-sm max-w-lg mx-auto">
+              <strong>Enter a domain</strong> (e.g. fashionnova.com) to scan all products and get a site-wide health score.<br />
+              <strong>Or paste a product URL</strong> (e.g. .../products/...) for deep AI analysis of that single product.
+            </p>
           </div>
         )}
       </div>

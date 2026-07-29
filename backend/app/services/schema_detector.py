@@ -49,6 +49,7 @@ class SiteAuditResult:
     js_rendering_issues: int = 0
     health_score: int = 0
     top_issues: list[str] = field(default_factory=list)
+    sampled_products: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -568,17 +569,29 @@ class SchemaDetector:
 
         for p in sample:
             handle = p.get("handle", "")
+            product_title = p.get("title", "") or handle
             if handle:
                 product_url = urljoin(base, f"/products/{handle}")
                 try:
                     html = await self._fetch(product_url)
                     soup = BeautifulSoup(html, "lxml")
                     self._count_schemas(soup, result)
+                    # Extract product data for DB persistence
+                    title = self._extract_title(soup)
+                    scripts = soup.find_all("script", type="application/ld+json")
+                    has_schema = False; fields = 0
+                    for s in scripts:
+                        try: data=json.loads(s.string); types=SchemaDetector._extract_types(data)
+                        except: continue
+                        if types & {"Product","ProductGroup"}: has_schema=True; fields=len([k for k in data if k not in ("@context","@type")])
+                    result.sampled_products.append({"title": title or product_title, "url": product_url, "has_schema": has_schema, "schema_fields": fields})
                 except Exception:
                     try:
                         html = await self._fetch_stealth(product_url)
                         soup = BeautifulSoup(html, "lxml")
                         self._count_schemas(soup, result)
+                        title = self._extract_title(soup)
+                        result.sampled_products.append({"title": title or product_title, "url": product_url, "has_schema": False, "schema_fields": 0})
                         stealth_used = True
                     except Exception:
                         result.js_rendering_issues += 1
