@@ -34,16 +34,18 @@ export default function CitePage() {
   const runReport = async () => {
     if (!category.trim()) return;
     setLoading(true);
+    setData(null); setInfluence(null); setChainData(null);
     try {
-      const kws = keywords ? keywords.split(",").map(k => k.trim()).filter(Boolean) : [`best ${category}`];
+      const kws = keywords ? keywords.split(",").map((k: string) => k.trim()).filter(Boolean) : [`best ${category}`];
       const [reportRes, influenceRes] = await Promise.all([
         fetch("/api/cite/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category, keywords: kws }) }),
         fetch(`/api/cite/influence?category=${encodeURIComponent(category)}`).then(r => r.json()),
       ]);
-      setData(await reportRes.json());
-      setInfluence(influenceRes);
-      setChainData(null);
-    } catch {}
+      const reportData = await reportRes.json();
+      // Only show results if there are actually citations
+      if (reportData.total_citations > 0) setData(reportData);
+      if (influenceRes?.sources?.length > 0) setInfluence(influenceRes);
+    } catch (err) { console.error(err); }
     setLoading(false);
   };
 

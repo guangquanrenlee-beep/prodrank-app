@@ -235,18 +235,18 @@ class CitationEngine:
 
         async def query_agent(agent_name: str, model: str, combined_kws: str):
             prompt = (
-                f"You are an expert product reviewer. A user wants to know which websites are the most "
-                f"authoritative and trusted sources for product reviews and buying guides in this category: {combined_kws}.\n\n"
-                f"Think about real websites that actually exist and are well-known for reviewing these products. "
-                f"Even if you're not 100% sure they review this exact category, list sites that are commonly "
-                f"cited by consumers and experts for product advice.\n\n"
-                f"Output ONLY domain names, one per line. Do NOT use numbers or bullets. Example:\n"
-                f"rtings.com\nwirecutter.com"
+                f"List 10 real websites that publish expert reviews and buying guides for: {combined_kws}.\n\n"
+                f"Rules:\n"
+                f"- Only list sites that ACTUALLY exist and are well-known for reviewing these products\n"
+                f"- Include a mix of: dedicated review sites, magazines, YouTube channels, retail sites with reviews\n"
+                f"- Output ONLY domain names, one per line, no numbers/bullets/descriptions\n"
+                f"- Example format:\n"
+                f"rtings.com\nwirecutter.com\namazon.com\nyoutube.com\nreddit.com"
             )
             try:
                 resp = await self.client.chat.completions.create(
                     model=model, messages=[{"role": "user", "content": prompt}],
-                    temperature=0.6, max_tokens=600, timeout=30.0,
+                    temperature=0.8, max_tokens=600, timeout=30.0,
                 )
                 raw = resp.choices[0].message.content or ""
                 citations = self.extract_citations(raw, agent_name, combined_kws, category)
