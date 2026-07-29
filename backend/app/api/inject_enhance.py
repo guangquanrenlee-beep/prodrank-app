@@ -51,7 +51,7 @@ PRODUCT INFO:
 Generate a COMPLETE JSON-LD enhancement package. Include ALL of the following:
 
 1. "category": Best guess at Google Product Category (e.g. "Apparel & Accessories > Clothing > Dresses")
-2. "aggregateRating": Use actual rating if provided ({req.rating or 'N/A'}, {req.review_count} reviews), otherwise suggest realistic estimate. Include ratingValue, bestRating, reviewCount.
+2. "aggregateRating": ONLY include if actual rating data is available ({req.rating or 'none'}, {req.review_count} reviews). If no real rating exists, set this to null. NEVER fabricate ratings.
 3. "faq": Generate 5-6 SPECIFIC questions a real customer would ask about {name}. Use the product context to make them relevant. Format as array of {{"question":"...","answer":"..."}}
 4. "brand_story": Write a 100-word brand story for {brand}. Professional, appealing to customers.
 5. "comparison": List 3-4 key points that differentiate {name} from similar products. What makes it special?
@@ -129,19 +129,13 @@ def _build_product_schema(req: EnhanceRequest, ai: dict) -> dict:
         },
         "category": ai.get("category", ""),
     }
-    if ai.get("aggregateRating"):
-        schema["aggregateRating"] = {
-            "@type": "AggregateRating",
-            "ratingValue": str(ai["aggregateRating"].get("ratingValue", 4.5)),
-            "bestRating": "5",
-            "reviewCount": str(ai["aggregateRating"].get("reviewCount", 1)),
-        }
-    if req.rating:
+    # ONLY include aggregateRating if the page actually has real rating data
+    if req.rating and req.rating > 0:
         schema["aggregateRating"] = {
             "@type": "AggregateRating",
             "ratingValue": str(req.rating),
             "bestRating": "5",
-            "reviewCount": str(req.review_count or 1),
+            "reviewCount": str(max(req.review_count, 1)),
         }
     # Clean None values
     return {k: v for k, v in schema.items() if v is not None}
@@ -165,8 +159,8 @@ def _build_basic_product(req: EnhanceRequest) -> dict:
             "itemCondition": "https://schema.org/NewCondition",
         },
     }
-    if req.rating:
-        schema["aggregateRating"] = {"@type": "AggregateRating", "ratingValue": str(req.rating), "bestRating": "5", "reviewCount": str(req.review_count or 1)}
+    if req.rating and req.rating > 0:
+        schema["aggregateRating"] = {"@type": "AggregateRating", "ratingValue": str(req.rating), "bestRating": "5", "reviewCount": str(max(req.review_count, 1))}
     return {k: v for k, v in schema.items() if v is not None}
 
 
