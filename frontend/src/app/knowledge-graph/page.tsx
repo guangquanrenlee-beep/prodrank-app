@@ -18,15 +18,6 @@ interface Report {
   knowledge_gap: { category: string; total_ai_questions: number; covered_questions: number; coverage_pct: number; top_missing: string[]; gaps: GapItem[]; } | null;
 }
 
-interface SaaSReport {
-  url: string; title: string;
-  has_software_schema: boolean; has_org_schema: boolean; has_faq_schema: boolean;
-  field_count: number; max_fields: number;
-  schema_fields: { field: string; present: boolean; value: string | null; note: string }[];
-  content_quality_score: number;
-  content_issues: string[];
-}
-
 /* ── Helpers ── */
 
 const sc = (s: number) => s >= 70 ? "text-emerald-400" : s >= 40 ? "text-amber-400" : "text-red-400";
@@ -45,75 +36,36 @@ const PRODUCT_CATEGORIES: Record<string, string[]> = {
   "Food & Beverage": ["Ingredients", "Dietary tags", "Shelf life", "Origin", "Certifications", "Nutrition facts"],
 };
 
-/* ── SaaS: SoftwareApplication fields AI checks ── */
-
-const SAAS_FIELDS = [
-  { key: "name", label: "Software Name", desc: "AI needs to know your exact product name to recommend it" },
-  { key: "description", label: "Description", desc: "What does your software do? Must be clear, specific, and keyword-rich" },
-  { key: "applicationCategory", label: "Category", desc: "e.g. BusinessApplication, CRMSoftware — AI uses this to match user intent" },
-  { key: "operatingSystem", label: "Platform", desc: "Web, iOS, Android — AI filters by platform availability" },
-  { key: "url", label: "Website URL", desc: "Must match your canonical domain for AI trust signals" },
-  { key: "offers.price", label: "Price", desc: "AI shoppers frequently ask 'cheap X tool' or 'X under \\$Y/mo'" },
-  { key: "offers.priceCurrency", label: "Currency", desc: "USD, EUR, etc. — AI needs to know which currency your price is in" },
-  { key: "aggregateRating.ratingValue", label: "Rating Score", desc: "AI heavily weights social proof when ranking — 4.0+ recommended" },
-  { key: "aggregateRating.reviewCount", label: "Review Count", desc: "Number of reviews — more reviews = more AI trust" },
-  { key: "screenshot", label: "Screenshots", desc: "Visual proof increases AI confidence in your product" },
-  { key: "featureList", label: "Feature List", desc: "AI matches features to user needs — missing features = missed matches" },
-  { key: "datePublished", label: "Launch Date", desc: "Older, established software gets higher AI trust" },
-];
-
 export default function KnowledgeGraphPage() {
   const { user, loading: authLoading } = useAuth();
   const [domain, setDomain] = useState("");
   const [category, setCategory] = useState("");
   const [report, setReport] = useState<Report | null>(null);
-  const [saasReport, setSaasReport] = useState<SaaSReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"saas" | "ecommerce">("ecommerce");
-  const isSaaS = mode === "saas";
 
   useEffect(() => {
     if (user) {
       const key = `prodrank_last_domain_${user.id}`;
       const last = localStorage.getItem(key);
       if (last) setDomain(last);
-      const savedMode = localStorage.getItem("prodrank_dashboard_mode");
-      if (savedMode === "saas" || savedMode === "ecommerce") setMode(savedMode);
     }
   }, [user]);
 
   const runAnalysis = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!domain.trim()) return;
-    setLoading(true); setError(""); setReport(null); setSaasReport(null);
-
+    setLoading(true); setError(""); setReport(null);
     const cleanDomain = domain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
     const url = `https://${cleanDomain}`;
-
     try {
-      if (isSaaS) {
-        // SaaS path: use SoftwareApplication audit
-        const res = await fetch("/api/audit/saas", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        setSaasReport(await res.json());
-      } else {
-        // Ecommerce path: full AI intelligence
-        const res = await fetch("/api/intel/full", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, brand: cleanDomain, category: category || "" }),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        setReport(await res.json());
-      }
-    } catch (err: any) {
-      setError(err.message || "Analysis failed");
-    }
+      const res = await fetch("/api/intel/full", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, brand: cleanDomain, category: category || "" }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setReport(await res.json());
+    } catch (err: any) { setError(err.message || "Analysis failed"); }
     setLoading(false);
   };
 
@@ -129,13 +81,9 @@ export default function KnowledgeGraphPage() {
           <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 text-sm">← Dashboard</Link>
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold mt-1">🧠 Knowledge Graph</h1>
-            <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full mt-1">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
+            <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full mt-1">🛒 Store</span>
           </div>
-          <p className="text-zinc-400 text-sm mt-1">
-            {isSaaS
-              ? "Audit what AI agents know about your SaaS — which fields are missing from your schema and what's costing you AI recommendations."
-              : "See exactly what AI agents know about your products — which attributes they find, which they miss, and what to fix."}
-          </p>
+          <p className="text-zinc-400 text-sm mt-1">See exactly what AI agents know about your products — which attributes they find, which they miss, and what to fix.</p>
         </div>
 
         {/* ═══ INPUT ═══ */}
@@ -143,13 +91,11 @@ export default function KnowledgeGraphPage() {
           <div className="flex gap-3">
             <input value={domain} onChange={e => setDomain(e.target.value)} placeholder="yourdomain.com"
               className="flex-1 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-            {!isSaaS && (
-              <input value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. winter jackets (optional)"
-                className="w-52 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-            )}
+            <input value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. winter jackets (optional)"
+              className="w-52 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             <button type="submit" disabled={loading || !domain.trim()}
               className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg transition whitespace-nowrap">
-              {loading ? "Analyzing…" : isSaaS ? "🔍 Audit SaaS Schema" : "🔍 Scan Knowledge"}
+              {loading ? "Analyzing…" : "🔍 Scan Knowledge"}
             </button>
           </div>
           {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
@@ -159,149 +105,11 @@ export default function KnowledgeGraphPage() {
         {loading && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-20 text-center">
             <div className="animate-spin h-8 w-8 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-zinc-400">{isSaaS ? "Scanning SoftwareApplication schema on" : "Asking AI agents what they know about"} {domain}…</p>
+            <p className="text-zinc-400">Asking AI agents what they know about {domain}…</p>
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════ */}
-        {/* ═══════════  SaaS REPORT ══════════════════════════════════ */}
-        {/* ═══════════════════════════════════════════════════════════ */}
-        {!loading && saasReport && (
-          <>
-            {/* Score hero */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center">
-              <div className={`text-8xl font-bold tracking-tight ${sc(saasReport.content_quality_score)}`}>{saasReport.content_quality_score}</div>
-              <div className="text-sm text-zinc-500 mt-1">Schema Health Score</div>
-              <div className={`inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-medium ${saasReport.content_quality_score >= 60 ? "bg-emerald-900/30 text-emerald-400" : "bg-amber-900/30 text-amber-400"}`}>
-                {saasReport.content_quality_score >= 70 ? "Well Structured" : saasReport.content_quality_score >= 40 ? "Needs Work" : "Poor"}
-              </div>
-              <div className="flex justify-center gap-6 mt-4 text-xs text-zinc-500">
-                <span>{saasReport.schema_fields.filter(f => f.present).length}/{saasReport.schema_fields.length} schema fields</span>
-                <span>{saasReport.has_software_schema ? "✅ Software Schema" : "❌ No Software Schema"}</span>
-                <span>{saasReport.has_org_schema ? "✅ Org Schema" : "❌ No Org Schema"}</span>
-                <span>{saasReport.has_faq_schema ? "✅ FAQ Schema" : "❌ No FAQ Schema"}</span>
-              </div>
-            </div>
-
-            {/* Field-by-field audit */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h3 className="font-semibold text-lg mb-2">📋 SoftwareApplication Schema — Field-by-Field</h3>
-              <p className="text-xs text-zinc-500 mb-5">
-                AI agents check these 12 fields when recommending software. Green = present. Red = missing — each red row has exact code you can add.
-              </p>
-              <div className="space-y-3">
-                {saasReport.schema_fields.map((f, i) => (
-                  <div key={i} className={`rounded-lg p-4 border ${f.present ? "border-emerald-800/50 bg-emerald-900/5" : "border-red-800/40 bg-red-900/10"}`}>
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg flex-shrink-0">{f.present ? "✅" : "❌"}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-zinc-200">{f.field}</div>
-                        {f.present && f.value ? (
-                          <div className="text-xs text-emerald-400/70 mt-0.5 truncate max-w-lg" title={f.value}>Current: {f.value}</div>
-                        ) : (
-                          <div className="text-xs text-amber-400 mt-0.5">{f.note}</div>
-                        )}
-                      </div>
-                      <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full ${f.present ? "bg-emerald-900/50 text-emerald-400" : "bg-red-900/50 text-red-400"}`}>
-                        {f.present ? "✓" : `Missing —8 pts`}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Missing fields summary */}
-              {saasReport.schema_fields.filter(f => !f.present).length > 0 && (
-                <div className="mt-5 space-y-3">
-                  <div className="p-4 bg-amber-900/10 border border-amber-800 rounded-lg">
-                    <div className="text-sm font-medium text-amber-400 mb-2">
-                      🔧 {saasReport.schema_fields.filter(f => !f.present).length} missing fields
-                    </div>
-                    <div className="flex gap-3">
-                      <button onClick={async () => {
-                        if (!domain) return;
-                        setLoading(true);
-                        try {
-                          const clean = domain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
-                          const res = await fetch("/api/audit/saas/auto-fix", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ url: `https://${clean}` }),
-                          });
-                          if (res.ok) {
-                            const data = await res.json();
-                            // Re-scan to show updated results
-                            const reRes = await fetch("/api/audit/saas", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ url: `https://${clean}` }),
-                            });
-                            if (reRes.ok) setSaasReport(await reRes.json());
-                          } else {
-                            alert("Auto-fix failed. Try manual fix instead.");
-                          }
-                        } catch { alert("Network error. Try again."); }
-                        setLoading(false);
-                      }}
-                        disabled={loading}
-                        className="flex-1 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition text-center">
-                        ⚡ Auto-Fix (1 Click) →
-                      </button>
-                      <Link href={`/saas-optimize?url=${encodeURIComponent(`https://${domain}`)}`}
-                        className="flex-1 px-5 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-medium rounded-lg transition text-center">
-                        🔧 Manual Fix →
-                      </Link>
-                    </div>
-                  </div>
-                  <p className="text-xs text-zinc-500 text-center">
-                    Auto-Fix: AI fills in the missing fields, stores on server. Your inject-saas.js script auto-loads it on next page visit.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Issues */}
-            {saasReport.content_issues?.length > 0 && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <h3 className="font-semibold text-lg mb-4">⚠️ Content Issues Found</h3>
-                <div className="space-y-2">
-                  {saasReport.content_issues.map((issue, i) => (
-                    <div key={i} className="flex items-start gap-2 text-sm text-zinc-300 bg-zinc-800/50 rounded-lg px-4 py-2.5">
-                      <span className="text-amber-400 mt-0.5">⚠</span><span>{issue}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Action buttons */}
-            <div className="flex gap-3">
-              <Link href={`/saas-optimize?url=${encodeURIComponent(`https://${domain}`)}`} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-center transition">
-                🔧 Generate SoftwareApplication Schema →
-              </Link>
-              <Link href="/inject-guide" className="flex-1 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium rounded-lg text-center transition">
-                ⚡ Install inject-saas.js →
-              </Link>
-            </div>
-
-            {/* AI Field Reference */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h3 className="font-semibold text-lg mb-4">🤖 What Each Field Means to AI</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {SAAS_FIELDS.map(f => (
-                  <div key={f.key} className="bg-zinc-800/30 rounded-lg p-3.5 border border-zinc-700/50">
-                    <div className="text-sm font-medium text-zinc-200">{f.label}</div>
-                    <div className="text-xs text-zinc-500 mt-0.5">{f.desc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════ */}
-        {/* ═════════  ECOMMERCE REPORT ═══════════════════════════════ */}
-        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* ═════════  ECOMMERCE REPORT ═══════════ */}
         {!loading && report && (
           <>
             {/* Score overview */}
@@ -468,15 +276,11 @@ export default function KnowledgeGraphPage() {
         )}
 
         {/* ═══════ EMPTY STATE ═══════ */}
-        {!loading && !report && !saasReport && (
+        {!loading && !report && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center space-y-3">
             <div className="text-4xl">🧠</div>
-            <h3 className="text-lg font-semibold text-white">{isSaaS ? "Audit Your SaaS Schema" : "See What AI Knows About Your Products"}</h3>
-            <p className="text-zinc-400 text-sm max-w-md mx-auto">
-              {isSaaS
-                ? "We'll scan your site for SoftwareApplication schema and show exactly which fields AI agents need — and which ones you're missing."
-                : "Enter a product page URL above. We'll ask ChatGPT, Gemini, and Claude what they know about your product — and show you the gaps."}
-            </p>
+            <h3 className="text-lg font-semibold text-white">See What AI Knows About Your Products</h3>
+            <p className="text-zinc-400 text-sm max-w-md mx-auto">Enter a product page URL above. We'll ask ChatGPT, Gemini, and Claude what they know about your product — and show you the gaps.</p>
           </div>
         )}
       </div>

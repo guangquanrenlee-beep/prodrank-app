@@ -24,8 +24,6 @@ function CompareContent() {
   const [results, setResults] = useState<Competitor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"saas" | "ecommerce">("ecommerce");
-  const isSaaS = mode === "saas";
 
   useEffect(() => {
     if (user) {
@@ -33,8 +31,6 @@ function CompareContent() {
         const last = localStorage.getItem(`prodrank_last_domain_${user.id}`);
         if (last) setDomain(last);
       }
-      const savedMode = localStorage.getItem("prodrank_dashboard_mode");
-      if (savedMode === "saas" || savedMode === "ecommerce") setMode(savedMode);
     }
   }, [user]);
 
@@ -74,12 +70,10 @@ function CompareContent() {
           <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 text-sm">← Dashboard</Link>
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold mt-1">⚔️ Competitor Monitor</h1>
-            <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full mt-1">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
+            <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full mt-1">{"🛒 Store"}</span>
           </div>
           <p className="text-zinc-400 text-sm mt-1">
-            {isSaaS
-              ? "We auto-detect your top 4 competitors using AI, then compare schema, content, and estimated AI visibility side by side."
-              : "Compare your product pages against competitors."}
+            Compare your product pages against competitors.
           </p>
         </div>
 
@@ -98,11 +92,7 @@ function CompareContent() {
               {loading ? "Analyzing…" : "⚔️ Compare vs Competitors"}
             </button>
           </div>
-          <p className="text-xs text-zinc-500">
-            {isSaaS
-              ? "AI will detect your top competitors, then we compare schema completeness, content depth, and estimated AI visibility scores."
-              : "Paste product URLs to compare schema and content quality."}
-          </p>
+          <p className="text-xs text-zinc-500">Compare schema completeness, content depth, and estimated AI visibility scores against competitors.</p>
           {error && <p className="text-red-400 text-sm">{error}</p>}
         </div>
 
@@ -181,9 +171,7 @@ function CompareContent() {
                 <div className="bg-blue-900/10 border border-blue-800 rounded-xl p-5">
                   <div className="text-xs text-blue-400 font-medium mb-1">💡 What to Do</div>
                   <div className="text-xs text-zinc-400">
-                    {isSaaS
-                      ? "1. Match the top schema count  2. Exceed their word count by 2x  3. Get listed on directories they're on"
-                      : "1. Match best schema coverage  2. Add FAQ if they have it  3. Write longer descriptions"}
+                    1. Match best schema coverage  2. Add FAQ if competitors have it  3. Write longer, more detailed descriptions
                   </div>
                 </div>
               </>;

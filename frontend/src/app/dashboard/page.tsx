@@ -12,7 +12,7 @@ interface ScoreData {
   recommendation: string; analyzed_at?: string; title?: string;
 }
 
-const NAV_ECOMMERCE = [
+const NAV = [
   { label: "Products", href: "/products", icon: "📦" },
   { label: "Knowledge Graph", href: "/knowledge-graph", icon: "🧠" },
   { label: "Knowledge Base", href: "/knowledge-base", icon: "📚" },
@@ -23,19 +23,6 @@ const NAV_ECOMMERCE = [
   { label: "Action Center", href: "/actions", icon: "⚡" },
   { label: "Optimization Center", href: "/optimize", icon: "🔧" },
   { label: "Verification", href: "/verify", icon: "📈" },
-  { label: "Monitoring", href: "/monitoring", icon: "📡" },
-  { label: "Reports", href: "/reports", icon: "📊" },
-  { label: "Integrations", href: "/integrations", icon: "🔌" },
-  { label: "Settings", href: "/settings", icon: "⚙️" },
-];
-
-const NAV_SAAS = [
-  { label: "Knowledge Graph", href: "/knowledge-graph", icon: "🧠" },
-  { label: "Knowledge Base", href: "/knowledge-base", icon: "📚" },
-  { label: "Citation Intelligence", href: "/cite", icon: "📰" },
-  { label: "Competitors", href: "/compare", icon: "⚔️" },
-  { label: "Social Listening", href: "/social-listening", icon: "👂" },
-  { label: "Source Marketplace", href: "/marketplace", icon: "🏪" },
   { label: "Monitoring", href: "/monitoring", icon: "📡" },
   { label: "Reports", href: "/reports", icon: "📊" },
   { label: "Integrations", href: "/integrations", icon: "🔌" },
@@ -66,7 +53,6 @@ const PILLAR_INFO: Record<string, { icon: string; desc: string; lowWhy: string; 
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const [mode, setMode] = useState<"ecommerce" | "saas">("ecommerce");
   const [domain, setDomain] = useState("");
   const [cms, setCms] = useState<CMSData | null>(null);
   const [score, setScore] = useState<ScoreData | null>(null);
@@ -88,8 +74,6 @@ export default function DashboardPage() {
       const key = `prodrank_last_domain_${user.id}`;
       const last = localStorage.getItem(key);
       if (last && !domain) setDomain(last);
-      const savedMode = localStorage.getItem("prodrank_dashboard_mode");
-      if (savedMode === "saas" || savedMode === "ecommerce") setMode(savedMode);
     }
   }, [user]);
 
@@ -135,7 +119,6 @@ export default function DashboardPage() {
     setWhyLoading(false);
   };
 
-  const isSaaS = mode === "saas";
   const hasBreakdown = score && Object.keys(score.breakdown || {}).length > 0;
 
   const loadSites = async (uid: string) => {
@@ -199,7 +182,7 @@ export default function DashboardPage() {
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-zinc-500 hover:text-zinc-300 text-xs">{sidebarOpen ? "◀" : "▶"}</button>
         </div>
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {(isSaaS ? NAV_SAAS : NAV_ECOMMERCE).map(item => (
+          {NAV.map(item => (
             <Link key={item.href} href={item.href} className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition">
               <span>{item.icon}</span>{sidebarOpen && <span>{item.label}</span>}
             </Link>
