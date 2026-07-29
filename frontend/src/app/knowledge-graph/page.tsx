@@ -56,14 +56,21 @@ export default function KnowledgeGraphPage() {
     e.preventDefault();
     if (!domain.trim()) return;
     setLoading(true); setError(""); setReport(null);
-    const cleanDomain = domain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
-    const url = `https://${cleanDomain}`;
+    const raw = domain.trim();
+    // Accept both full URLs and bare domains
+    let url: string;
+    if (raw.startsWith("http")) {
+      url = raw.replace(/\/$/, "");
+    } else {
+      const clean = raw.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
+      url = `https://${clean}`;
+    }
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90000); // 90s
+      const timeout = setTimeout(() => controller.abort(), 90000);
       const res = await fetch("/api/intel/full", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, brand: cleanDomain, category: category || "" }),
+        body: JSON.stringify({ url, brand: new URL(url).hostname, category: category || "" }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -96,7 +103,7 @@ export default function KnowledgeGraphPage() {
         {/* ═══ INPUT ═══ */}
         <form onSubmit={runAnalysis} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
           <div className="flex gap-3">
-            <input value={domain} onChange={e => setDomain(e.target.value)} placeholder="yourdomain.com"
+            <input value={domain} onChange={e => setDomain(e.target.value)} placeholder="yourstore.com or paste a product URL"
               className="flex-1 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             <input value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. winter jackets (optional)"
               className="w-52 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
