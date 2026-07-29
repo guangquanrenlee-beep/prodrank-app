@@ -46,8 +46,7 @@ export default function KnowledgeGraphPage() {
 
   useEffect(() => {
     if (user) {
-      const key = `prodrank_last_domain_${user.id}`;
-      const last = localStorage.getItem(key);
+      const last = localStorage.getItem(`prodrank_last_kg_url_${user.id}`);
       if (last) setDomain(last);
     }
   }, [user]);
@@ -75,7 +74,9 @@ export default function KnowledgeGraphPage() {
       });
       clearTimeout(timeout);
       if (!res.ok) throw new Error(await res.text());
-      setReport(await res.json());
+      const result = await res.json();
+      setReport(result);
+      if (user) localStorage.setItem(`prodrank_last_kg_url_${user.id}`, url);
     } catch (err: any) {
       if (err.name === "AbortError") setError("Analysis timed out after 90s — the site may be too large. Try a smaller site.");
       else setError(err.message || "Analysis failed. The site might be blocking our crawler. Try installing inject.js first.");
