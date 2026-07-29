@@ -59,13 +59,20 @@ export default function KnowledgeGraphPage() {
     const cleanDomain = domain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
     const url = `https://${cleanDomain}`;
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90000); // 90s
       const res = await fetch("/api/intel/full", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, brand: cleanDomain, category: category || "" }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (!res.ok) throw new Error(await res.text());
       setReport(await res.json());
-    } catch (err: any) { setError(err.message || "Analysis failed"); }
+    } catch (err: any) {
+      if (err.name === "AbortError") setError("Analysis timed out after 90s — the site may be too large. Try a smaller site.");
+      else setError(err.message || "Analysis failed. The site might be blocking our crawler. Try installing inject.js first.");
+    }
     setLoading(false);
   };
 
@@ -103,9 +110,16 @@ export default function KnowledgeGraphPage() {
 
         {/* ═══ LOADING ═══ */}
         {loading && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-20 text-center">
-            <div className="animate-spin h-8 w-8 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-zinc-400">Asking AI agents what they know about {domain}…</p>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-20 text-center space-y-3">
+            <div className="animate-spin h-8 w-8 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto" />
+            <p className="text-zinc-400 font-medium">Scanning {domain}…</p>
+            <div className="text-xs text-zinc-600 space-y-1">
+              <p>🔍 Crawling product pages &amp; reading Schema</p>
+              <p>🤖 Asking ChatGPT what it knows about your products</p>
+              <p>🔮 Asking Gemini to cross-validate</p>
+              <p>📊 Building AI Understanding report</p>
+            </div>
+            <p className="text-xs text-zinc-500 mt-4">This takes 30-60 seconds for most sites</p>
           </div>
         )}
 
