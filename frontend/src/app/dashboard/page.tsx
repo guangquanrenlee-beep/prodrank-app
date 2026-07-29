@@ -13,8 +13,6 @@ interface ScoreData {
 }
 
 const NAV_ECOMMERCE = [
-  { label: "🏠 Home", href: "/", icon: "" },
-  { label: "Dashboard", href: "/dashboard", icon: "📊", active: true },
   { label: "Products", href: "/products", icon: "📦" },
   { label: "Knowledge Graph", href: "/knowledge-graph", icon: "🧠" },
   { label: "Knowledge Base", href: "/knowledge-base", icon: "📚" },
@@ -32,8 +30,6 @@ const NAV_ECOMMERCE = [
 ];
 
 const NAV_SAAS = [
-  { label: "🏠 Home", href: "/", icon: "" },
-  { label: "Dashboard", href: "/dashboard", icon: "📊", active: true },
   { label: "Knowledge Graph", href: "/knowledge-graph", icon: "🧠" },
   { label: "Knowledge Base", href: "/knowledge-base", icon: "📚" },
   { label: "Citation Intelligence", href: "/cite", icon: "📰" },
@@ -59,14 +55,18 @@ function timeAgo(iso: string): string {
 }
 
 const GREETINGS = ["Good Morning", "Good Afternoon", "Good Evening"];
-function getGreeting() {
-  const h = new Date().getHours();
-  return h < 12 ? GREETINGS[0] : h < 18 ? GREETINGS[1] : GREETINGS[2];
-}
+function getGreeting() { const h = new Date().getHours(); return h < 12 ? GREETINGS[0] : h < 18 ? GREETINGS[1] : GREETINGS[2]; }
+
+const PILLAR_INFO: Record<string, { icon: string; desc: string; lowWhy: string; midWhy: string; evidenceKeys: string[] }> = {
+  discover: { icon: "🔍", desc: "Can AI find your products?", lowWhy: "AI cannot discover your products. Missing Product Schema means search engines and AI agents don't know your products exist.", midWhy: "AI can partially find your products. Some Schema fields are missing — complete them for full visibility.", evidenceKeys: ["No Product Schema", "Missing brand/price/shipping", "No structured data"] },
+  understand: { icon: "🧠", desc: "Does AI understand them?", lowWhy: "Product descriptions are incomplete. AI needs detailed content — materials, audience, use cases, comparisons — to understand what you sell.", midWhy: "AI understands some products but coverage gaps remain. Add FAQ and detailed descriptions.", evidenceKeys: ["Short descriptions", "Missing FAQ", "No H1 tags", "No alt text"] },
+  trust: { icon: "🛡️", desc: "Does AI believe in them?", lowWhy: "AI cannot verify your brand. Without reviews, citations, and external mentions, AI sees your products as unverified.", midWhy: "AI has partial trust. More reviews, citations, and brand mentions will strengthen your position.", evidenceKeys: ["No Review Schema", "No external reviews", "No Reddit/YouTube mentions", "Weak brand entity"] },
+  recommend: { icon: "🚀", desc: "Will AI recommend them?", lowWhy: "AI confidence is low. Until Discover, Understand, and Trust scores improve, AI will recommend competitors over you.", midWhy: "Some AI agents recommend you. Fix remaining gaps to increase recommendation frequency.", evidenceKeys: ["Not mentioned by AI agents", "Competitors outrank you", "Low recommendation rate"] },
+};
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const [mode, setMode] = useState<"ecommerce" | "saas">("ecommerce");
+  const [mode, setMode] = useState<"ecommerce" | "saas">("saas");
   const [domain, setDomain] = useState("");
   const [cms, setCms] = useState<CMSData | null>(null);
   const [score, setScore] = useState<ScoreData | null>(null);
@@ -74,11 +74,13 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [sites, setSites] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [refreshingScore, setRefreshingScore] = useState(false);
   const [scoreHistory, setScoreHistory] = useState<{date:string;score:number}[]>([]);
   const [scoreTrend, setScoreTrend] = useState<"up"|"down"|"flat">("flat");
   const [scoreChange, setScoreChange] = useState(0);
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [aiSummary, setAiSummary] = useState<any>(null);
+  const [showWhy, setShowWhy] = useState(false);
+  const [whyLoading, setWhyLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -95,24 +97,43 @@ export default function DashboardPage() {
     if (!domain || !score) return;
     const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
     fetch(`/api/score/history?domain=${encodeURIComponent(clean)}&days=30`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.snapshots?.length > 0) {
-          setScoreHistory(d.snapshots);
-          setScoreTrend(d.trend || "flat");
-          setScoreChange(d.change || 0);
-        }
+      .then(r => r.json()).then(d => {
+        if (d.snapshots?.length > 0) { setScoreHistory(d.snapshots); setScoreTrend(d.trend || "flat"); setScoreChange(d.change || 0); }
         const newAlerts: string[] = [];
-        if (score?.breakdown) {
-          for (const [key, val] of Object.entries(score.breakdown)) {
-            if (val.score < 20) newAlerts.push(`${val.label || key} critically low at ${val.score}/100 — needs immediate attention`);
-          }
-        }
-        if (d.trend === "down") newAlerts.push(`Score trending down over ${d.snapshots.length} days — check what changed`);
+        if (score?.breakdown) for (const [key, val] of Object.entries(score.breakdown)) { if (val.score < 20) newAlerts.push(`${val.label || key} critically low at ${val.score}/100`); }
         setAlerts(newAlerts);
-      })
-      .catch(() => {});
+      }).catch(() => {});
   }, [domain, score]);
+
+  useEffect(() => {
+    if (score) fetchAiSummary();
+  }, [score]);
+
+  const fetchAiSummary = async () => {
+    if (!score) return;
+    const b = score.breakdown || {};
+    try {
+      const res = await fetch("/api/dashboard/ai-summary", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ score: score.ai_visibility_score, discover: b.discover?.score || 0, understand: b.understand?.score || 0, trust: b.trust?.score || 0, recommend: b.recommend?.score || 0, domain, product_count: sites.length || 1 }),
+      });
+      if (res.ok) setAiSummary(await res.json());
+    } catch {}
+  };
+
+  const fetchWhyAnalysis = async () => {
+    setWhyLoading(true);
+    try {
+      const b = score?.breakdown || {};
+      const res = await fetch("/api/dashboard/ai-summary", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ score: score?.ai_visibility_score || 0, discover: b.discover?.score || 0, understand: b.understand?.score || 0, trust: b.trust?.score || 0, recommend: b.recommend?.score || 0, domain, product_count: sites.length || 1 }),
+      });
+      if (res.ok) setAiSummary(await res.json());
+      setShowWhy(true);
+    } catch {}
+    setWhyLoading(false);
+  };
 
   const isSaaS = mode === "saas";
   const hasBreakdown = score && Object.keys(score.breakdown || {}).length > 0;
@@ -124,23 +145,21 @@ export default function DashboardPage() {
       const last = data[0];
       setDomain(last.domain);
       setCms({ domain: last.domain, platform: last.platform || "unknown", confidence: last.platform_confidence || 0, recommended_action: "Previously analyzed.", auth_method: last.auth_method || "csv_upload" });
-      if (last.score_data) { setScore(last.score_data as ScoreData); }
-      else if (last.ai_visibility_score) {
-        setScore({ ai_visibility_score: last.ai_visibility_score, label: last.ai_visibility_score >= 60 ? "Good" : "Poor", breakdown: {}, recommendation: "" });
-      }
+      if (last.score_data) setScore(last.score_data as ScoreData);
+      else if (last.ai_visibility_score) setScore({ ai_visibility_score: last.ai_visibility_score, label: last.ai_visibility_score >= 60 ? "Good" : "Poor", breakdown: {}, recommendation: "" });
     }
   };
 
-  const saveScoreToDB = async (cleanDomain: string, scoreData: ScoreData) => {
-    const enriched = { ...scoreData, analyzed_at: new Date().toISOString() };
-    await supabase.from("sites").update({ ai_visibility_score: scoreData.ai_visibility_score, score_data: enriched, updated_at: new Date().toISOString() }).eq("user_id", user!.id).eq("domain", cleanDomain);
+  const saveScoreToDB = async (cleanDomain: string, sd: ScoreData) => {
+    const enriched = { ...sd, analyzed_at: new Date().toISOString() };
+    await supabase.from("sites").update({ ai_visibility_score: sd.ai_visibility_score, score_data: enriched, updated_at: new Date().toISOString() }).eq("user_id", user!.id).eq("domain", cleanDomain);
   };
 
   const handleAnalyze = useCallback(async (e?: React.FormEvent, targetDomain?: string) => {
     if (e) e.preventDefault();
     const d = (targetDomain || domain).trim();
     if (!d || !user) return;
-    setLoading(true); setError(""); setCms(null); setScore(null);
+    setLoading(true); setError(""); setCms(null); setScore(null); setAiSummary(null);
     try {
       const cleanDomain = d.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
       const cmsRes = await fetch("/api/cms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: cleanDomain }) });
@@ -150,8 +169,7 @@ export default function DashboardPage() {
       const scoreRes = await fetch("/api/calculate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: `https://${cleanDomain}`, product_name: cleanDomain }) });
       if (scoreRes.ok) {
         const sd: ScoreData = await scoreRes.json();
-        setScore(sd);
-        setDomain(cleanDomain);
+        setScore(sd); setDomain(cleanDomain);
         localStorage.setItem(`prodrank_last_domain_${user.id}`, cleanDomain);
         await saveScoreToDB(cleanDomain, sd);
         await loadSites(user.id);
@@ -160,26 +178,17 @@ export default function DashboardPage() {
     setLoading(false);
   }, [domain, user]);
 
-  const handleRefresh = async () => { setRefreshingScore(true); await handleAnalyze(undefined, domain); setRefreshingScore(false); };
+  const handleRefresh = async () => { setAiSummary(null); await handleAnalyze(undefined, domain); };
 
-  if (authLoading) return (<main className="min-h-screen flex items-center justify-center bg-zinc-950"><div className="animate-spin h-5 w-5 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full" /></main>);
-  if (!user) return (<main className="min-h-screen flex items-center justify-center bg-zinc-950"><div className="text-center space-y-4"><p className="text-zinc-400">Sign in to see your dashboard</p><Link href="/login" className="text-emerald-400">Sign in →</Link></div></main>);
+  if (authLoading) return <main className="min-h-screen flex items-center justify-center bg-zinc-950"><div className="animate-spin h-5 w-5 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full" /></main>;
+  if (!user) return <main className="min-h-screen bg-zinc-950 flex items-center justify-center"><div className="text-center space-y-4"><p className="text-zinc-400">Sign in to see your dashboard</p><Link href="/login" className="text-emerald-400">Sign in →</Link></div></main>;
 
   const sc = (s: number) => s >= 70 ? "text-emerald-400" : s >= 40 ? "text-amber-400" : "text-red-400";
-  const sb = (s: number) => s >= 70 ? "bg-emerald-500" : s >= 40 ? "bg-amber-500" : "bg-red-500";
+  const scFill = (s: number) => s >= 70 ? "#10b981" : s >= 40 ? "#f59e0b" : "#ef4444";
   const lastAnalyzed = score?.analyzed_at || null;
   const hasNoSites = sites.length === 0;
-
-  // Today's priority: weakest scoring dimension
-  const dims = hasBreakdown ? (Object.entries(score!.breakdown) as [string, { score: number; weight: number; label?: string; desc?: string }][]).sort((a, b) => a[1].score - b[1].score) : [];
-  const weakest = dims[0];
-
-  const PILLAR_ACTIONS: Record<string, { icon: string; action: string; link: string }> = {
-    discover: { icon: "🔍", action: "Fix Schema — Run Auto-Fix", link: `/knowledge-graph?domain=${encodeURIComponent(domain)}` },
-    understand: { icon: "🧠", action: "Expand Product Content & Descriptions", link: `/knowledge-graph?domain=${encodeURIComponent(domain)}` },
-    trust: { icon: "🛡️", action: "Build Trust — Reviews, Citations, PR", link: "/cite" },
-    recommend: { icon: "🚀", action: "Check Competitor Rankings", link: `/compare?domain=${encodeURIComponent(domain)}` },
-  };
+  const breakdown = score?.breakdown || {};
+  const pillars = ["discover", "understand", "trust", "recommend"];
 
   return (
     <div className="min-h-screen bg-zinc-950 flex">
@@ -191,7 +200,7 @@ export default function DashboardPage() {
         </div>
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {(isSaaS ? NAV_SAAS : NAV_ECOMMERCE).map(item => (
-            <Link key={item.href} href={item.href} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${item.active ? "bg-emerald-900/30 text-emerald-400" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"}`}>
+            <Link key={item.href} href={item.href} className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition">
               <span>{item.icon}</span>{sidebarOpen && <span>{item.label}</span>}
             </Link>
           ))}
@@ -204,190 +213,256 @@ export default function DashboardPage() {
 
       {/* Main */}
       <main className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
+        <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
 
-          {/* ===== HEADER: Greeting + Domain input ===== */}
+          {/* HEADER */}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-bold">{getGreeting()}, {user.email?.split("@")[0]}</h1>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
-                <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full">{isSaaS ? "💻 SaaS" : "🛒 Store"}</span>
-                {domain && <span className="text-xs text-zinc-500">{domain}</span>}
-                {lastAnalyzed && <span className="text-xs text-zinc-600">Analyzed {timeAgo(lastAnalyzed)}</span>}
-              </div>
+              <h1 className="text-xl font-bold text-zinc-300">{getGreeting()}, {user.email?.split("@")[0]}</h1>
+              {domain && <span className="text-xs text-zinc-600">{domain} {lastAnalyzed ? `· Analyzed ${timeAgo(lastAnalyzed)}` : ""}</span>}
             </div>
             <div className="flex gap-2">
-              <input type="text" value={domain} onChange={e => setDomain(e.target.value)} placeholder="yourdomain.com" className="w-48 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-              <button onClick={(e) => handleAnalyze(e as any)} disabled={loading || !domain.trim()} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">{loading ? "..." : "Analyze"}</button>
+              <input type="text" value={domain} onChange={e => setDomain(e.target.value)} placeholder="yourdomain.com" className="w-44 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+              <button onClick={handleRefresh} disabled={loading} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-xs rounded-lg">{loading ? "..." : "Analyze"}</button>
             </div>
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-400 text-xs">{error}</p>}
 
-          {/* ===== NEW USER: No sites ===== */}
+          {/* NEW USER */}
           {hasNoSites && !score && (
-            <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-10 text-center space-y-4">
-              <div className="text-4xl">👋</div>
-              <h3 className="text-xl font-semibold text-white">Welcome to ProdRank!</h3>
-              <p className="text-zinc-400 text-sm max-w-lg mx-auto">
-                Enter your store domain above to see your AI Shopping Score. No setup required — we analyze everything automatically.
-              </p>
+            <div className="bg-emerald-900/10 border border-emerald-800 rounded-2xl p-16 text-center space-y-4">
+              <div className="text-5xl">🤖</div>
+              <h2 className="text-2xl font-bold text-white">The Operating System for AI Shopping Visibility</h2>
+              <p className="text-zinc-400 max-w-md mx-auto">Understand why AI doesn't recommend your products — and fix it.</p>
+              <div className="flex gap-3 justify-center pt-2">
+                <input type="text" value={domain} onChange={e => setDomain(e.target.value)} placeholder="yourstore.com" className="w-56 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm" />
+                <button onClick={(e) => handleAnalyze(e as any)} disabled={loading || !domain.trim()} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-sm">{loading ? "Analyzing…" : "Analyze My Store"}</button>
+              </div>
             </div>
           )}
 
-          {/* ===== HAS SITES BUT NO SCORE ===== */}
-          {!hasNoSites && !score && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center space-y-3">
-              <div className="text-3xl">📊</div>
-              <p className="text-zinc-300 font-medium">Select a site above or enter a new domain to see your AI Visibility Score.</p>
-            </div>
+          {/* NO SCORE */}
+          {!hasNoSites && !score && !loading && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center text-zinc-500">Select a site or enter a new domain above.</div>
           )}
 
-          {/* ===== SCORE LOADED ===== */}
+          {/* LOADING */}
+          {loading && <div className="text-center py-20"><div className="animate-spin h-8 w-8 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"/><p className="text-zinc-400 text-sm">Scanning {domain}…</p></div>}
+
+          {/* ══════════ SCORE LOADED ══════════ */}
           {score && (
             <>
-              {/* Overal Score Hero */}
+              {/* ── ROW 1: AI Shopping Score + Why ── */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center relative">
-                <button onClick={handleRefresh} disabled={refreshingScore} className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-500 text-xs rounded-lg"><span className={refreshingScore ? "animate-spin" : ""}>🔄</span></button>
-                <div className="text-xs text-zinc-500 mb-2">AI Recommendation Readiness</div>
-                <div className={`text-8xl font-bold tracking-tight ${sc(score.ai_visibility_score || 0)}`}>{score.ai_visibility_score}</div>
-                <div className="flex items-center justify-center gap-2 mt-2">
-                  {scoreChange !== 0 ? (
-                    <span className={`text-sm font-medium ${scoreChange > 0 ? "text-emerald-400" : "text-red-400"}`}>{scoreChange > 0 ? `▲ +${scoreChange}` : `▼ ${scoreChange}`} from last report</span>
-                  ) : (
-                    <span className="text-sm text-zinc-500">No change from last report</span>
-                  )}
+                <div className="text-xs text-zinc-500 mb-2 uppercase tracking-wider">AI Shopping Score</div>
+                <div className="flex items-center justify-center gap-4">
+                  <div className={`text-8xl font-bold tracking-tight ${sc(score.ai_visibility_score)}`}>{score.ai_visibility_score}</div>
+                  <div className="text-left">
+                    <div className="text-xs text-zinc-500">/100</div>
+                    <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${score.ai_visibility_score >= 60 ? "bg-emerald-900/30 text-emerald-400" : score.ai_visibility_score >= 40 ? "bg-amber-900/30 text-amber-400" : "bg-red-900/30 text-red-400"}`}>{score.label}</div>
+                    {scoreChange !== 0 && <div className={`text-xs mt-1 ${scoreChange > 0 ? "text-emerald-400" : "text-red-400"}`}>{scoreChange > 0 ? `↑ +${scoreChange} this week` : `↓ ${scoreChange} this week`}</div>}
+                  </div>
                 </div>
-                <div className={`inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-full text-xs font-medium ${score.ai_visibility_score >= 60 ? "bg-emerald-900/30 text-emerald-400" : "bg-amber-900/30 text-amber-400"}`}>{score.label}</div>
-                {scoreHistory.length >= 2 && (
-                  <div className="mt-4 flex items-end justify-center gap-0.5 h-10">
-                    {scoreHistory.slice(-14).map((s, i) => { const h = Math.max(4, (s.score / 100) * 40); return <div key={i} className="w-2 bg-emerald-500/60 rounded-t-sm" style={{ height: `${h}px` }} title={`${s.date}: ${s.score}`} />; })}
-                  </div>
-                )}
+                <button onClick={fetchWhyAnalysis} disabled={whyLoading} className="mt-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition">
+                  {whyLoading ? "Analyzing…" : "🤔 Why?"}
+                </button>
               </div>
 
-              {/* Four Pillars */}
-              <div className="grid grid-cols-4 gap-3">
-                {hasBreakdown && Object.entries(score.breakdown).map(([key, val]) => (
-                  <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center">
-                    <div className={`text-3xl font-bold ${sc(val.score)}`}>{val.score}</div>
-                    <div className="text-xs text-zinc-400 mt-1">{val.label || key}</div>
-                    <div className="text-xs text-zinc-600 mt-0.5">{val.desc || ""}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Today's Priority — weakest pillar */}
-              {weakest && (
-                <div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-6">
+              {/* WHY MODAL */}
+              {showWhy && aiSummary && (
+                <div className="bg-zinc-900 border border-emerald-800/50 rounded-2xl p-8 space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs text-emerald-400 font-medium mb-1">⭐ TODAY'S PRIORITY</div>
-                      <div className="text-lg font-semibold text-white">
-                        {PILLAR_ACTIONS[weakest[0]]?.action || `Improve ${weakest[1].label || weakest[0]}`}
-                      </div>
-                      <div className="text-xs text-zinc-400 mt-1">
-                        Expected Gain: +{Math.round((100 - weakest[1].score) * 0.25)} pts &nbsp;|&nbsp; Time: ~5 min
-                      </div>
-                    </div>
-                    <Link href={PILLAR_ACTIONS[weakest[0]]?.link || "/knowledge-graph"} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition whitespace-nowrap">
-                      Fix Now →
-                    </Link>
+                    <h3 className="font-bold text-emerald-400 text-lg">🔬 AI Analysis</h3>
+                    <button onClick={() => setShowWhy(false)} className="text-zinc-500 hover:text-white text-sm">✕</button>
                   </div>
-                  <div className="mt-3 w-full bg-zinc-800 rounded-full h-2">
-                    <div className={`h-2 rounded-full ${sb(weakest[1].score)}`} style={{ width: `${Math.max(weakest[1].score, 5)}%` }} />
+                  <p className="text-zinc-300 leading-relaxed">{aiSummary.why_explanation || aiSummary.summary}</p>
+                  {aiSummary.simulation && <div className="bg-zinc-800/50 rounded-xl p-4 text-sm text-zinc-400"><span className="text-zinc-500">💡 Simulation:</span> {aiSummary.simulation}</div>}
+                  <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                    <div className="bg-zinc-800/30 rounded-lg p-3"><div className="text-zinc-500">Current</div><div className="text-red-400 font-bold text-lg">{aiSummary.estimated_potential?.current || score.ai_visibility_score}</div></div>
+                    <div className="bg-zinc-800/30 rounded-lg p-3"><div className="text-zinc-500">After Fix</div><div className="text-emerald-400 font-bold text-lg">{aiSummary.estimated_potential?.after_fix || "?"}</div></div>
+                    <div className="bg-emerald-900/20 rounded-lg p-3"><div className="text-zinc-500">Potential Gain</div><div className="text-emerald-400 font-bold text-lg">+{aiSummary.estimated_potential?.gain || "?"}</div></div>
                   </div>
                 </div>
               )}
 
-              {/* Quick stats row */}
+              {/* ── ROW 2: AI Summary ── */}
+              {aiSummary && (
+                <div className="bg-gradient-to-r from-emerald-900/10 to-zinc-900 border border-emerald-800/30 rounded-2xl p-6">
+                  <div className="flex items-center gap-2 mb-3"><span className="text-emerald-400 text-sm">⭐</span><span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Today's AI Summary</span></div>
+                  <p className="text-zinc-300 text-sm leading-relaxed">{aiSummary.summary}</p>
+                  <p className="text-emerald-400 text-sm font-medium mt-2">→ {aiSummary.cta}</p>
+                </div>
+              )}
+
+              {/* ── ROW 3: Four Pillars ── */}
               <div className="grid grid-cols-4 gap-3">
-                {[
-                  { label: "Products Analyzed", value: sites.length || 1, sub: `${sites.length || 1} site${sites.length !== 1 ? "s" : ""}` },
-                  { label: "Schema Health", value: hasBreakdown ? `${score.breakdown?.discover?.score || "—"}/100` : "—", sub: "Discover Score" },
-                  { label: "Competitors Tracked", value: "Auto", sub: "Refreshed with each scan" },
-                  { label: "Alerts", value: alerts.length, sub: alerts.length > 0 ? `${alerts.length} need attention` : "All clear" },
-                ].map((s, i) => (
-                  <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
-                    <div className="text-xl font-bold text-emerald-400">{s.value}</div>
-                    <div className="text-xs text-zinc-500 mt-0.5">{s.label}</div>
-                    <div className="text-xs text-zinc-600">{s.sub}</div>
-                  </div>
-                ))}
+                {hasBreakdown && pillars.map(key => {
+                  const val = breakdown[key] || { score: 0 };
+                  const info = PILLAR_INFO[key] || { icon: "•", desc: "", lowWhy: "", midWhy: "", evidenceKeys: [] };
+                  const isLow = val.score < 40;
+                  const isMid = val.score >= 40 && val.score < 70;
+                  return (
+                    <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center group">
+                      {/* Circular progress */}
+                      <div className="relative w-16 h-16 mx-auto mb-2">
+                        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                          <circle cx="18" cy="18" r="15.5" fill="none" stroke="#27272a" strokeWidth="3" />
+                          <circle cx="18" cy="18" r="15.5" fill="none" stroke={scFill(val.score)} strokeWidth="3"
+                            strokeDasharray={`${val.score * 0.97} 100`} strokeLinecap="round" />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className={`text-lg font-bold ${sc(val.score)}`}>{val.score}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs font-semibold text-zinc-200">{info.icon} {val.label || key}</div>
+                      <div className="text-xs text-zinc-500 mt-1 leading-relaxed">{isLow ? info.lowWhy : isMid ? info.midWhy : info.desc}</div>
+                      {isLow && (
+                        <div className="mt-2 space-y-0.5">
+                          {info.evidenceKeys.map((e, i) => <div key={i} className="text-xs text-red-400/70">✗ {e}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* ===== YOUR SITES ===== */}
-              {sites.length > 0 && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold">{isSaaS ? "Your Sites" : "Your Stores"}</h3>
-                    <span className="text-xs text-zinc-500">{sites.length} site{sites.length > 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {sites.map((s: any) => (
-                      <button key={s.id} onClick={() => { setDomain(s.domain); handleAnalyze(undefined, s.domain); }}
-                        className={`bg-zinc-800/50 hover:bg-zinc-800 rounded-lg p-4 flex items-center justify-between transition border text-left ${s.domain === domain ? "border-emerald-700 ring-1 ring-emerald-700/50" : "border-transparent"}`}>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-zinc-200">{s.domain}</span>
-                            {s.inject_active ? (
-                              <span className="text-xs text-emerald-400">● Active</span>
-                            ) : (
-                              <span className="text-xs text-zinc-600">○ Not tracked</span>
-                            )}
-                          </div>
-                          <div className="text-xs text-zinc-500">
-                            {(s.platform && s.platform !== "unknown") ? s.platform : (isSaaS ? "SaaS Site" : "Web Store")}
-                            {s.score_data?.analyzed_at && <span className="ml-2 text-zinc-600">· {timeAgo(s.score_data.analyzed_at)}</span>}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className={`text-lg font-bold ${sc(s.ai_visibility_score || 0)}`}>{s.ai_visibility_score ?? "—"}</div>
-                          <span className="text-xs text-emerald-400">View →</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ===== COMPETITOR MONITOR ===== */}
-              <CompetitorMonitor domain={domain} />
-
-              {/* ===== ALERTS ===== */}
-              {alerts.length > 0 && (
-                <div className="bg-zinc-900 border border-red-800/50 rounded-xl p-6">
-                  <h3 className="font-semibold mb-3 flex items-center gap-2"><span className="text-red-400">🔔</span> Recent Alerts</h3>
+              {/* ── ROW 4: Top Opportunities ── */}
+              {aiSummary?.top_opportunities?.length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <div className="flex items-center gap-2 mb-4"><span className="text-amber-400">⭐</span><h3 className="font-semibold">Top Opportunities</h3></div>
                   <div className="space-y-2">
-                    {alerts.slice(0, 5).map((a, i) => (
-                      <div key={i} className="flex items-start gap-2 text-sm text-zinc-300 bg-red-900/10 border border-red-800/30 rounded-lg px-4 py-2.5">
-                        <span className="text-red-400 mt-0.5">⚠</span><span>{a}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ===== LATEST OPTIMIZATIONS ===== */}
-              {scoreHistory.length >= 3 && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                  <h3 className="font-semibold mb-3">📈 Score Trend</h3>
-                  <div className="flex items-end justify-between gap-2 h-20">
-                    {scoreHistory.map((s, i) => {
-                      const h = Math.max(4, (s.score / 100) * 80);
+                    {aiSummary.top_opportunities.slice(0, 4).map((opp: any, i: number) => {
+                      const stars = opp.impact === "High" ? "★★★★★" : opp.impact === "Medium" ? "★★★★" : "★★★";
                       return (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                          <span className="text-xs text-zinc-600">{s.score}</span>
-                          <div className="w-full bg-emerald-500/60 rounded-t-sm" style={{ height: `${h}px` }} />
-                          <span className="text-xs text-zinc-700">{s.date?.slice(5)}</span>
+                        <div key={i} className="flex items-center justify-between bg-zinc-800/30 rounded-xl p-4 hover:bg-zinc-800/50 transition">
+                          <div className="flex items-center gap-3">
+                            <span className="text-amber-400 text-sm w-16 flex-shrink-0">{stars}</span>
+                            <div>
+                              <div className="text-sm font-medium text-zinc-200">{opp.title}</div>
+                              <div className="text-xs text-zinc-500">{opp.action}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 text-right flex-shrink-0">
+                            <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full font-medium">{opp.expected_gain}</span>
+                            <span className="text-xs text-zinc-500">{opp.time}</span>
+                            <Link href="/knowledge-graph" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition whitespace-nowrap">Fix →</Link>
+                          </div>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="text-xs text-zinc-500 mt-3 text-center">
-                    {scoreTrend === "up" ? "Trending up — keep going!" : scoreTrend === "down" ? "Trending down — check what changed" : "Steady — monitor for changes"}
+                </div>
+              )}
+
+              {/* ── ROW 5: Products Summary + Trend ── */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Products summary */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-sm">📦 Products</h3>
+                    <span className="text-xs text-zinc-500">{sites.length} site{sites.length !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      { label: "Analyzed", value: sites.length, color: "bg-emerald-500" },
+                      { label: "Need Attention", value: (score?.ai_visibility_score || 0) < 40 ? 1 : 0, color: "bg-amber-500" },
+                      { label: "Critical", value: (score?.ai_visibility_score || 0) < 20 ? 1 : 0, color: "bg-red-500" },
+                    ].map((s, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${s.color}`} />
+                        <span className="text-sm text-zinc-300 flex-1">{s.label}</span>
+                        <span className="text-sm font-bold text-zinc-400">{s.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-zinc-800">
+                    {scoreHistory.length >= 2 ? (
+                      <div className="flex items-end gap-1 h-10">
+                        {scoreHistory.slice(-14).map((s, i) => {
+                          const maxS = Math.max(...scoreHistory.map(x => x.score), 1);
+                          const h = Math.max(4, (s.score / maxS) * 40);
+                          return <div key={i} className="flex-1 bg-emerald-500/50 rounded-t-sm" style={{ height: `${h}px` }} title={`${s.date}: ${s.score}`} />;
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-zinc-600 text-center py-2">Run Analyze to see trend</div>
+                    )}
+                    <div className="text-xs text-zinc-500 mt-2 text-center">
+                      {scoreTrend === "up" ? `↑ Improving (+${scoreChange} pts)` : scoreTrend === "down" ? `↓ Declining (${scoreChange} pts)` : "→ Steady"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Competitor changes */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <h3 className="font-semibold text-sm mb-4">⚔️ Competitor Watch</h3>
+                  <CompetitorMini domain={domain} />
+                  {sites.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-zinc-800">
+                      <div className="text-xs text-zinc-500 mb-2">Your Sites</div>
+                      {sites.slice(0, 2).map((s: any) => (
+                        <div key={s.id} className="flex items-center justify-between py-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-zinc-300">{s.domain}</span>
+                            {s.inject_active ? <span className="text-xs text-emerald-400">● Active</span> : <span className="text-xs text-zinc-600">○ Not tracked</span>}
+                          </div>
+                          <span className={`text-xs font-bold ${sc(s.ai_visibility_score || 0)}`}>{s.ai_visibility_score ?? "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── ROW 6: Critical Issues ── */}
+              {aiSummary?.critical_issues?.length > 0 && (
+                <div className="bg-zinc-900 border border-red-800/30 rounded-2xl p-6">
+                  <h3 className="font-semibold text-sm text-red-400 mb-3">⚠️ Critical AI Issues</h3>
+                  <div className="space-y-2">
+                    {aiSummary.critical_issues.map((issue: string, i: number) => {
+                      const stars = issue.includes("critically") ? "★★★★★" : issue.includes("low") ? "★★★★" : "★★★";
+                      return (
+                        <div key={i} className="flex items-start gap-3 bg-red-900/5 border border-red-800/20 rounded-xl px-4 py-3">
+                          <span className="text-red-400 text-sm flex-shrink-0 mt-0.5">{stars}</span>
+                          <span className="text-sm text-zinc-300">{issue}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
+
+              {/* ── ROW 7: Optimization Progress ── */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-sm">📊 Optimization Overview</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-6 text-center">
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Current Score</div>
+                    <div className={`text-2xl font-bold ${sc(score.ai_visibility_score)}`}>{score.ai_visibility_score}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Potential After Fix</div>
+                    <div className="text-2xl font-bold text-emerald-400">{aiSummary?.estimated_potential?.after_fix || (score.ai_visibility_score + 25)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Estimated Gain</div>
+                    <div className="text-2xl font-bold text-emerald-400">+{aiSummary?.estimated_potential?.gain || 25}</div>
+                  </div>
+                </div>
+                <div className="mt-4 w-full bg-zinc-800 rounded-full h-2">
+                  <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${Math.max(5, score.ai_visibility_score)}%` }} />
+                </div>
+                <div className="flex justify-between text-xs text-zinc-600 mt-1"><span>0</span><span>100</span></div>
+              </div>
+
+              {/* ── BOTTOM: Trend + Actions ── */}
+              <div className="flex gap-3 justify-center">
+                <Link href="/actions" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition">⚡ Action Center</Link>
+                <Link href="/knowledge-graph" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm rounded-lg transition">🧠 Knowledge Graph</Link>
+                <Link href="/compare" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm rounded-lg transition">⚔️ Compare vs Competitors</Link>
+              </div>
             </>
           )}
         </div>
@@ -396,58 +471,33 @@ export default function DashboardPage() {
   );
 }
 
-function CompetitorMonitor({ domain }: { domain: string }) {
-  const [competitors, setCompetitors] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+function CompetitorMini({ domain }: { domain: string }) {
+  const [data, setData] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
-
   useEffect(() => {
     if (!domain || loaded) return;
     const clean = domain.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
-    setLoading(true);
-    fetch("/api/score/competitors/compare", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domain: clean, name: clean }),
-    })
-      .then(r => r.json())
-      .then(d => { if (d.results?.length >= 2) setCompetitors(d.results); })
-      .catch(() => {})
-      .finally(() => { setLoading(false); setLoaded(true); });
+    fetch("/api/score/competitors/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: clean, name: clean }) })
+      .then(r => r.json()).then(d => { if (d.results?.length >= 2) setData(d.results); }).catch(() => {}).finally(() => setLoaded(true));
   }, [domain]);
-
-  if (loading) return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-      <div className="flex items-center gap-2"><div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" /><span className="text-sm text-zinc-500">Detecting competitors…</span></div>
-    </div>
-  );
-  if (competitors.length < 2) return null;
-
-  const you = competitors.find((c: any) => c.is_you);
-  const others = competitors.filter((c: any) => !c.is_you && !c.error).sort((a: any, b: any) => (b.estimated_score || 0) - (a.estimated_score || 0));
-
+  if (!loaded) return <div className="text-xs text-zinc-500">Loading competitor data…</div>;
+  if (data.length < 2) return <div className="text-xs text-zinc-600">Competitor data will load on next Analyze</div>;
+  const others = data.filter((c: any) => !c.is_you && !c.error);
+  const you = data.find((c: any) => c.is_you);
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold">⚔️ Competitor Monitor</h3>
-        <Link href={`/compare?domain=${encodeURIComponent(domain)}`} className="text-xs text-emerald-400 hover:text-emerald-300">Full comparison →</Link>
-      </div>
-      <div className="flex items-end gap-2 mb-3">
-        {[you, ...others].filter(Boolean).slice(0, 5).map((c: any, i: number) => {
-          const h = Math.max(8, ((c.estimated_score || 0) / 100) * 60);
-          return (
-            <div key={i} className="flex-1 text-center">
-              <div className="text-xs font-bold text-zinc-200 mb-1">{c.estimated_score || "—"}</div>
-              <div className={`w-full rounded-t-md mx-auto ${c.is_you ? "bg-emerald-500" : "bg-zinc-600"}`} style={{ height: `${h}px`, maxWidth: "40px", margin: "0 auto" }} />
-              <div className="text-xs text-zinc-500 mt-1 truncate" title={c.name}>{c.is_you ? "You" : c.name?.split(" ")[0]}</div>
-            </div>
-          );
-        })}
-      </div>
-      {others.length > 0 && you && (
-        <div className="text-xs text-zinc-500 text-center">
-          {you.estimated_score >= (others[0]?.estimated_score || 0)
-            ? "🎉 You're leading! Keep going."
-            : `📉 ${others[0].name} leads by ${(others[0].estimated_score || 0) - (you.estimated_score || 0)} pts — improve schema + content to catch up.`}
+    <div className="space-y-2">
+      {others.slice(0, 4).map((c: any, i: number) => (
+        <div key={i} className="flex items-center justify-between text-xs">
+          <span className="text-zinc-300">{c.name}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-zinc-500">{c.estimated_score} pts</span>
+            {c.has_software_schema ? <span className="text-emerald-500 text-xs">+Schema</span> : <span className="text-red-500 text-xs">-Schema</span>}
+          </div>
+        </div>
+      ))}
+      {you && others.length > 0 && (
+        <div className="text-xs text-emerald-400 mt-2 pt-2 border-t border-zinc-800">
+          {you.estimated_score >= (others[0]?.estimated_score || 0) ? "🎉 You're leading" : `📉 Behind ${others[0].name} by ${(others[0].estimated_score || 0) - (you.estimated_score || 0)} pts`}
         </div>
       )}
     </div>
