@@ -66,7 +66,7 @@ const PILLAR_INFO: Record<string, { icon: string; desc: string; lowWhy: string; 
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const [mode, setMode] = useState<"ecommerce" | "saas">("saas");
+  const [mode, setMode] = useState<"ecommerce" | "saas">("ecommerce");
   const [domain, setDomain] = useState("");
   const [cms, setCms] = useState<CMSData | null>(null);
   const [score, setScore] = useState<ScoreData | null>(null);
