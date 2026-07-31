@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "prodrank/ai-content",
+  "title": "ProdRank AI Content",
+  "category": "embed",
+  "icon": "format-quote",
+  "description": "Renders one ProdRank AI section (FAQ, Pros, Cons, Comparison, Buying Guide, AI Summary, Description) stored in post meta.",
+  "attributes": {
+    "field": {
+      "type": "string",
+      "default": "faq"
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": true
+  },
+  "textdomain": "prodrank-ai-seo",
+  "editorScript": "file:./index.js"
+}
