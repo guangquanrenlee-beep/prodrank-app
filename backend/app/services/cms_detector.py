@@ -17,7 +17,7 @@ class CMSResult:
     platform: str  # "shopify", "woocommerce", "wordpress", "bigcommerce", "magento", "custom"
     confidence: int  # 0-100
     markers: list[str]
-    auth_method: str  # "oauth", "rest_api", "plugin", "csv_upload"
+    auth_method: str  # "oauth", "rest_api", "plugin"
     recommended_action: str
 
 
@@ -46,8 +46,8 @@ class CMSDetector:
         except Exception:
             return CMSResult(
                 domain=domain, platform="custom", confidence=0,
-                markers=["unreachable"], auth_method="csv_upload",
-                recommended_action="Upload your product CSV or install inject.js on your site.",
+                markers=["unreachable"], auth_method="plugin",
+                recommended_action="Your site could not be reached. ProdRank supports Shopify (App) and WooCommerce (plugin) — retry once the site is back online.",
             )
 
         soup = BeautifulSoup(html, "lxml")
@@ -141,8 +141,8 @@ class CMSDetector:
             confidence = 85
             return CMSResult(
                 domain=domain, platform="bigcommerce", confidence=confidence,
-                markers=markers, auth_method="csv_upload",
-                recommended_action="Export your products as CSV from BigCommerce and upload here for instant Schema generation.",
+                markers=markers, auth_method="plugin",
+                recommended_action="ProdRank currently supports Shopify and WooCommerce. BigCommerce support is coming soon.",
             )
 
         # ── Magento ── (strict: require magento references, not just "mage/" which matches too broadly)
@@ -158,8 +158,8 @@ class CMSDetector:
             confidence = 85
             return CMSResult(
                 domain=domain, platform="magento", confidence=confidence,
-                markers=markers, auth_method="csv_upload",
-                recommended_action="Export your catalog as CSV from Magento admin and upload here.",
+                markers=markers, auth_method="plugin",
+                recommended_action="ProdRank currently supports Shopify and WooCommerce. Magento support is coming soon.",
             )
 
         # ── Cloudflare: only mark as Shopify if Shopify markers also found ──
@@ -180,14 +180,14 @@ class CMSDetector:
             markers = ["Cloudflare detected — cannot determine CMS"]
             return CMSResult(
                 domain=domain, platform="unknown", confidence=20,
-                markers=markers, auth_method="csv_upload",
-                recommended_action="Your site is behind Cloudflare. We can't auto-detect your platform. If this is a Shopify store, connect via OAuth. Otherwise, upload your product CSV.",
+                markers=markers, auth_method="plugin",
+                recommended_action="Your site is behind Cloudflare. We can't auto-detect your platform. If this is a Shopify store, connect via OAuth; if WooCommerce, install the WordPress plugin.",
             )
 
         # ── Custom / Unknown ──
         return CMSResult(
             domain=domain, platform="custom", confidence=30,
             markers=["No known CMS detected"],
-            auth_method="csv_upload",
-            recommended_action="Upload your product CSV for instant Schema generation, or install our one-line inject.js script on your site.",
+            auth_method="plugin",
+            recommended_action="ProdRank supports Shopify (App) and WooCommerce (plugin). No supported integration detected for this site.",
         )

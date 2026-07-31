@@ -31,7 +31,7 @@ create table sites (
     domain text not null,
     platform text, -- 'shopify', 'woocommerce', 'wordpress', 'bigcommerce', 'magento', 'custom'
     platform_confidence int default 0,
-    auth_method text, -- 'oauth', 'rest_api', 'plugin', 'csv_upload'
+    auth_method text, -- 'oauth', 'rest_api', 'plugin'
     access_token text, -- encrypted
     shopify_shop text,
     last_synced_at timestamptz,

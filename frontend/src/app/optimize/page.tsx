@@ -137,7 +137,7 @@ export default function OptimizationCenterPage() {
                 </>
               )}
               {item.status === "approved" && (
-                <span className="text-xs text-emerald-400 flex items-center gap-1">✅ Ready to publish — use Shopify App or inject.js to publish</span>
+                <span className="text-xs text-emerald-400 flex items-center gap-1">✅ Ready to publish — use Shopify App or WordPress Plugin to publish</span>
               )}
             </div>
           </div>

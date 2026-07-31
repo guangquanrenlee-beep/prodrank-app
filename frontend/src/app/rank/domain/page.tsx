@@ -168,7 +168,6 @@ function DomainRankContent() {
           <div className="flex justify-center gap-4">
             <a href="/api/shopify/install?shop=yourstore.myshopify.com" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Install for Shopify</a>
             <Link href="/wordpress" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-medium rounded-lg transition">Install for WordPress</Link>
-            <a href="/csv" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-medium rounded-lg transition">Upload CSV</a>
           </div>
         </div>
       )}

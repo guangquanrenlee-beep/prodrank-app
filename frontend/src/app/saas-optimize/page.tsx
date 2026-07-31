@@ -195,7 +195,6 @@ function SaasOptimizeContent() {
               <li>Click <strong>Copy All</strong> above</li>
               <li>Open your SaaS site&apos;s HTML template</li>
               <li>Paste inside the <code className="bg-zinc-800 px-1 rounded">&lt;head&gt;</code> tag</li>
-              <li>Or: install <Link href="/inject-guide" className="text-emerald-400 underline">inject-saas.js</Link> to do this automatically</li>
             </ol>
           </div>
         </div>

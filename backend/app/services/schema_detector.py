@@ -200,13 +200,11 @@ class SchemaDetector:
                     f"Unable to crawl this page — the site has advanced bot protection.",
                     f"",
                     f"Options to proceed:",
-                    f"1. Install the ProdRank inject.js on your site (1 line of code)",
-                    f"   <script async src=\"https://prodrank.app/inject.js\" data-site=\"{domain}\"></script>",
-                    f"   This auto-detects product pages and injects Schema without us needing to crawl.",
+                    f"1. If this is a Shopify store, install the ProdRank App from Shopify App Store.",
+                    f"   (WooCommerce stores: install the ProdRank WordPress plugin — it injects Schema",
+                    f"   server-side, so AI agents see it even without crawling.)",
                     f"",
-                    f"2. If this is a Shopify store, install the ProdRank App from Shopify App Store.",
-                    f"",
-                    f"3. Paste the product page HTML directly for manual audit.",
+                    f"2. Paste the product page HTML directly for manual audit.",
                 ]
                 result.content_quality_score = 0
                 return result

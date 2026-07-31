@@ -36,7 +36,7 @@ function SiteAuditContent() {
     })
       .then((r) => { clearTimeout(timeout); return r.json(); })
       .then(setData)
-      .catch((e) => setError(e.name === "AbortError" ? "Scan timed out — this site may have aggressive bot protection. Try installing inject.js instead." : e.message))
+      .catch((e) => setError(e.name === "AbortError" ? "Scan timed out — this site may have aggressive bot protection. Try a single product URL instead." : e.message))
       .finally(() => setLoading(false));
   }, [domain]);
 

@@ -16,7 +16,7 @@ export default async function ComparePage({ params }: { params: Promise<{ tool: 
       <h2 className="font-semibold">Why choose ProdRank</h2>
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div className="bg-zinc-800/50 rounded-lg p-3"><div className="font-medium text-zinc-200">AI Agent Tracking</div><div className="text-zinc-500 mt-1">ChatGPT, Gemini, Claude, Grok</div></div>
-        <div className="bg-zinc-800/50 rounded-lg p-3"><div className="font-medium text-zinc-200">Auto Schema Injection</div><div className="text-zinc-500 mt-1">Shopify App, WP Plugin, inject.js</div></div>
+        <div className="bg-zinc-800/50 rounded-lg p-3"><div className="font-medium text-zinc-200">Auto Schema Injection</div><div className="text-zinc-500 mt-1">Shopify App & WP Plugin</div></div>
         <div className="bg-zinc-800/50 rounded-lg p-3"><div className="font-medium text-zinc-200">Citation Intelligence</div><div className="text-zinc-500 mt-1">Source influence scoring</div></div>
         <div className="bg-zinc-800/50 rounded-lg p-3"><div className="font-medium text-zinc-200">4-Agent Ranking</div><div className="text-zinc-500 mt-1">Daily monitoring + history</div></div>
       </div>

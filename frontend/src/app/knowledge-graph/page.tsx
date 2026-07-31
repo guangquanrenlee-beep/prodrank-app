@@ -102,7 +102,7 @@ export default function KnowledgeGraphPage() {
         if (user) localStorage.setItem(`prodrank_last_kg_url_${user.id}`, raw);
       } catch (err: any) {
         if (err.name === "AbortError") setError("Bulk scan timed out. The site may have too many products or bot protection.");
-        else setError(err.message || "Bulk scan failed. Try a single product URL, or install inject.js.");
+        else setError(err.message || "Bulk scan failed. Try a single product URL instead.");
       }
     }
     setLoading(false);

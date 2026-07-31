@@ -46,19 +46,14 @@ function AnalyticsContent() {
 
     {error && <div className="bg-amber-900/20 border border-amber-800 rounded-xl p-4 text-center"><p className="text-amber-400 text-sm">{error}</p>{error.includes("limit") && <Link href="/signup" className="inline-block mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Sign up for unlimited access →</Link>}</div>}
 
-    {/* CMS Install Guide */}
-    {cms && (<div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-6">
-      <h2 className="font-semibold text-emerald-400 mb-3">How to install for {cms.platform === "shopify" ? "Shopify" : cms.platform === "woocommerce" || cms.platform === "wordpress" ? "WordPress" : "any platform"}</h2>
+    {/* CMS Install Guide — only for supported platforms */}
+    {cms && (cms.platform === "shopify" || cms.platform === "woocommerce" || cms.platform === "wordpress") && (<div className="bg-emerald-900/10 border border-emerald-800 rounded-xl p-6">
+      <h2 className="font-semibold text-emerald-400 mb-3">How to install for {cms.platform === "shopify" ? "Shopify" : "WordPress"}</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {cms.platform === "shopify" ? (<>
           <InstallCard icon="📲" title="Shopify App" desc="Install from App Store. One click, auto-injects Schema on all product pages." href={`/api/shopify/install?shop=${domain}`} cta="Connect Shopify →" />
-          <InstallCard icon="⚡" title="inject.js (Universal)" desc="One line of code. Works on any platform including Shopify." href="/inject-guide" cta="View Guide →" />
-        </>) : cms.platform === "woocommerce" || cms.platform === "wordpress" ? (<>
-          <InstallCard icon="📝" title="WordPress Plugin" desc="Upload & activate. Auto-injects Schema on all pages. Yoast/RankMath compatible." href="/wordpress" cta="Get Plugin →" />
-          <InstallCard icon="⚡" title="inject.js (Universal)" desc="One line of code. Works on any platform." href="/inject-guide" cta="View Guide →" />
         </>) : (<>
-          <InstallCard icon="⚡" title="inject.js (Recommended)" desc="One line of code. Auto-detects products, injects Schema. Works everywhere." href="/inject-guide" cta="View Guide →" />
-          <InstallCard icon="📦" title="CSV Upload" desc="Export products from any store, upload here, get Schema for every SKU." href="/csv" cta="Upload CSV →" />
+          <InstallCard icon="📝" title="WordPress Plugin" desc="Upload & activate. Auto-injects Schema on all pages. Yoast/RankMath compatible." href="/wordpress" cta="Get Plugin →" />
         </>)}
         <InstallCard icon="📊" title="Check AI Ranking" desc="See where your brand ranks across ChatGPT, Gemini, Claude, Grok." href={`/rank/domain?domain=${encodeURIComponent(domain)}`} cta="Check Now →" />
       </div>

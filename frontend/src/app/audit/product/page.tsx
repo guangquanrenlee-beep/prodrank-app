@@ -89,18 +89,7 @@ function ProductAuditContent() {
           <p className="text-sm text-zinc-300">{error}</p>
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-            <p className="text-sm font-medium text-zinc-300 mb-3">Option 1: Install inject.js (recommended)</p>
-            <p className="text-xs text-zinc-500 mb-2">
-              Add this one line to your site template. It auto-detects product pages and injects Schema
-              — works on all platforms, no crawling needed.
-            </p>
-            <code className="block bg-zinc-950 text-emerald-400 text-xs p-3 rounded-lg break-all">
-              {"<script async src=\"https://prodrank.app/inject.js\" data-site=\""}{domain || "yoursite.com"}{"\"></script>"}
-            </code>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-            <p className="text-sm font-medium text-zinc-300 mb-3">Option 2: Paste HTML manually</p>
+            <p className="text-sm font-medium text-zinc-300 mb-3">Option: Paste HTML manually</p>
             <p className="text-xs text-zinc-500 mb-2">
               Open your product page → View Source → copy everything → paste below.
             </p>
@@ -151,9 +140,6 @@ function ProductAuditContent() {
         </a>
         <a href={`/verify`} className="flex items-center gap-2 px-5 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium rounded-lg transition text-sm">
           📈 Verify After Fixing
-        </a>
-        <a href={`/inject-guide`} className="flex items-center gap-2 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-lg transition text-sm">
-          ⚡ Install inject.js
         </a>
       </div>
 

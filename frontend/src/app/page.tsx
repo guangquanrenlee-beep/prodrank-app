@@ -10,7 +10,7 @@ const FEATURES = [
   { icon: "🔍", title: "Schema Audit", desc: "12-field JSON-LD check across every product page. See exactly what AI crawlers see." },
   { icon: "🏆", title: "AI Ranking", desc: "Track your position across ChatGPT, Gemini, Claude, and Grok for every keyword that matters." },
   { icon: "📰", title: "Citation Tracking", desc: "Discover which sources AI agents cite — and measure their influence on recommendations." },
-  { icon: "🔧", title: "Auto-Fix", desc: "One-click Schema generation for Shopify, WooCommerce, or any site via inject.js." },
+  { icon: "🔧", title: "Auto-Fix", desc: "One-click Schema generation for Shopify and WooCommerce stores." },
   { icon: "⚔️", title: "Competitor Compare", desc: "Side-by-side analysis of your AI visibility versus up to 3 competitors." },
   { icon: "📡", title: "24/7 Monitoring", desc: "Automated rank tracking with historical trends. Know the moment AI changes its mind." },
 ];
@@ -19,19 +19,18 @@ const USE_CASES = [
   { icon: "🛒", title: "Shopify Stores", desc: "Install our official Shopify App. Schema injection, product sync, and AI ranking in one click." },
   { icon: "🧩", title: "WooCommerce", desc: "Upload our WordPress plugin. Works with any theme and auto-detects your product pages." },
   { icon: "📦", title: "Amazon Sellers", desc: "Track if AI agents recommend your brand when shoppers ask for category comparisons." },
-  { icon: "🌐", title: "Custom Sites", desc: "Paste one line of inject.js. Works with React, Vue, PHP, or plain HTML — any platform." },
 ];
 
 const PRICING = [
   { name: "Free", price: "$0", period: "", cta: "Get Started", href: "#", features: ["1 site audit", "3 product audits", "Basic Schema check", "AI visibility quick scan"], featured: false },
-  { name: "Pro", price: "$79", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Unlimited site audits", "50 product audits/mo", "20 keyword AI tracking", "Shopify/WP/inject.js", "Schema optimization", "14-day trial"], featured: true },
+  { name: "Pro", price: "$79", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Unlimited site audits", "50 product audits/mo", "20 keyword AI tracking", "Shopify App & WP plugin", "Schema optimization", "14-day trial"], featured: true },
   { name: "Growth", price: "$199", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Everything in Pro", "100 keyword tracking", "Competitor comparison", "Citation tracking", "Reason Engine", "Entity intelligence"], featured: false },
   { name: "Agency", price: "$499", period: "/mo", cta: "Contact Us", href: "mailto:sales@prodrank.app", features: ["Everything in Growth", "500 keyword tracking", "Multi-brand", "API access", "White-label", "Dedicated support"], featured: false },
 ];
 
 const FAQS = [
   { q: "What can I do for free?", a: "You get 1 full site audit plus 3 product audits per day — including AI visibility score, Schema check, and basic ranking. No credit card needed." },
-  { q: "How do I connect my store?", a: 'Shopify: install our <a href="/integrations" class="text-emerald-400 hover:text-emerald-300 underline">official App</a>. WooCommerce: upload our <a href="/wordpress" class="text-emerald-400 hover:text-emerald-300 underline">plugin</a>. Any other platform: paste one line of <a href="/inject-guide" class="text-emerald-400 hover:text-emerald-300 underline">inject.js</a>. No developer needed.' },
+  { q: "How do I connect my store?", a: 'Shopify: install our <a href="/integrations" class="text-emerald-400 hover:text-emerald-300 underline">official App</a>. WooCommerce: upload our <a href="/wordpress" class="text-emerald-400 hover:text-emerald-300 underline">plugin</a>. Both inject Schema server-side, so AI agents see it. No developer needed.' },
   { q: "How often do AI recommendations update?", a: "AI agent rankings can shift weekly as models retrain and new content is indexed. Pro and Growth plans include automated daily tracking so you never miss a change." },
   { q: "What if I'm not satisfied?", a: "All paid plans come with a 14-day money-back guarantee. Email support@prodrank.app and we'll refund you — no questions asked." },
   { q: "How is this different from SEO tools?", a: "SEO tools optimize for Google's algorithm. We optimize for AI agents. You can rank #1 on Google and still be invisible to ChatGPT, Gemini, or Claude. We fix that gap." },

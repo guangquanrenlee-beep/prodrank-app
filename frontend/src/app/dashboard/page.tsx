@@ -127,7 +127,7 @@ export default function DashboardPage() {
       setSites(data);
       const last = data[0];
       setDomain(last.domain);
-      setCms({ domain: last.domain, platform: last.platform || "unknown", confidence: last.platform_confidence || 0, recommended_action: "Previously analyzed.", auth_method: last.auth_method || "csv_upload" });
+      setCms({ domain: last.domain, platform: last.platform || "unknown", confidence: last.platform_confidence || 0, recommended_action: "Previously analyzed.", auth_method: last.auth_method || "plugin" });
       if (last.score_data) setScore(last.score_data as ScoreData);
       else if (last.ai_visibility_score) setScore({ ai_visibility_score: last.ai_visibility_score, label: last.ai_visibility_score >= 60 ? "Good" : "Poor", breakdown: {}, recommendation: "" });
     }
@@ -387,7 +387,6 @@ export default function DashboardPage() {
                         <div key={s.id} className="flex items-center justify-between py-1.5">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-zinc-300">{s.domain}</span>
-                            {s.inject_active ? <span className="text-xs text-emerald-400">● Active</span> : <span className="text-xs text-zinc-600">○ Not tracked</span>}
                           </div>
                           <span className={`text-xs font-bold ${sc(s.ai_visibility_score || 0)}`}>{s.ai_visibility_score ?? "—"}</span>
                         </div>

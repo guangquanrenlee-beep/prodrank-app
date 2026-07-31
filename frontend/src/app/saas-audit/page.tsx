@@ -117,9 +117,6 @@ export default function SaasAuditPage() {
                 🔧 Generate SoftwareApplication Schema
               </Link>
             )}
-            <Link href="/inject-guide" className="px-5 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium rounded-lg transition text-sm">
-              ⚡ Install inject-saas.js
-            </Link>
             <Link href="/verify" className="px-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-lg transition text-sm">
               📈 Verify After Fixing
             </Link>

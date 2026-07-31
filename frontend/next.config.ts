@@ -10,10 +10,6 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${API_URL}/api/:path*`,
       },
-      {
-        source: "/inject.js",
-        destination: `${API_URL}/api/inject.js`,
-      },
     ];
   },
 };

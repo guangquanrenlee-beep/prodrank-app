@@ -21,7 +21,7 @@ export default function PricingPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           { name: "Free", price: "$0", period: "", cta: "Get Started", href: "/signup", features: ["1 site audit", "3 product audits", "Basic Schema check", "AI visibility quick scan"], featured: false },
-          { name: "Pro", price: "$79", period: "/mo", cta: "Start Free Trial", plan: "pro", features: ["Unlimited site audits", "50 product audits/month", "20 keyword AI tracking", "Shopify/WP/inject.js", "Schema optimization", "14-day trial"], featured: true },
+          { name: "Pro", price: "$79", period: "/mo", cta: "Start Free Trial", plan: "pro", features: ["Unlimited site audits", "50 product audits/month", "20 keyword AI tracking", "Shopify App & WP plugin", "Schema optimization", "14-day trial"], featured: true },
           { name: "Growth", price: "$199", period: "/mo", cta: "Start Free Trial", plan: "growth", features: ["Everything in Pro", "100 keyword tracking", "Competitor comparison", "Citation tracking", "Reason Engine", "Entity intelligence"], featured: false },
           { name: "Agency", price: "$499", period: "/mo", cta: "Contact Us", href: "mailto:sales@prodrank.app", features: ["Everything in Growth", "500 keyword tracking", "Multi-brand", "API access", "White-label", "Dedicated support"], featured: false },
         ].map(tier => (

@@ -94,7 +94,6 @@ export default function SettingsPage() {
           <h3 className="font-semibold">Integrations</h3>
           <div className="flex items-center justify-between"><div><div className="text-sm text-zinc-200">Shopify</div><div className="text-xs text-zinc-500">Connect your store via OAuth</div></div><Link href="/api/shopify/install?shop=yourstore.myshopify.com" className="text-sm text-emerald-400 hover:text-emerald-300">Connect →</Link></div>
           <div className="flex items-center justify-between"><div><div className="text-sm text-zinc-200">WordPress</div><div className="text-xs text-zinc-500">Install the ProdRank plugin</div></div><Link href="/wordpress" className="text-sm text-emerald-400 hover:text-emerald-300">Install →</Link></div>
-          <div className="flex items-center justify-between"><div><div className="text-sm text-zinc-200">Any Platform</div><div className="text-xs text-zinc-500">One line inject.js</div></div><Link href="/inject-guide" className="text-sm text-emerald-400 hover:text-emerald-300">Install →</Link></div>
         </div>
 
         <button onClick={() => supabase.auth.signOut()} className="text-sm text-red-400 hover:text-red-300">Sign out</button>

@@ -31,7 +31,7 @@ class GuidanceEngine:
                 issue="No Product Schema — AI cannot understand your product at all",
                 severity="critical", auto_fixable=True, impact_stars="5/5", difficulty="Easy", expected_gain="High",
                 what_to_do="Generate and install complete Product Schema JSON-LD",
-                how_to_do_it="Option 1 (instant): If on Shopify, install ProdRank App. Option 2 (1 line): Add inject.js script to your site template. Option 3 (manual): Copy JSON-LD from /api/optimize/fixes.",
+                how_to_do_it="Option 1 (instant): If on Shopify, install ProdRank App. Option 2 (WooCommerce): install the ProdRank WordPress plugin. Option 3 (manual): Copy JSON-LD from /api/optimize/fixes.",
                 effort="1-5 minutes", impact="Transforms your product from invisible to fully structured for AI. Single biggest improvement."))
 
         missing_fields = [f for f in schema_fields if not f.get("present")]
@@ -43,7 +43,7 @@ class GuidanceEngine:
                     issue=f"Schema missing critical fields: {', '.join(critical_missing)}",
                     severity="high", auto_fixable=True, impact_stars="4/5", difficulty="Easy", expected_gain="High",
                     what_to_do=f"Add: {', '.join(critical_missing)}",
-                    how_to_do_it="Use /api/optimize/fixes to generate corrected JSON-LD. Or install inject.js which auto-extracts these fields.",
+                    how_to_do_it="Use /api/optimize/fixes to generate corrected JSON-LD. Or install the Shopify App / WordPress Plugin, which auto-extracts these fields.",
                     effort="5-10 minutes", impact="AI agents will see price, brand, and images — directly affecting recommendations."))
 
         if not has_faq:
@@ -51,7 +51,7 @@ class GuidanceEngine:
                 issue="No FAQPage Schema — missing AI recommendation signals",
                 severity="high", auto_fixable=True, impact_stars="4/5", difficulty="Easy", expected_gain="High",
                 what_to_do="Add FAQPage Schema with 3-5 product-specific questions",
-                how_to_do_it="Shopify App, WordPress Plugin, and inject.js all auto-generate FAQ. For manual: copy FAQPage JSON-LD from /api/optimize/fixes.",
+                how_to_do_it="Shopify App and WordPress Plugin both auto-generate FAQ. For manual: copy FAQPage JSON-LD from /api/optimize/fixes.",
                 effort="2-5 minutes", impact="Products with FAQ are more likely to be cited by AI agents in Q&A scenarios."))
 
         if any("too short" in i or "too little" in i for i in content_issues):
@@ -68,7 +68,7 @@ class GuidanceEngine:
                 issue="No structured reviews — AI favors products with social proof",
                 severity="medium", auto_fixable=False, impact_stars="5/5", difficulty="Hard", expected_gain="High",
                 what_to_do="Collect and mark up customer reviews with AggregateRating Schema",
-                how_to_do_it="If you have reviews (WooCommerce, Judge.me, Yotpo): inject.js auto-detects them. If no reviews: send review request emails. Even 5-10 structured reviews help.",
+                how_to_do_it="If you have reviews (WooCommerce, Judge.me, Yotpo): the Shopify App / WordPress Plugin auto-detects them. If no reviews: send review request emails. Even 5-10 structured reviews help.",
                 effort="1 hour", impact="Products with reviews are consistently ranked higher by AI agents.",
                 if_cannot_fix="List on G2, Trustpilot, or Google Reviews — AI agents cite these platforms even for third-party reviews."))
 
