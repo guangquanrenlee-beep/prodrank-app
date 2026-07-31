@@ -1,0 +1,57 @@
+# ProdRank WordPress plugin — local test store
+# Usage: docker compose up -d   (start Docker Desktop first)
+# Store:  http://localhost:8081  (admin: admin / admin)
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+      MYSQL_ROOT_PASSWORD: rootpass
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wp:
+    image: wordpress:php8.3-apache
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8081:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: "1"
+    volumes:
+      - wp_data:/var/www/html
+      # 直接挂载真实插件目录 — 改代码即时生效
+      - ../../wordpress-plugin:/var/www/html/wp-content/plugins/prodrank-ai-seo
+
+  wpcli:
+    # 一次性设置容器：装 WordPress + WooCommerce + 示例商品 + 激活插件
+    image: wordpress:cli-php8.3
+    depends_on:
+      db:
+        condition: service_healthy
+      wp:
+        condition: service_started
+    volumes:
+      - wp_data:/var/www/html
+      - ../../wordpress-plugin:/var/www/html/wp-content/plugins/prodrank-ai-seo
+      - ./setup.sh:/setup.sh
+    entrypoint: ["sh", "/setup.sh"]
+    restart: "no"
+
+volumes:
+  db_data:
+  wp_data:

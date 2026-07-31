@@ -38,19 +38,9 @@ class KeywordSetUpdate(BaseModel):
     product_keywords: Optional[list[str]] = None
     is_active: Optional[bool] = None
 
-class PostActionRequest(BaseModel):
-    action: str  # 'answered' | 'ignored' | 'forwarded'
-    response_text: str = ""
-    forwarded_to: str = ""
+class ManualPostRequest(BaseModel):
+    url: str  # Reddit post URL
     notes: str = ""
-
-class AIDraftRequest(BaseModel):
-    style: str = "helpful"  # 'helpful' | 'expert' | 'promotional' | 'casual'
-
-class TrackUpdateRequest(BaseModel):
-    upvotes: int = 0
-    is_best_answer: bool = False
-    reply_count: int = 0
 
 
 # ── Helper ──
