@@ -61,23 +61,3 @@ app.include_router(dashboard_api.router, prefix="/api/dashboard", tags=["Dashboa
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "prodrank"}
-
-
-@app.post("/api/dev/reset-password")
-async def dev_reset_password(email: str, password: str):
-    """Dev-only: reset a user password via Supabase admin. Remove before production."""
-    from supabase import create_client
-    from app.core.config import get_settings
-    s = get_settings()
-    client = create_client(s.supabase_url, s.supabase_service_key)
-    users = client.auth.admin.list_users()
-    for u in users:
-        if u.email == email:
-            client.auth.admin.update_user_by_id(u.id, {"password": password, "email_confirm": True})
-            return {"ok": True, "email": email, "id": u.id}
-    # Create new user if not found
-    try:
-        resp = client.auth.admin.create_user({"email": email, "password": password, "email_confirm": True})
-        return {"ok": True, "email": email, "id": resp.user.id, "created": True}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
