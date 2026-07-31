@@ -1,74 +1,87 @@
 {% comment %}
-  ProdRank — Product Schema Injection Block
-  Injects complete JSON-LD Product Schema into every product page <head>.
+  ProdRank — ⑤ Schema Renderer
+  Outputs the complete Product JSON-LD into every product page <head>.
+
+  - Preferred: the full AI-generated schema stored by the SaaS backend in the
+    "prodrank/schema" metafield (Product + Offer + AggregateRating + Breadcrumb
+    + MerchantReturnPolicy + ShippingDetails — all generated from synced data).
+  - Fallback: live-generated minimal schema from storefront data, so pages
+    always have valid structured data even before the backend runs.
+  This block ALWAYS outputs (Rendering Rules only affect visible content).
 {% endcomment %}
 
 {% if product %}
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org/",
-    "@type": "Product",
-    "name": {{ product.title | json }},
-    "description": {{ product.description | strip_html | truncate: 500 | json }},
-    "image": [
-      {% for image in product.images limit:3 %}
-        "https:{{ image | image_url: 'master' }}"{% unless forloop.last %},{% endunless %}
-      {% endfor %}
-    ],
-    "sku": {{ product.selected_or_first_available_variant.sku | json }},
-    "gtin13": {{ product.selected_or_first_available_variant.barcode | json }},
-    "brand": {
-      "@type": "Brand",
-      "name": {{ shop.name | json }}
-    },
-    "offers": {
-      "@type": "Offer",
-      "url": "{{ shop.url }}{{ product.url }}",
-      "priceCurrency": "{{ shop.currency }}",
-      "price": "{{ product.selected_or_first_available_variant.price | money_without_currency | replace: ',', '' }}",
-      "priceValidUntil": "{{ 'now' | date: '%s' | plus: 31536000 | date: '%Y-%m-%d' }}",
-      "availability": {% if product.selected_or_first_available_variant.available %}
-        "https://schema.org/InStock"
-      {% else %}
-        "https://schema.org/OutOfStock"
-      {% endif %},
-      "itemCondition": "https://schema.org/NewCondition",
-      "shippingDetails": {
-        "@type": "OfferShippingDetails",
-        "shippingDestination": {
-          "@type": "DefinedRegion",
-          "addressCountry": "US"
+  {% if product.metafields.prodrank.schema %}
+    <script type="application/ld+json">
+    {{ product.metafields.prodrank.schema.value | json }}
+    </script>
+  {% else %}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org/",
+      "@type": "Product",
+      "name": {{ product.title | json }},
+      "description": {{ product.description | strip_html | truncate: 500 | json }},
+      "image": [
+        {% for image in product.images limit:3 %}
+          "https:{{ image | image_url: 'master' }}"{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      ],
+      "sku": {{ product.selected_or_first_available_variant.sku | json }},
+      "gtin13": {{ product.selected_or_first_available_variant.barcode | json }},
+      "brand": {
+        "@type": "Brand",
+        "name": {{ shop.name | json }}
+      },
+      "offers": {
+        "@type": "Offer",
+        "url": "{{ shop.url }}{{ product.url }}",
+        "priceCurrency": "{{ shop.currency }}",
+        "price": "{{ product.selected_or_first_available_variant.price | money_without_currency | replace: ',', '' }}",
+        "priceValidUntil": "{{ 'now' | date: '%s' | plus: 31536000 | date: '%Y-%m-%d' }}",
+        "availability": {% if product.selected_or_first_available_variant.available %}
+          "https://schema.org/InStock"
+        {% else %}
+          "https://schema.org/OutOfStock"
+        {% endif %},
+        "itemCondition": "https://schema.org/NewCondition",
+        "shippingDetails": {
+          "@type": "OfferShippingDetails",
+          "shippingDestination": {
+            "@type": "DefinedRegion",
+            "addressCountry": "US"
+          }
         }
       }
+      {% if product.metafields.reviews.rating_count %}
+      ,"aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "{{ product.metafields.reviews.rating.value }}",
+        "reviewCount": "{{ product.metafields.reviews.rating_count }}"
+      }
+      {% endif %}
+      {% if product.metafields.reviews.review_data %}
+      ,"review": [
+        {% for review in product.metafields.reviews.review_data.value limit:3 %}
+        {
+          "@type": "Review",
+          "author": {
+            "@type": "Person",
+            "name": {{ review.author | json }}
+          },
+          "reviewBody": {{ review.body | json }}
+        }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      ]
+      {% endif %}
     }
-    {% if product.metafields.reviews.rating_count %}
-    ,"aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "{{ product.metafields.reviews.rating.value }}",
-      "reviewCount": "{{ product.metafields.reviews.rating_count }}"
-    }
-    {% endif %}
-    {% if product.metafields.reviews.review_data %}
-    ,"review": [
-      {% for review in product.metafields.reviews.review_data.value limit:3 %}
-      {
-        "@type": "Review",
-        "author": {
-          "@type": "Person",
-          "name": {{ review.author | json }}
-        },
-        "reviewBody": {{ review.body | json }}
-      }{% unless forloop.last %},{% endunless %}
-      {% endfor %}
-    ]
-    {% endif %}
-  }
-  </script>
+    </script>
+  {% endif %}
 {% endif %}
 
 {% schema %}
 {
-  "name": "ProdRank Product",
+  "name": "ProdRank Product Schema",
   "target": "head",
   "settings": []
 }

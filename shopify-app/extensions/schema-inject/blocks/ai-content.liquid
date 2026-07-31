@@ -1,0 +1,162 @@
+{% comment %}
+  ProdRank — AI Content Block
+  Renders AI-optimized content stored in product metafields:
+  AI Description, FAQ, Pros & Cons, Comparison, Use Cases, Buying Guide,
+  Specification, AI Summary.
+
+  - Drag this block onto the product page anywhere you like.
+  - Sections render only when their metafield exists (empty metafield = hidden).
+  - Merchants can hide individual sections via Rendering Rules (shop-level
+    metafield "prodrank/rendering_rules"); if unreadable, everything renders.
+  - The JSON-LD Schema block always outputs regardless of these rules.
+{% endcomment %}
+
+{% if product %}
+  {% assign rules = shop.metafields.prodrank.rendering_rules.value %}
+
+  {% assign show_description = true %}
+  {% if rules and rules.description == false %}{% assign show_description = false %}{% endif %}
+  {% assign show_faq = true %}
+  {% if rules and rules.faq == false %}{% assign show_faq = false %}{% endif %}
+  {% assign show_pros = true %}
+  {% if rules and rules.pros == false %}{% assign show_pros = false %}{% endif %}
+  {% assign show_cons = true %}
+  {% if rules and rules.cons == false %}{% assign show_cons = false %}{% endif %}
+  {% assign show_comparison = true %}
+  {% if rules and rules.comparison == false %}{% assign show_comparison = false %}{% endif %}
+  {% assign show_use_cases = true %}
+  {% if rules and rules.use_cases == false %}{% assign show_use_cases = false %}{% endif %}
+  {% assign show_buying_guide = true %}
+  {% if rules and rules.buying_guide == false %}{% assign show_buying_guide = false %}{% endif %}
+  {% assign show_specification = true %}
+  {% if rules and rules.specification == false %}{% assign show_specification = false %}{% endif %}
+  {% assign show_ai_summary = true %}
+  {% if rules and rules.ai_summary == false %}{% assign show_ai_summary = false %}{% endif %}
+
+  <div class="prodrank-ai-content" data-prodrank="ai-content">
+
+    {% if product.metafields.prodrank.description.value and show_description %}
+      <section class="prodrank-section" data-prodrank="description">
+        <h2>{{ product.metafields.prodrank.description.value.title | default: "Product Overview" }}</h2>
+        {{ product.metafields.prodrank.description.value.html }}
+      </section>
+    {% endif %}
+
+    {% if product.metafields.prodrank.ai_summary.value and show_ai_summary %}
+      <section class="prodrank-section" data-prodrank="ai_summary">
+        <h2>{{ product.metafields.prodrank.ai_summary.value.title | default: "Summary" }}</h2>
+        {{ product.metafields.prodrank.ai_summary.value.html }}
+      </section>
+    {% endif %}
+
+    {% if product.metafields.prodrank.pros.value and show_pros %}
+      <section class="prodrank-section" data-prodrank="pros">
+        <h2>{{ product.metafields.prodrank.pros.value.title | default: "Pros" }}</h2>
+        <ul>
+          {% for item in product.metafields.prodrank.pros.value.items %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if product.metafields.prodrank.cons.value and show_cons %}
+      <section class="prodrank-section" data-prodrank="cons">
+        <h2>{{ product.metafields.prodrank.cons.value.title | default: "Cons" }}</h2>
+        <ul>
+          {% for item in product.metafields.prodrank.cons.value.items %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if product.metafields.prodrank.faq.value and show_faq %}
+      <section class="prodrank-section" data-prodrank="faq">
+        <h2>{{ product.metafields.prodrank.faq.value.title | default: "FAQ" }}</h2>
+        {% for qa in product.metafields.prodrank.faq.value.questions %}
+          <details class="prodrank-faq-item">
+            <summary>{{ qa.question }}</summary>
+            <p>{{ qa.answer }}</p>
+          </details>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    {% if product.metafields.prodrank.comparison.value and show_comparison %}
+      <section class="prodrank-section" data-prodrank="comparison">
+        <h2>{{ product.metafields.prodrank.comparison.value.title | default: "How it compares" }}</h2>
+        <table class="prodrank-comparison">
+          <thead>
+            <tr>
+              <th>{{ product.title }}</th>
+              <th>{{ product.metafields.prodrank.comparison.value.competitor | default: "Typical competitor" }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in product.metafields.prodrank.comparison.value.rows %}
+              <tr>
+                <td>{{ row.ours }}</td>
+                <td>{{ row.typical }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% endif %}
+
+    {% if product.metafields.prodrank.use_cases.value and show_use_cases %}
+      <section class="prodrank-section" data-prodrank="use_cases">
+        <h2>{{ product.metafields.prodrank.use_cases.value.title | default: "Use cases" }}</h2>
+        {% for use_case in product.metafields.prodrank.use_cases.value.items %}
+          <div class="prodrank-use-case">
+            <h3>{{ use_case.title }}</h3>
+            <p>{{ use_case.description }}</p>
+          </div>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    {% if product.metafields.prodrank.buying_guide.value and show_buying_guide %}
+      <section class="prodrank-section" data-prodrank="buying_guide">
+        <h2>{{ product.metafields.prodrank.buying_guide.value.title | default: "Buying guide" }}</h2>
+        <ol>
+          {% for step in product.metafields.prodrank.buying_guide.value.steps %}
+            <li><strong>{{ step.title }}</strong> — {{ step.detail }}</li>
+          {% endfor %}
+        </ol>
+      </section>
+    {% endif %}
+
+    {% if product.metafields.prodrank.specification.value and show_specification %}
+      <section class="prodrank-section" data-prodrank="specification">
+        <h2>{{ product.metafields.prodrank.specification.value.title | default: "Specifications" }}</h2>
+        <table class="prodrank-specs">
+          {% for spec in product.metafields.prodrank.specification.value.items %}
+            <tr>
+              <th>{{ spec.name }}</th>
+              <td>{{ spec.value }}</td>
+            </tr>
+          {% endfor %}
+        </table>
+      </section>
+    {% endif %}
+
+  </div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "ProdRank AI Content",
+  "target": "body",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Renders AI-optimized content (Description, FAQ, Pros/Cons, Comparison, Buying Guide, AI Summary) from ProdRank metafields. Sections appear only when content exists."
+    }
+  ],
+  "enabled_on": {
+    "templates": ["product"]
+  }
+}
+{% endschema %}

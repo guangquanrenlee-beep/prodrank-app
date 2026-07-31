@@ -13,5 +13,21 @@ redirect_urls = ["https://api.prodrank.app/api/shopify/callback", "https://prodr
 [webhooks]
 api_version = "2026-07"
 
+# ⑧ Webhook Listener — incremental sync + lifecycle events
+[[webhooks.subscriptions]]
+topics = ["products/update", "products/create"]
+uri = "https://api.prodrank.app/api/shopify/webhook/products/update"
+
+[[webhooks.subscriptions]]
+topics = ["inventory_levels/update"]
+uri = "https://api.prodrank.app/api/shopify/webhook/inventory_levels/update"
+
+[[webhooks.subscriptions]]
+topics = ["themes/publish"]
+uri = "https://api.prodrank.app/api/shopify/webhook/themes/publish"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "https://api.prodrank.app/api/shopify/webhook/app/uninstalled"
+
 extension_directories = ["extensions/schema-inject"]
-web_directories = ["web"]

@@ -39,6 +39,25 @@ class DB:
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }, on_conflict="user_id,domain").execute().data[0] if True else {}
 
+    def save_shopify_store(self, shop: str, access_token: str, shop_info: dict | None = None):
+        """① Store Connection — save/update a connected Shopify store after OAuth.
+        No user_id yet (OAuth is separate from Supabase Auth); rows are keyed by
+        domain and the Dashboard binds them to accounts later."""
+        fields = {
+            "platform": "shopify",
+            "platform_confidence": 95,
+            "auth_method": "oauth",
+            "access_token": access_token,
+            "shopify_shop": shop,
+            "last_synced_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        existing = self.client.table("sites").select("id").eq("domain", shop).eq("platform", "shopify").limit(1).execute().data
+        if existing:
+            self.client.table("sites").update(fields).eq("id", existing[0]["id"]).execute()
+        else:
+            self.client.table("sites").insert({"domain": shop, "user_id": "", **fields}).execute()
+
     def get_sites(self, user_id: str) -> list[dict]:
         return self.client.table("sites").select("*").eq("user_id", user_id).execute().data or []
 
@@ -47,20 +66,6 @@ class DB:
             "ai_visibility_score": score,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", site_id).execute()
-
-    def update_inject_status(self, domain: str, active: bool = True):
-        """Update inject.js/inject-saas.js ping status for a site by domain.
-        If no site record exists yet, the ping is ignored (user must Analyze first)."""
-        try:
-            result = self.client.table("sites").update({
-                "inject_active": active,
-                "last_ping_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("domain", domain).execute()
-            if not result.data:
-                print(f"[ProdRank] Ping from {domain} — no site record yet, skipping (user needs to Analyze in dashboard first)")
-        except Exception as e:
-            print(f"[ProdRank] Ping from {domain} — DB update failed: {e}")
 
     # ── Products ──
 
@@ -81,7 +86,7 @@ class DB:
         return data[0] if data else {}
 
     def save_products_batch(self, site_id: str, products: list[dict]):
-        """Batch insert products from site audit."""
+        """Batch insert products from site audit or Shopify full sync."""
         if not site_id or not products:
             return
         now = datetime.now(timezone.utc).isoformat()
@@ -92,6 +97,15 @@ class DB:
             "brand": p.get("brand", ""), "schema_fields": p.get("schema_fields", 0),
             "content_quality_score": p.get("content_quality_score", 0),
             "ai_visibility_score": p.get("ai_visibility_score", 0),
+            "shopify_id": p.get("shopify_id", ""),
+            "seo_title": p.get("seo_title", ""),
+            "meta_description": p.get("meta_description", ""),
+            "product_type": p.get("product_type", ""),
+            "tags": p.get("tags", []),
+            "collections": p.get("collections", []),
+            "variants": p.get("variants", []),
+            "inventory_quantity": p.get("inventory_quantity", 0),
+            "vendor": p.get("vendor", ""),
             "updated_at": now,
         } for p in products]
         self.client.table("products").upsert(rows, on_conflict="site_id,url").execute()
@@ -208,6 +222,51 @@ class DB:
     def get_subscription(self, user_id: str) -> dict | None:
         data = self.client.table("subscriptions").select("*").eq("user_id", user_id).execute().data
         return data[0] if data else None
+
+    # ── AI Content Drafts (⑥ publish + ⑦ rollback versioning) ──
+
+    def save_content_draft(self, shop: str, shopify_product_id: str, field: str,
+                           content, status: str = "draft", provenance: dict | None = None) -> int:
+        """Save a new AI content version. Returns the new version number."""
+        rows = (self.client.table("content_drafts")
+                .select("version").eq("shop", shop).eq("shopify_product_id", shopify_product_id)
+                .eq("field", field).order("version", desc=True).limit(1).execute().data)
+        version = (rows[0]["version"] + 1) if rows else 1
+        now = datetime.now(timezone.utc).isoformat()
+        self.client.table("content_drafts").insert({
+            "shop": shop, "shopify_product_id": str(shopify_product_id), "field": field,
+            "content": content, "status": status, "version": version,
+            "provenance": provenance or {},
+            "created_at": now, "updated_at": now,
+        }).execute()
+        return version
+
+    def get_latest_drafts(self, shop: str, shopify_product_id: str, fields: list[str] | None = None) -> dict:
+        """Latest draft per field (version descending, deduped in Python since
+        Supabase has no simple group-by for this)."""
+        data = (self.client.table("content_drafts")
+                .select("*").eq("shop", shop).eq("shopify_product_id", str(shopify_product_id))
+                .order("version", desc=True).limit(500).execute().data or [])
+        out: dict = {}
+        for d in data:
+            if fields and d.get("field") not in fields:
+                continue
+            if d.get("field") not in out:
+                out[d["field"]] = d
+        return out
+
+    def get_draft_history(self, shop: str, shopify_product_id: str, field: str, limit: int = 20) -> list[dict]:
+        """Full version history for one field (⑦ Rollback support)."""
+        return (self.client.table("content_drafts")
+                .select("*").eq("shop", shop).eq("shopify_product_id", str(shopify_product_id))
+                .eq("field", field).order("version", desc=True).limit(limit).execute().data or [])
+
+    def mark_drafts_published(self, draft_ids: list[str]):
+        """Mark drafts as published after they've been written to metafields."""
+        if not draft_ids:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        self.client.table("content_drafts").update({"status": "published", "updated_at": now}).in_("id", draft_ids).execute()
 
     @staticmethod
     def _domain_from_url(url: str) -> str:

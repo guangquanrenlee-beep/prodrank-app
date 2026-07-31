@@ -352,3 +352,169 @@ class ShopifyService:
                 score += 5
 
         return min(score, 100)
+
+    # ── ① Store Connection — store info, themes, collections ──
+
+    async def get_shop_info(self, store: ShopifyStore) -> dict:
+        """Fetch store-level info: name, email, plan, timezone, currency."""
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://{store.shop}/admin/api/2024-10/shop.json",
+                headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            return resp.json().get("shop", {})
+
+    async def get_themes(self, store: ShopifyStore) -> list[dict]:
+        """List the store's themes (to detect which one is live)."""
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://{store.shop}/admin/api/2024-10/themes.json",
+                headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            return resp.json().get("themes", [])
+
+    async def get_collections(self, store: ShopifyStore, limit: int = 250) -> list[dict]:
+        """List the store's collections."""
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://{store.shop}/admin/api/2024-10/collections.json",
+                headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
+                params={"limit": limit},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            return resp.json().get("collections", [])
+
+    # ── ② Product Sync — full catalog sync with cursor pagination ──
+
+    async def get_all_products(self, store: ShopifyStore) -> list[dict]:
+        """Fetch ALL products using Link-header cursor pagination (250/page).
+        Handles Shopify's page_info cursor in the Link header automatically."""
+        import re
+
+        products: list[dict] = []
+        url = f"https://{store.shop}/admin/api/2024-10/products.json?limit=250"
+        async with httpx.AsyncClient() as client:
+            while url:
+                resp = await client.get(
+                    url,
+                    headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                batch = resp.json().get("products", [])
+                products.extend(batch)
+                link = resp.headers.get("Link", "")
+                m = re.search(r'<([^>]+)>;\s*rel="next"', link)
+                url = m.group(1) if m and batch else None
+        return products
+
+    @staticmethod
+    def extract_product_sync_data(product: dict, shop: str) -> dict:
+        """Map a Shopify product dict to our Supabase products schema."""
+        variants = product.get("variants") or []
+        first = variants[0] if variants else {}
+        images = [img.get("src", "") for img in (product.get("images") or [])[:5]]
+        seo = product.get("seo") or {}
+        available = any(v.get("available", False) for v in variants)
+        total_inventory = sum(int(v.get("inventory_quantity") or 0) for v in variants)
+        return {
+            "shopify_id": str(product.get("id", "")),
+            "title": product.get("title", ""),
+            "description": (product.get("body_html") or "").strip(),
+            "price": str(first.get("price", "")),
+            "currency": "USD",
+            "sku": first.get("sku", ""),
+            "gtin": first.get("barcode", ""),
+            "brand": product.get("vendor", ""),
+            "vendor": product.get("vendor", ""),
+            "images": images,
+            "url": f"https://{shop}/products/{product.get('handle', '')}" if product.get("handle") else "",
+            "in_stock": available,
+            "inventory_quantity": total_inventory,
+            "seo_title": seo.get("title", ""),
+            "meta_description": seo.get("description", ""),
+            "product_type": product.get("product_type", ""),
+            "tags": [t for t in (product.get("tags", "") or "").split(", ") if t],
+            "collections": [],
+            "variants": [
+                {
+                    "id": str(v.get("id", "")), "title": v.get("title", ""),
+                    "sku": v.get("sku", ""), "price": v.get("price", ""),
+                    "available": v.get("available", False),
+                    "inventory_quantity": v.get("inventory_quantity", 0),
+                }
+                for v in variants
+            ],
+        }
+
+    # ── ③ AI Content Storage — metafield conventions ──
+    # All AI content lives in product metafields under the `prodrank` namespace.
+    # Content boundaries (see docs/product-content-boundaries.md):
+    #   ✅ Allowed: product description overwrite (only when merchant opts in),
+    #      page modules via Theme Blocks (metafield-rendered), JSON-LD via
+    #      Liquid render-time output, metafield storage itself.
+    #   ❌ Never: About/Blog/Homepage/Landing pages, Collections, nav, theme
+    #      source (CSS/HTML/Liquid/JS), images.
+
+    AI_CONTENT_FIELDS = [
+        "description", "faq", "pros", "cons", "comparison",
+        "use_cases", "buying_guide", "specification", "schema", "ai_summary",
+    ]
+
+    async def set_ai_content_metafield(self, store: ShopifyStore, product_id: int, field: str, content) -> dict:
+        """Write one AI content field to a product metafield (JSON type)."""
+        return await self.set_product_metafield(store, product_id, "prodrank", field, content, "json")
+
+    async def get_product_metafields(self, store: ShopifyStore, product_id: int) -> dict:
+        """Read ALL prodrank metafields for a product (used by ⑨ Verification)."""
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://{store.shop}/admin/api/2024-10/products/{product_id}/metafields.json",
+                headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
+                params={"namespace": "prodrank"},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            out: dict = {}
+            for mf in resp.json().get("metafields", []):
+                key = mf.get("key")
+                value = mf.get("value")
+                if mf.get("type") == "json" and value:
+                    try:
+                        value = json.loads(value)
+                    except Exception:
+                        pass
+                out[key] = value
+            return out
+
+    async def set_rendering_rules(self, store: ShopifyStore, rules: dict) -> dict:
+        """Rendering Rules — shop-level metafield controlling which AI sections render.
+        Example: {"faq": true, "pros": true, "cons": false, "comparison": true,
+                   "use_cases": true, "buying_guide": true, "ai_summary": true,
+                   "description": false}
+        The schema JSON-LD block is ALWAYS output regardless of these rules.
+        (Theme app extensions can only read defined metafields; if the shop-level
+        metafield is not readable in Liquid, the block falls back to "render all".)"""
+        info = await self.get_shop_info(store)
+        shop_id = info.get("id")
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"https://{store.shop}/admin/api/2024-10/metafields.json",
+                headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
+                json={"metafield": {
+                    "namespace": "prodrank",
+                    "key": "rendering_rules",
+                    "value": json.dumps(rules),
+                    "type": "json",
+                    "owner_resource": "shop",
+                    "owner_id": shop_id,
+                }},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            return resp.json()

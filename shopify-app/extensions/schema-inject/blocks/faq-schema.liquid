@@ -1,21 +1,24 @@
 {% comment %}
-  ProdRank — FAQPage Schema Injection Block
-  Injects AI-generated FAQ JSON-LD into product pages.
+  ProdRank — FAQPage Schema Renderer
+  Outputs the FAQPage JSON-LD into the product page <head> when the SaaS has
+  generated FAQ content ("prodrank/faq" metafield). The stored value is the
+  complete schema.org Question array, shared with the visible FAQ section.
+  JSON-LD always outputs regardless of visible-section rendering rules.
 {% endcomment %}
 
-{% if app.metafields.prodrank.faq_schema %}
+{% if product and product.metafields.prodrank.faq %}
   <script type="application/ld+json">
   {
     "@context": "https://schema.org/",
     "@type": "FAQPage",
-    "mainEntity": {{ app.metafields.prodrank.faq_schema.value | json }}
+    "mainEntity": {{ product.metafields.prodrank.faq.value.questions | json }}
   }
   </script>
 {% endif %}
 
 {% schema %}
 {
-  "name": "ProdRank FAQ",
+  "name": "ProdRank FAQ Schema",
   "target": "head",
   "settings": []
 }

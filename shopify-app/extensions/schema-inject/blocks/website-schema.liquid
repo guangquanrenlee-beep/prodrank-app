@@ -1,0 +1,26 @@
+{% comment %}
+  ProdRank — WebSite + SearchAction Schema (site-wide)
+  Outputs WebSite structured data with SearchAction on every page.
+{% endcomment %}
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "WebSite",
+  "name": {{ shop.name | json }},
+  "url": {{ shop.url | json }},
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": {{ shop.url | append: "/search?q={search_term_string}" | json }},
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+
+{% schema %}
+{
+  "name": "ProdRank Website Schema",
+  "target": "head",
+  "settings": []
+}
+{% endschema %}

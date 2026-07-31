@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import audit, rank, shopify, optimize, intelligence, recommendation, citation, inject, inject_enhance, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api
+from app.api import audit, rank, shopify, shopify_publish, shopify_webhook, woocommerce_publish, optimize, intelligence, recommendation, citation, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api
 
 
 @asynccontextmanager
@@ -36,12 +36,13 @@ app.add_middleware(
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
 app.include_router(rank.router, prefix="/api/rank", tags=["Rank"])
 app.include_router(shopify.router, prefix="/api/shopify", tags=["Shopify"])
+app.include_router(shopify_publish.router, prefix="/api/shopify", tags=["Shopify Publish"])
+app.include_router(shopify_webhook.router, prefix="/api/shopify/webhook", tags=["Shopify Webhooks"])
+app.include_router(woocommerce_publish.router, prefix="/api/woocommerce", tags=["WooCommerce Publish"])
 app.include_router(optimize.router, prefix="/api/optimize", tags=["Optimize"])
 app.include_router(intelligence.router, prefix="/api/intel", tags=["Intelligence"])
 app.include_router(recommendation.router, prefix="/api/rec", tags=["Recommendation"])
 app.include_router(citation.router, prefix="/api/cite", tags=["Citation"])
-app.include_router(inject.router, prefix="/api", tags=["Inject"])
-app.include_router(inject_enhance.router, prefix="/api/inject", tags=["Inject AI"])
 app.include_router(detect.router, prefix="/api", tags=["Detect"])
 app.include_router(score.router, prefix="/api", tags=["Score"])
 app.include_router(integrations.router, prefix="/api/integrations", tags=["Integrations"])

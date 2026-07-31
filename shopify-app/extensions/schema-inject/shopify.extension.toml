@@ -6,22 +6,46 @@ uid = "15892994-efe2-d384-59c4-0c870cdad8ffd4069b74"
 [capabilities]
 network_access = false
 
-[metafields.prodrank_product_schema]
-namespace = "prodrank"
-key = "product_schema"
+# ── ③ AI Content Storage — product-level metafield definitions ──
+# All AI-generated content is stored here so it never touches the merchant's
+# original product content. Theme blocks read these to render on the page.
 
-[metafields.prodrank_faq_schema]
+[metafields.prodrank_description]
 namespace = "prodrank"
-key = "faq_schema"
+key = "description"
 
-[metafields.prodrank_org_schema]
+[metafields.prodrank_faq]
 namespace = "prodrank"
-key = "organization_schema"
+key = "faq"
 
-[metafields.prodrank_ai_desc]
+[metafields.prodrank_pros]
 namespace = "prodrank"
-key = "ai_description"
+key = "pros"
 
-[metafields.prodrank_audit_score]
+[metafields.prodrank_cons]
 namespace = "prodrank"
-key = "audit_score"
+key = "cons"
+
+[metafields.prodrank_comparison]
+namespace = "prodrank"
+key = "comparison"
+
+[metafields.prodrank_use_cases]
+namespace = "prodrank"
+key = "use_cases"
+
+[metafields.prodrank_buying_guide]
+namespace = "prodrank"
+key = "buying_guide"
+
+[metafields.prodrank_specification]
+namespace = "prodrank"
+key = "specification"
+
+[metafields.prodrank_schema]
+namespace = "prodrank"
+key = "schema"
+
+[metafields.prodrank_ai_summary]
+namespace = "prodrank"
+key = "ai_summary"
