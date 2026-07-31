@@ -1,4 +1,4 @@
-const API_BASE = "https://prodrank-api.keywordslends.workers.dev";
+const API_BASE = typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:8000" : "https://api.prodrank.app";
 
 export async function api(path: string, options?: RequestInit) {
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;

@@ -45,6 +45,11 @@ services:
         condition: service_healthy
       wp:
         condition: service_started
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
     volumes:
       - wp_data:/var/www/html
       - ../../wordpress-plugin:/var/www/html/wp-content/plugins/prodrank-ai-seo

@@ -66,7 +66,7 @@ class ProdRank_Admin {
         ?>
         <div class="wrap">
             <h1>ProdRank — AI Agent Commerce SEO</h1>
-            <p>Your store's visibility in ChatGPT, Gemini, Perplexity, and Claude.</p>
+            <p>Get ChatGPT, Gemini, Perplexity, and Claude to recommend your product.</p>
 
             <hr>
 

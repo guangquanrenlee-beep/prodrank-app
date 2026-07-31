@@ -25,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("dark", "font-sans", geist.variable)}>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: "(function(){var A=\"https://api.prodrank.app\";var F=window.fetch;window.fetch=function(u,o){if(typeof u===\"string\"&&u.startsWith(\"/api/\")){u=A+u;o=o||{};o.headers=o.headers||{};try{var s=JSON.parse(localStorage.getItem(\"sb-reqacknemyxnyqzkvrpe-auth-token\")||\"{}\");var e=(s.user||{}).email;if(e)o.headers[\"X-User-Email\"]=e;}catch(_){}}return F(u,o);}})();" }} />
+        <script dangerouslySetInnerHTML={{ __html: "(function(){var A=window.location.hostname===\"localhost\"?\"http://localhost:8000\":\"https://api.prodrank.app\";var F=window.fetch;window.fetch=function(u,o){if(typeof u===\"string\"&&u.startsWith(\"/api/\")){u=A+u;o=o||{};o.headers=o.headers||{};try{var s=JSON.parse(localStorage.getItem(\"sb-reqacknemyxnyqzkvrpe-auth-token\")||\"{}\");var e=(s.user||{}).email;if(e)o.headers[\"X-User-Email\"]=e;}catch(_){}}return F(u,o);}})();" }} />
       </head>
       <body className={`${inter.className} bg-zinc-950 text-zinc-100 antialiased min-h-screen flex flex-col`}>
         <AuthProvider>
