@@ -123,7 +123,6 @@ async def webhook_listener(topic: str, request: Request):
         # Merchant removed the app — disconnect the store, keep history.
         try:
             db.client.table("sites").update({
-                "connection_status": "removed",
                 "access_token": "",
                 "updated_at": now,
             }).eq("domain", shop).eq("platform", "shopify").execute()

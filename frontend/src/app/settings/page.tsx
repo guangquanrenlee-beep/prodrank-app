@@ -9,6 +9,10 @@ export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [saved, setSaved] = useState(false);
+  const [wpDomain, setWpDomain] = useState("");
+  const [wpToken, setWpToken] = useState("");
+  const [wpConnecting, setWpConnecting] = useState(false);
+  const [wpStatus, setWpStatus] = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     if (user?.email) setEmail(user.email);
@@ -92,8 +96,44 @@ export default function SettingsPage() {
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
           <h3 className="font-semibold">Integrations</h3>
-          <div className="flex items-center justify-between"><div><div className="text-sm text-zinc-200">Shopify</div><div className="text-xs text-zinc-500">Connect your store via OAuth</div></div><Link href="/api/shopify/install?shop=yourstore.myshopify.com" className="text-sm text-emerald-400 hover:text-emerald-300">Connect →</Link></div>
-          <div className="flex items-center justify-between"><div><div className="text-sm text-zinc-200">WordPress</div><div className="text-xs text-zinc-500">Install the ProdRank plugin</div></div><Link href="/wordpress" className="text-sm text-emerald-400 hover:text-emerald-300">Install →</Link></div>
+
+          {/* Shopify */}
+          <div className="flex items-center justify-between">
+            <div><div className="text-sm text-zinc-200">Shopify</div><div className="text-xs text-zinc-500">Connect your store via OAuth</div></div>
+            <Link href="/api/shopify/install?shop=yourstore.myshopify.com" className="text-sm text-emerald-400 hover:text-emerald-300">Connect →</Link>
+          </div>
+
+          {/* WordPress / WooCommerce — token-based connect */}
+          <div className="border-t border-zinc-800 pt-3 space-y-3">
+            <div><div className="text-sm text-zinc-200">WordPress / WooCommerce</div><div className="text-xs text-zinc-500">Install the ProdRank plugin, then paste the API token from WooCommerce → ProdRank SEO</div></div>
+            <div className="grid grid-cols-2 gap-2">
+              <input value={wpDomain} onChange={e => setWpDomain(e.target.value)} placeholder="yourstore.com" className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input value={wpToken} onChange={e => setWpToken(e.target.value)} placeholder="API token" className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <button
+              onClick={async () => {
+                if (!wpDomain.trim() || !wpToken.trim()) return;
+                setWpConnecting(true); setWpStatus(null);
+                try {
+                  const r = await fetch("/api/woocommerce/connect", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ domain: wpDomain.trim(), api_token: wpToken.trim() }),
+                  });
+                  const d = await r.json();
+                  if (r.ok) setWpStatus({ ok: true, msg: `Connected to ${d.domain} — plugin v${d.plugin?.plugin || "?"}` });
+                  else setWpStatus({ ok: false, msg: d.detail || "Connection failed" });
+                } catch { setWpStatus({ ok: false, msg: "Network error" }); }
+                finally { setWpConnecting(false); }
+              }}
+              disabled={wpConnecting} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
+              {wpConnecting ? "Connecting…" : "Connect"}
+            </button>
+            {wpStatus && (
+              <p className={`text-sm ${wpStatus.ok ? "text-emerald-400" : "text-red-400"}`}>
+                {wpStatus.ok ? "✅ " : "❌ "}{wpStatus.msg}
+              </p>
+            )}
+          </div>
         </div>
 
         <button onClick={() => supabase.auth.signOut()} className="text-sm text-red-400 hover:text-red-300">Sign out</button>

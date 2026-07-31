@@ -261,6 +261,13 @@ class DB:
                 .select("*").eq("shop", shop).eq("shopify_product_id", str(shopify_product_id))
                 .eq("field", field).order("version", desc=True).limit(limit).execute().data or [])
 
+    def count_generations(self, shop: str, shopify_product_id: str) -> int:
+        """Count how many times generate has been called for this product.
+        Counts distinct version groups across all fields (one generate call
+        creates one version per field with the same version number)."""
+        data = self.client.table("content_drafts").select("version").eq("shop", shop).eq("shopify_product_id", str(shopify_product_id)).order("version", desc=True).limit(1).execute().data
+        return data[0]["version"] if data else 0
+
     def mark_drafts_published(self, draft_ids: list[str]):
         """Mark drafts as published after they've been written to metafields."""
         if not draft_ids:

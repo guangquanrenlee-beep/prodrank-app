@@ -82,10 +82,10 @@ async def _fetch_shop_info(shop: str, access_token: str) -> dict:
 
 
 def _provenance(extra: dict | None = None) -> dict:
-    from app.services.shopify_ai import PROMPT_VERSION, MODEL
+    from app.services.shopify_ai import CATEGORY_PROMPT_VERSION, MODEL
     p = {
         "model": MODEL,
-        "prompt_version": PROMPT_VERSION,
+        "prompt_version": CATEGORY_PROMPT_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "human_edited": False,
     }

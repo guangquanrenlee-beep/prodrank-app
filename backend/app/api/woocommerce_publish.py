@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services.db import DB
-from app.services.shopify_ai import ShopifyAIService, build_schema, PROMPT_VERSION, MODEL
+from app.services.shopify_ai import ShopifyAIService, build_schema, CATEGORY_PROMPT_VERSION, MODEL, CATEGORY_RULES
 
 router = APIRouter()
 ai = ShopifyAIService()
@@ -28,6 +28,143 @@ DEFAULT_FIELDS = ["description", "faq", "pros", "cons", "comparison",
 class WooConnectRequest(BaseModel):
     domain: str
     api_token: str  # the plugin token shown in WooCommerce → ProdRank SEO
+
+
+class WooResolveUrlRequest(BaseModel):
+    url: str  # full product page URL, e.g. https://yourstore.com/product/backpack/
+
+
+@router.post("/resolve-url")
+async def resolve_product_url(req: WooResolveUrlRequest):
+    """Resolve a product URL → domain + token + product data.
+    Tries: plugin API (if token exists) → page crawl → fallback."""
+    url = req.url.strip()
+    if not url.startswith("http"):
+        url = f"https://{url}"
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    domain = parsed.netloc or parsed.path.split("/")[0]
+    # Remove www. and port
+    domain = domain.replace("www.", "").split(":")[0]
+
+    # Try to resolve token
+    token = ""
+    try:
+        token = _resolve_token(domain)
+    except Exception:
+        pass
+
+    product = {"url": url, "title": "", "description": "", "price": "", "sku": "", "brand": "", "images": [], "id": 0}
+
+    # Tier 1: Plugin API (has token, can query accurately)
+    if token:
+        try:
+            # Try to find the product by slug in the URL path
+            path_parts = parsed.path.strip("/").split("/")
+            slug = path_parts[-1] if path_parts else ""
+            # Try common patterns: /product/slug/, /products/slug/, /shop/slug/
+            if slug:
+                # Plugin doesn't have a by-slug endpoint, so we fetch all and filter
+                # But that's slow for large stores. Instead, crawl the page for WP product ID.
+                import httpx
+                from bs4 import BeautifulSoup
+                async with httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36"})
+                    html = resp.text
+                    soup = BeautifulSoup(html, "lxml")
+                    # Try to find WooCommerce product ID
+                    product_id = None
+                    # WooCommerce stores product ID in various places
+                    for meta in soup.find_all("meta"):
+                        if meta.get("property") == "product:retailer_item_id":
+                            product_id = int(meta["content"]) if meta["content"].isdigit() else None
+                    # Fallback: try body class for postid
+                    if not product_id:
+                        body = soup.find("body")
+                        if body:
+                            classes = body.get("class", [])
+                            for c in classes:
+                                if c.startswith("postid-"):
+                                    try:
+                                        product_id = int(c.replace("postid-", ""))
+                                    except ValueError:
+                                        pass
+                            # Another pattern: single-product postid-XXX
+                            for c in classes:
+                                if c.startswith("page-id-") and "single-product" in classes:
+                                    try:
+                                        product_id = int(c.replace("page-id-", ""))
+                                    except ValueError:
+                                        pass
+
+                    # Extract product info from page
+                    title = soup.find("title").text.strip() if soup.find("title") else ""
+                    # Clean title: remove site name suffix
+                    for sep in [" – ", " — ", " | ", " - "]:
+                        if sep in title:
+                            title = title.split(sep)[0]
+
+                    desc_meta = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+                    description = desc_meta["content"] if desc_meta and desc_meta.get("content") else ""
+
+                    price_meta = soup.find("meta", attrs={"property": "product:price:amount"})
+                    price = price_meta["content"] if price_meta and price_meta.get("content") else ""
+
+                    images = []
+                    for img in soup.find_all("meta", attrs={"property": "og:image"}):
+                        if img.get("content"):
+                            images.append(img["content"])
+
+                    product["title"] = title[:200] if title else url.split("/")[-1].replace("-", " ").title()
+                    product["description"] = description[:3000]
+                    product["price"] = price
+                    product["images"] = images[:5]
+                    product["id"] = product_id or 0
+
+                    # If we found a product_id, enrich with plugin data
+                    if product_id:
+                        try:
+                            plugin_data = await _plugin_get(domain, f"/products/{product_id}")
+                            product["title"] = plugin_data.get("title", product["title"])
+                            product["description"] = plugin_data.get("description", product["description"])
+                            product["price"] = plugin_data.get("price", product["price"])
+                            product["sku"] = plugin_data.get("sku", "")
+                            product["brand"] = plugin_data.get("brand", "")
+                            product["id"] = product_id
+                        except Exception:
+                            pass
+
+                    product["found_via"] = "page_crawl"
+        except Exception as e:
+            product["crawl_error"] = str(e)[:200]
+
+    else:
+        # Tier 2: No token — just crawl the page
+        try:
+            import httpx
+            from bs4 import BeautifulSoup
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36"})
+                html = resp.text
+                soup = BeautifulSoup(html, "lxml")
+                title = (soup.find("title") or None) and soup.find("title").text.strip() or url.split("/")[-1].replace("-", " ").title()
+                for sep in [" – ", " — ", " | ", " - "]:
+                    if sep in title:
+                        title = title.split(sep)[0]
+                product["title"] = title[:200]
+                desc_meta = soup.find("meta", attrs={"name": "description"})
+                product["description"] = desc_meta["content"][:3000] if desc_meta and desc_meta.get("content") else ""
+                images = [img["content"] for img in soup.find_all("meta", attrs={"property": "og:image"}) if img.get("content")]
+                product["images"] = images[:5]
+                product["found_via"] = "page_crawl_no_token"
+        except Exception as e:
+            product["crawl_error"] = str(e)[:200]
+
+    # If no real product_id, use a hash of the URL as a synthetic id
+    if not product["id"]:
+        product["id"] = abs(hash(url)) % 100000
+
+    return {"status": "ok", "domain": domain, "has_token": bool(token), "product": product}
 
 
 class WooGenerateRequest(BaseModel):
@@ -57,7 +194,14 @@ class WooSyncRequest(BaseModel):
 # ── helpers ──
 
 def _plugin_base(domain: str) -> str:
-    return f"https://{domain}/wp-json/prodrank/v1"
+    """Resolve the plugin REST base URL.
+    localhost / 127.x.x.x use http (dev/test),
+    everything else uses https (production)."""
+    if domain.startswith("localhost") or domain.startswith("127."):
+        scheme = "http"
+    else:
+        scheme = "https"
+    return f"{scheme}://{domain}/wp-json/prodrank/v1"
 
 
 async def _plugin_headers(domain: str) -> dict:
@@ -108,7 +252,7 @@ def _provenance() -> dict:
     from datetime import datetime, timezone
     return {
         "model": MODEL,
-        "prompt_version": PROMPT_VERSION,
+        "prompt_version": CATEGORY_PROMPT_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "human_edited": False,
     }
@@ -123,7 +267,7 @@ async def connect(req: WooConnectRequest):
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(
-                f"https://{domain}/wp-json/prodrank/v1/status",
+                f"{_plugin_base(domain)}/status",
                 headers={"X-ProdRank-Token": req.api_token},
             )
             resp.raise_for_status()
@@ -137,12 +281,11 @@ async def connect(req: WooConnectRequest):
         "platform_confidence": 90,
         "auth_method": "plugin",
         "access_token": req.api_token,
-        "connection_status": "active",
     }
     if existing:
         DB().client.table("sites").update(fields).eq("id", existing[0]["id"]).execute()
     else:
-        DB().client.table("sites").insert({"domain": domain, "user_id": "", **fields}).execute()
+        DB().client.table("sites").insert({"domain": domain, **fields}).execute()
 
     return {"status": "connected", "domain": domain, "plugin": status}
 
@@ -174,30 +317,51 @@ async def sync(req: WooSyncRequest):
     return {"status": "synced", "domain": domain, "total": len(all_products)}
 
 
+MAX_GENERATIONS = 3
+
 @router.post("/publish/generate")
 async def generate_content(req: WooGenerateRequest):
-    """⑥ Step 1 — AI-generate content fields (draft only, versioned in Supabase)."""
+    """⑥ Step 1 — AI-generate content fields (draft only, versioned in Supabase).
+    Max 3 generations per product. After 3, the merchant must manually edit."""
     try:
+        db = DB()
+        count = db.count_generations(req.domain, str(req.product_id))
+        if count >= MAX_GENERATIONS:
+            raise HTTPException(status_code=429, detail=f"Limit reached: {MAX_GENERATIONS} AI generations per product. Please edit your existing draft manually.")
+
         product = await _plugin_get(req.domain, f"/products/{req.product_id}")
         synced = _extract_woo_product(product)
-        generated = await ai.generate_fields(synced, req.fields)
+
+        # Step 1: category detection
+        category, confidence = await ai.detect_category(synced)
+
+        # Step 2: filter fields to category-applicable only
+        valid_fields = ai.modules_for_category(category)
+        filtered_fields = [f for f in req.fields if f in valid_fields]
+
+        # Step 3: generate with category context
+        generated = await ai.generate_fields(synced, filtered_fields, category=category)
         if "error" in generated:
             raise HTTPException(status_code=500, detail=generated["error"])
 
-        db = DB()
         versions: dict[str, int] = {}
         for field, content in generated.items():
             versions[field] = db.save_content_draft(
                 shop=req.domain, shopify_product_id=str(req.product_id), field=field,
                 content=content, status="draft", provenance=_provenance(),
             )
+        remaining = MAX_GENERATIONS - db.count_generations(req.domain, str(req.product_id))
         return {
             "status": "drafted",
             "domain": req.domain,
             "product_id": req.product_id,
+            "category": {"key": category, "label": CATEGORY_RULES.get(category, {}).get("label", "General"), "confidence": confidence},
             "generated": list(generated.keys()),
+            "skipped": list(set(req.fields) - set(filtered_fields)),
             "versions": versions,
             "preview": generated,
+            "generations_used": db.count_generations(req.domain, str(req.product_id)),
+            "generations_remaining": max(0, remaining),
         }
     except HTTPException:
         raise
@@ -293,5 +457,44 @@ async def draft_history(domain: str, product_id: int):
         fields = db.get_latest_drafts(domain, str(product_id))
         history = {f: db.get_draft_history(domain, str(product_id), f) for f in fields}
         return {"domain": domain, "product_id": product_id, "history": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class EditDraftRequest(BaseModel):
+    domain: str
+    product_id: int
+    fields: dict  # { "description": {...}, "faq": {...}, ... }
+
+
+@router.post("/drafts/edit")
+async def save_edited_draft(req: EditDraftRequest):
+    """Save manually-edited content as a new draft version.
+    Marks provenance.human_edited=true so the audit trail is clear."""
+    try:
+        db = DB()
+        prov = _provenance()
+        prov["human_edited"] = True
+        prov["note"] = "manually edited by merchant"
+        versions: dict[str, int] = {}
+        for field, content in req.fields.items():
+            if not isinstance(content, dict) or not content:
+                continue
+            versions[field] = db.save_content_draft(
+                shop=req.domain, shopify_product_id=str(req.product_id), field=field,
+                content=content, status="draft", provenance=prov,
+            )
+        return {"status": "saved", "product_id": req.product_id, "versions": versions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/drafts/count")
+async def generation_count(domain: str, product_id: int):
+    """How many times has this product been generated? (max 3)"""
+    try:
+        db = DB()
+        count = db.count_generations(domain, str(product_id))
+        return {"product_id": product_id, "generations_used": count, "generations_remaining": max(0, MAX_GENERATIONS - count)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

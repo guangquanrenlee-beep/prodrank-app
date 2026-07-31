@@ -1,13 +1,17 @@
 """
 Shopify AI Content Generation — SaaS side of the One-click Publish chain (⑥).
 
-Generates GEO-optimized content for a Shopify product via the ofox.ai gateway,
-in the exact content shapes the Theme App Extension renders
-(extensions/schema-inject/blocks/ai-content.liquid).
+Generates GEO-optimized content for a product via the ofox.ai gateway.
+Content shapes match the Theme App Extension render contract.
 
 Content boundaries: docs/product-content-boundaries.md
   ✅ description/FAQ/modules via metafield + optional description overwrite
   ❌ never touches merchant pages, collections, nav, theme source, images
+
+Category-aware generation:
+  Step 1 — detect category from product data (title, description, product_type, tags)
+  Step 2 — only generate modules relevant to that category
+  This prevents a T-shirt from getting "Compatibility" or a coffee machine from getting "Size Guide".
 """
 
 import json
@@ -17,39 +21,132 @@ from openai import AsyncOpenAI
 
 from app.core.config import get_settings
 
-# Content shape contract — matches ai-content.liquid render expectations.
-# Each key is a prodrank.* metafield; the dict describes the expected JSON shape.
-FIELD_SHAPES: dict[str, dict] = {
-    "description": {"title": "str", "html": "str"},
-    "ai_summary": {"title": "str", "html": "str"},
-    "pros": {"title": "str", "items": ["str"]},
-    "cons": {"title": "str", "items": ["str"]},
-    "faq": {"title": "str", "questions": [{"question": "str", "answer": "str"}]},
-    "comparison": {"title": "str", "competitor": "str", "rows": [{"ours": "str", "typical": "str"}]},
-    "use_cases": {"title": "str", "items": [{"title": "str", "description": "str"}]},
-    "buying_guide": {"title": "str", "steps": [{"title": "str", "detail": "str"}]},
-    "specification": {"title": "str", "items": [{"name": "str", "value": "str"}]},
+# ═══ Module Pool — EVERY possible content module ProdRank can generate ═══
+# Categories pick from this pool; new industries only add JSON rules, not code.
+ALL_MODULES: dict[str, str] = {  # field_key → human-readable label
+    "description":     "AI-optimized product description",
+    "ai_summary":      "One-paragraph product summary",
+    "faq":             "Frequently asked questions",
+    "pros":            "Product strengths / advantages",
+    "cons":            "Product weaknesses / limitations",
+    "comparison":      "Side-by-side competitor comparison table",
+    "use_cases":       "Ideal use cases / scenarios",
+    "buying_guide":    "Step-by-step purchasing guide",
+    "specifications":  "Technical specifications table",
+    "compatibility":   "Compatible devices / models / accessories",
+    "warranty":        "Warranty coverage details",
+    "package_includes":"What's in the box",
+    "target_audience": "Who this product is for",
+    "occasion":        "Suitable occasions / events",
+    "season":          "Seasonal appropriateness",
+    "fit":             "Fit / sizing guidance",
+    "size_guide":      "Size chart / measurement guide",
+    "material":        "Fabric / materials / build quality",
+    "care":            "Care / washing / maintenance instructions",
+    "ingredients":     "Ingredients list (food, supplements, cosmetics)",
+    "benefits":        "Health / wellness benefits",
+    "dosage":          "Dosage / usage instructions (supplements)",
+    "warnings":        "Safety warnings / allergen alerts",
+    "nutrition":       "Nutritional information",
+    "certifications":  "Certifications (organic, FDA, fair trade, CE, etc.)",
+    "storage":         "Storage / shelf-life instructions",
+    "cleaning":        "Cleaning / descaling instructions",
+    "capacity":        "Capacity / volume specifications",
+    "dimensions":      "Physical dimensions / weight",
+    "how_to_use":      "Usage instructions",
+    "shipping":        "Shipping information",
+    "returns":         "Return / refund policy summary",
 }
 
-PROMPT_VERSION = "v1"
-MODEL = "anthropic/claude-haiku-4.5"
+# ═══ Content shapes for each module (LLM output contract) ═══
+FIELD_SHAPES: dict[str, Any] = {
+    "description":     {"title": "str", "html": "str"},
+    "ai_summary":      {"title": "str", "html": "str"},
+    "pros":            {"title": "str", "items": ["str"]},
+    "cons":            {"title": "str", "items": ["str"]},
+    "faq":            {"title": "str", "questions": [{"question": "str", "answer": "str"}]},
+    "comparison":     {"title": "str", "competitor": "str", "rows": [{"ours": "str", "typical": "str"}]},
+    "use_cases":      {"title": "str", "items": [{"title": "str", "description": "str"}]},
+    "buying_guide":   {"title": "str", "steps": [{"title": "str", "detail": "str"}]},
+    "specifications": {"title": "str", "items": [{"name": "str", "value": "str"}]},
+    "compatibility":  {"title": "str", "items": ["str"]},
+    "warranty":       {"title": "str", "html": "str"},
+    "package_includes":{"title": "str", "items": ["str"]},
+    "target_audience":{"title": "str", "html": "str"},
+    "occasion":       {"title": "str", "items": ["str"]},
+    "season":         {"title": "str", "html": "str"},
+    "fit":            {"title": "str", "html": "str"},
+    "size_guide":     {"title": "str", "html": "str"},
+    "material":       {"title": "str", "html": "str"},
+    "care":           {"title": "str", "html": "str"},
+    "ingredients":    {"title": "str", "items": [{"name": "str", "amount": "str"}]},
+    "benefits":       {"title": "str", "items": [{"title": "str", "description": "str"}]},
+    "dosage":         {"title": "str", "html": "str"},
+    "warnings":       {"title": "str", "items": ["str"]},
+    "nutrition":      {"title": "str", "items": [{"name": "str", "value": "str"}]},
+    "certifications": {"title": "str", "items": ["str"]},
+    "storage":        {"title": "str", "html": "str"},
+    "cleaning":       {"title": "str", "html": "str"},
+    "capacity":       {"title": "str", "items": [{"name": "str", "value": "str"}]},
+    "dimensions":     {"title": "str", "items": [{"name": "str", "value": "str"}]},
+    "how_to_use":     {"title": "str", "html": "str"},
+    "shipping":       {"title": "str", "html": "str"},
+    "returns":        {"title": "str", "html": "str"},
+}
 
-# The schema JSON-LD is assembled in code (not by the LLM) for quality control.
-# Only visible content (description/faq/...) is LLM-generated.
+# ═══ Category → applicable modules ═══
+# Modules are listed in recommended display order.
+# description + faq + pros are always first; the rest is category-specific.
+CATEGORY_RULES: dict[str, dict] = {
+    "fashion": {
+        "label": "Fashion & Apparel",
+        "modules": ["description", "target_audience", "occasion", "season", "fit", "size_guide",
+                     "material", "care", "faq", "pros", "cons", "ai_summary", "comparison"],
+    },
+    "electronics": {
+        "label": "Electronics & Gadgets",
+        "modules": ["description", "specifications", "compatibility", "dimensions", "warranty",
+                     "package_includes", "faq", "pros", "cons", "comparison", "ai_summary"],
+    },
+    "beauty": {
+        "label": "Beauty & Cosmetics",
+        "modules": ["description", "ingredients", "benefits", "how_to_use", "warnings",
+                     "certifications", "faq", "pros", "cons", "ai_summary"],
+    },
+    "home": {
+        "label": "Home & Kitchen",
+        "modules": ["description", "specifications", "dimensions", "material", "cleaning",
+                     "capacity", "warranty", "faq", "pros", "cons", "comparison", "ai_summary"],
+    },
+    "food": {
+        "label": "Food & Beverage",
+        "modules": ["description", "ingredients", "nutrition", "benefits", "warnings",
+                     "storage", "certifications", "faq", "pros", "cons", "ai_summary"],
+    },
+    "sports": {
+        "label": "Sports & Outdoors",
+        "modules": ["description", "specifications", "target_audience", "material", "care",
+                     "fit", "faq", "pros", "cons", "comparison", "ai_summary"],
+    },
+    "generic": {
+        "label": "General Product",
+        "modules": ["description", "faq", "pros", "cons", "ai_summary", "comparison"],
+    },
+}
+
+CATEGORY_PROMPT_VERSION = "v2"   # bumped: category-aware generation
+MODEL = "anthropic/claude-haiku-4.5"
 
 
 def build_schema(product: dict, shop_info: dict, faq: list[dict] | None = None) -> dict:
-    """⑤ Schema Renderer (SaaS side) — assemble the full JSON-LD from synced data.
-    Covers: Product, Offer, AggregateRating (only with real reviews), FAQPage,
-    Breadcrumb, MerchantReturnPolicy, ShippingDetails. Website/SearchAction and
-    Organization are output by Liquid blocks site-wide."""
+    """⑤ Schema Renderer (SaaS side) — assemble the full JSON-LD from synced data."""
+    # (unchanged — same as before)
     variants = product.get("variants") or []
     first = variants[0] if variants else {}
     images = product.get("images") or []
     available = bool(product.get("in_stock", True))
     shop_name = shop_info.get("name") or ""
     shop_url = f"https://{shop_info.get('domain') or ''}"
-
     product_url = product.get("url") or ""
     schema: dict[str, Any] = {
         "@context": "https://schema.org/",
@@ -61,8 +158,7 @@ def build_schema(product: dict, shop_info: dict, faq: list[dict] | None = None) 
         "gtin13": first.get("barcode", "") or None,
         "brand": {"@type": "Brand", "name": product.get("brand") or shop_name} if (product.get("brand") or shop_name) else None,
         "offers": {
-            "@type": "Offer",
-            "url": product_url or None,
+            "@type": "Offer", "url": product_url or None,
             "priceCurrency": first.get("price_currency", "USD"),
             "price": str(first.get("price", "0")),
             "availability": "https://schema.org/InStock" if available else "https://schema.org/OutOfStock",
@@ -77,11 +173,9 @@ def build_schema(product: dict, shop_info: dict, faq: list[dict] | None = None) 
                 },
             },
             "hasMerchantReturnPolicy": {
-                "@type": "MerchantReturnPolicy",
-                "applicableCountry": "US",
+                "@type": "MerchantReturnPolicy", "applicableCountry": "US",
                 "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
-                "merchantReturnDays": 30,
-                "returnMethod": "https://schema.org/ReturnByMail",
+                "merchantReturnDays": 30, "returnMethod": "https://schema.org/ReturnByMail",
                 "returnFees": "https://schema.org/FreeReturn",
             },
         },
@@ -93,16 +187,12 @@ def build_schema(product: dict, shop_info: dict, faq: list[dict] | None = None) 
             ],
         },
     }
-    # AggregateRating ONLY from real review data — never fabricated
     rating = product.get("aggregate_rating")
     if rating and float(rating.get("rating_value", 0) or 0) > 0:
         schema["aggregateRating"] = {
-            "@type": "AggregateRating",
-            "ratingValue": str(rating["rating_value"]),
-            "bestRating": "5",
-            "reviewCount": str(rating.get("review_count", 1)),
+            "@type": "AggregateRating", "ratingValue": str(rating["rating_value"]),
+            "bestRating": "5", "reviewCount": str(rating.get("review_count", 1)),
         }
-    # FAQPage block from AI-generated FAQ (stored separately in prodrank.faq)
     schema = {k: v for k, v in schema.items() if v is not None}
     return schema
 
@@ -124,7 +214,7 @@ def _validate_shape(value: Any, shape: Any, path: str = "") -> bool:
 
 
 class ShopifyAIService:
-    """Generate GEO-optimized content fields for a Shopify product."""
+    """Generate GEO-optimized, category-aware content for a product."""
 
     def __init__(self):
         settings = get_settings()
@@ -133,13 +223,93 @@ class ShopifyAIService:
             base_url=settings.openai_base_url,
         )
 
+    # ── Step 1: Category detection ──
+
+    async def detect_category(self, product: dict) -> tuple[str, int]:
+        """Given product data, return (category_key, confidence 0-100).
+        category_key matches a key in CATEGORY_RULES.
+
+        Fast path: if product_type already matches a known category, skip AI.
+        Otherwise: AI classifies from title + description + product_type + tags.
+        Cost: ~$0.0003 per call (tiny prompt, ~50 input tokens + ~20 output)."""
+        ptype = (product.get("product_type") or "").lower()
+        title_lower = (product.get("title") or "").lower()
+        tags = " ".join(product.get("tags") or []).lower()
+        description = (product.get("description") or "")[:300].lower()
+        combined = f"{ptype} {title_lower} {tags} {description}"
+
+        # Quick keyword match for common Shopify Product Types
+        keyword_map: dict[str, list[str]] = {
+            "fashion": ["cloth", "shirt", "t-shirt", "dress", "pant", "jean", "jacket", "coat", "shoe",
+                        "sneaker", "hoodie", "sweater", "skirt", "top", "bottom", "apparel", "wear",
+                        "fashion", "hat", "cap", "scarf", "belt", "sock", "underwear", "swim"],
+            "electronics": ["electronic", "gadget", "phone", "laptop", "tablet", "camera", "speaker",
+                           "headphone", "charger", "cable", "adapter", "monitor", "keyboard", "mouse",
+                           "watch", "tv", "television", "audio", "computer", "usb", "hdmi"],
+            "beauty": ["cosmetic", "makeup", "skincare", "cream", "serum", "lotion", "shampoo",
+                      "conditioner", "perfume", "fragrance", "nail", "lipstick", "mascara", "beauty",
+                      "hair", "face", "skin", "bath", "soap"],
+            "home": ["kitchen", "cook", "bake", "furniture", "decor", "bed", "pillow", "blanket",
+                    "towel", "lamp", "light", "rug", "curtain", "storage", "organizer", "home",
+                    "household", "dinner", "plate", "cup", "mug", "pan", "pot", "appliance"],
+            "food": ["food", "beverage", "drink", "snack", "coffee", "tea", "chocolate", "candy",
+                    "supplement", "vitamin", "protein", "nutrition", "organic", "gluten", "vegan"],
+            "sports": ["sport", "fitness", "exercise", "yoga", "gym", "running", "hiking", "camping",
+                      "bike", "cycling", "swim", "outdoor", "athletic", "training", "ball"],
+        }
+        for cat, keywords in keyword_map.items():
+            score = sum(1 for kw in keywords if kw in combined)
+            if score >= 3:     # strong match — 3+ keywords hit
+                return (cat, 95)
+            if score >= 1 and cat == "fashion" and any(k in combined for k in ["shirt", "dress", "shoe", "jacket", "pant"]):
+                return (cat, 92)
+
+        # AI fallback: let the LLM classify
+        try:
+            resp = await self.client.chat.completions.create(
+                model=MODEL,
+                messages=[{
+                    "role": "system",
+                    "content": "You classify products into categories. Reply with ONLY the category key and confidence. No other text.",
+                }, {
+                    "role": "user",
+                    "content": (
+                        f"Product: {product.get('title', '')}\n"
+                        f"Type: {ptype or 'unknown'}\n"
+                        f"Description: {(product.get('description') or '')[:200]}\n"
+                        f"Tags: {tags}\n\n"
+                        f"Categories: fashion, electronics, beauty, home, food, sports, generic\n"
+                        f"Reply: <category> <confidence_0-100>"
+                    ),
+                }],
+                temperature=0.1, max_tokens=15, timeout=10.0,
+            )
+            raw = (resp.choices[0].message.content or "").strip().lower()
+            parts = raw.split()
+            cat = parts[0] if parts else "generic"
+            conf = 0
+            try:
+                conf = int(parts[1]) if len(parts) > 1 else 60
+            except ValueError:
+                conf = 60
+            cat = cat if cat in CATEGORY_RULES else "generic"
+            return (cat, min(100, conf))
+        except Exception:
+            return ("generic", 30)
+
+    # ── Step 2: Content generation ──
+
+    def modules_for_category(self, category: str) -> list[str]:
+        """Return the list of module keys applicable to a category."""
+        rule = CATEGORY_RULES.get(category, CATEGORY_RULES["generic"])
+        return rule["modules"]
+
     def _product_context(self, product: dict) -> str:
         variants = product.get("variants") or []
         first = variants[0] if variants else {}
         parts = [
             f"Name: {product.get('title', '')}",
             f"Brand: {product.get('brand') or product.get('vendor') or ''}",
-            # WooCommerce products carry price at the top level; Shopify at variant level
             f"Price: {first.get('price', product.get('price', ''))}",
             f"Type: {product.get('product_type', '')}",
             f"Tags: {', '.join(product.get('tags') or [])}",
@@ -147,31 +317,44 @@ class ShopifyAIService:
         ]
         return "\n".join(parts)
 
-    async def generate_fields(self, product: dict, fields: list[str]) -> dict:
+    async def generate_fields(self, product: dict, fields: list[str],
+                              category: str | None = None) -> dict:
         """Generate the requested content fields in one AI call.
+        If `category` is provided, only modules applicable to that category are
+        generated (category-specific fields are filtered before the LLM call).
+        If `category` is None, the caller is responsible for filtering.
+
         Returns {field: content} in the exact shapes of FIELD_SHAPES."""
-        requested = [f for f in fields if f in FIELD_SHAPES]
-        if not requested:
+        # If a category was given, intersect the requested fields with
+        # what's valid for this category. Non-applicable fields are silently
+        # skipped (no "Compatibility" for T-shirts).
+        if category:
+            valid = set(self.modules_for_category(category))
+            fields = [f for f in fields if f in valid]
+
+        if not fields:
             return {}
 
         context = self._product_context(product)
-        shape_guide = "\n".join(f"- {f}: {json.dumps(FIELD_SHAPES[f], ensure_ascii=False)}" for f in requested)
+        cat_label = CATEGORY_RULES.get(category or "generic", {}).get("label", "General Product")
+        shape_guide = "\n".join(
+            f"- {f} ({ALL_MODULES.get(f, f)}): {json.dumps(FIELD_SHAPES.get(f, {f: 'str'}), ensure_ascii=False)}"
+            for f in fields
+        )
 
         prompt = f"""You are a GEO (Generative Engine Optimization) content writer for e-commerce.
 
+PRODUCT CATEGORY: {cat_label}
 PRODUCT DATA:
 {context}
 
-Generate these content fields for the product page. Follow the EXACT JSON shapes given.
-Write factual, persuasive English marketing copy. Do NOT fabricate specifications,
-certifications, or review data that is not in the product data — if unknown, say so
-honestly or omit. FAQs must be realistic customer questions with useful answers.
+Generate ONLY the content fields listed below. This is a {cat_label} product — generate category-appropriate content. Do NOT fabricate specifications, certifications, or review data that is not in the product data. If unknown, say so honestly or omit. FAQs must be realistic customer questions with useful answers.
 
-EXPECTED SHAPES:
+FIELDS TO GENERATE ({len(fields)}):
 {shape_guide}
 
 Return ONLY valid JSON (no markdown, no explanation), an object with one key per field:
-{{"description": {{...}}, "faq": {{...}}, ...}}"""
+{{"{fields[0]}": {{...}}, ...}}"""
 
         try:
             resp = await self.client.chat.completions.create(
@@ -189,12 +372,12 @@ Return ONLY valid JSON (no markdown, no explanation), an object with one key per
             return {"error": f"AI generation failed: {str(e)[:200]}"}
 
         out: dict = {}
-        for f in requested:
+        for f in fields:
             value = data.get(f)
             if value is None:
                 continue
-            if not _validate_shape(value, FIELD_SHAPES[f]):
-                # Keep invalid fields out; they can be regenerated individually
+            shape = FIELD_SHAPES.get(f, {f: "str"})
+            if not _validate_shape(value, shape):
                 continue
             out[f] = value
         return out
