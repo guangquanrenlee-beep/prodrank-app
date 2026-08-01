@@ -60,6 +60,20 @@ class TaskQueue:
                 d = SchemaDetector()
                 r = loop.run_until_complete(d.audit_site(task["params"]["domain"]))
                 return {"health_score": r.health_score, "total_pages": r.total_pages, "top_issues": r.top_issues}
+            elif task["type"] == "collect_questions":
+                # Daily real-question collection (circuit breaker + caps inside)
+                import os
+                from app.services.data_collector import DataCollector, CATEGORY_CONFIG
+                collector = DataCollector()
+                results = {}
+                for cat in task["params"].get("categories", []):
+                    try:
+                        results[cat] = loop.run_until_complete(
+                            collector.collect_category(cat, youtube_key=os.getenv("YOUTUBE_API_KEY", ""))
+                        )
+                    except Exception as e:
+                        results[cat] = {"error": str(e)[:200]}
+                return results
             return {"error": "unknown task type"}
         except Exception as e:
             return {"error": str(e)}

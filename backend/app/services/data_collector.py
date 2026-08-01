@@ -80,6 +80,9 @@ class RawQuestion:
 class DataCollector:
     """Collect raw questions from public sources."""
 
+    # ── Protection: circuit breaker + backoff + daily caps ──
+    # Per-source state so one blocked source doesn't kill the others.
+
     def __init__(self):
         settings = get_settings()
         self.client = AsyncOpenAI(
@@ -87,6 +90,47 @@ class DataCollector:
             base_url=settings.openai_base_url,
         )
         self.model = "google/gemini-3.6-flash"
+        # source -> {requests_today, tripped}
+        self._state: dict[str, dict] = {}
+        self._daily_caps: dict[str, int] = {
+            "google": 300,
+            "reddit": 60,
+            "youtube": 40,
+            "brand_faq": 20,
+        }
+
+    def _source_ok(self, source: str) -> bool:
+        st = self._state.setdefault(source, {"requests": 0, "tripped": False})
+        if st["tripped"]:
+            return False
+        return st["requests"] < self._daily_caps.get(source, 100)
+
+    def _count_request(self, source: str):
+        self._state.setdefault(source, {"requests": 0, "tripped": False})["requests"] += 1
+
+    def _trip(self, source: str):
+        self._state.setdefault(source, {"requests": 0, "tripped": False})["tripped"] = True
+        print(f"[data_collector] {source} tripped for today (rate-limited)")
+
+    async def _guarded_get(self, client: httpx.AsyncClient, source: str, url: str, **kwargs):
+        """GET with circuit breaker + exponential backoff on 429/403."""
+        if not self._source_ok(source):
+            return None
+        self._count_request(source)
+        delay = 1.0
+        for attempt in range(4):
+            try:
+                r = await client.get(url, **kwargs)
+                if r.status_code in (429, 403):
+                    self._trip(source)
+                    return None
+                return r
+            except (httpx.TimeoutException, httpx.TransportError):
+                if attempt == 3:
+                    return None
+                await asyncio.sleep(delay)
+                delay *= 2  # 1s → 2s → 4s
+        return None
 
     # ── 1. Google Autocomplete ──
 
@@ -95,22 +139,25 @@ class DataCollector:
         out: list[RawQuestion] = []
         async with httpx.AsyncClient(timeout=10, headers={"User-Agent": UA}) as c:
             for seed in seeds:
-                try:
-                    # Suggest prefix variants to widen coverage
-                    for prefix in ["best ", "best cheap ", "are ", "is ", "how "]:
-                        r = await c.get(
-                            "https://suggestqueries.google.com/complete/search",
-                            params={"client": "firefox", "q": prefix + seed},
-                        )
-                        if r.status_code != 200:
-                            continue
+                if not self._source_ok("google"):
+                    break
+                # Suggest prefix variants to widen coverage
+                for prefix in ["best ", "best cheap ", "are ", "is ", "how "]:
+                    r = await self._guarded_get(
+                        c, "google",
+                        "https://suggestqueries.google.com/complete/search",
+                        params={"client": "firefox", "q": prefix + seed},
+                    )
+                    if r is None:
+                        break
+                    try:
                         data = r.json()
                         for suggestion in data[1]:
                             text = str(suggestion)
                             if QUESTION_RE.search(text) or text.lower().startswith(("best ", "top ", "how ", "is ", "are ")):
                                 out.append(RawQuestion(text=text, source="google"))
-                except Exception:
-                    continue
+                    except Exception:
+                        continue
         return out
 
     # ── 2. Reddit ──
@@ -121,13 +168,16 @@ class DataCollector:
         async with httpx.AsyncClient(timeout=12, headers={"User-Agent": "prodrank-collector/1.0"}, follow_redirects=True) as c:
             for sub in subs:
                 for seed in seeds[:3]:  # limit queries per sub to stay under rate limits
+                    if not self._source_ok("reddit"):
+                        break
+                    r = await self._guarded_get(
+                        c, "reddit",
+                        f"https://www.reddit.com/r/{sub}/search.json",
+                        params={"q": seed, "restrict_sr": 1, "sort": "relevance", "limit": 15},
+                    )
+                    if r is None:
+                        break
                     try:
-                        r = await c.get(
-                            f"https://www.reddit.com/r/{sub}/search.json",
-                            params={"q": seed, "restrict_sr": 1, "sort": "relevance", "limit": 15},
-                        )
-                        if r.status_code != 200:
-                            continue
                         for post in r.json().get("data", {}).get("children", []):
                             p = post.get("data", {})
                             title = p.get("title", "")
@@ -135,7 +185,7 @@ class DataCollector:
                                 out.append(RawQuestion(text=title, source="reddit", url=f"https://reddit.com{p.get('permalink', '')}"))
                     except Exception:
                         continue
-                    time.sleep(1.2)  # be polite to reddit
+                    await asyncio.sleep(1.2)  # be polite to reddit
         return out
 
     # ── 3. YouTube comments ──
@@ -147,22 +197,24 @@ class DataCollector:
             return out
         async with httpx.AsyncClient(timeout=12) as c:
             for seed in seeds[:3]:
+                if not self._source_ok("youtube"):
+                    break
+                r = await self._guarded_get(c, "youtube", "https://www.googleapis.com/youtube/v3/search", params={
+                    "part": "snippet", "q": seed + " review", "type": "video",
+                    "maxResults": max_results, "key": api_key,
+                })
+                if r is None:
+                    break
                 try:
-                    r = await c.get("https://www.googleapis.com/youtube/v3/search", params={
-                        "part": "snippet", "q": seed + " review", "type": "video",
-                        "maxResults": max_results, "key": api_key,
-                    })
-                    if r.status_code != 200:
-                        continue
                     for item in r.json().get("items", []):
                         video_id = item["id"].get("videoId", "")
                         if not video_id:
                             continue
-                        cr = await c.get("https://www.googleapis.com/youtube/v3/commentThreads", params={
+                        cr = await self._guarded_get(c, "youtube", "https://www.googleapis.com/youtube/v3/commentThreads", params={
                             "part": "snippet", "videoId": video_id, "maxResults": 15, "key": api_key,
                         })
-                        if cr.status_code != 200:
-                            continue
+                        if cr is None:
+                            break
                         for thread in cr.json().get("items", []):
                             text = thread["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
                             text = re.sub(r"<[^>]+>", "", text).strip()
@@ -186,10 +238,12 @@ class DataCollector:
         out: list[RawQuestion] = []
         async with httpx.AsyncClient(timeout=12, headers={"User-Agent": UA}, follow_redirects=True) as c:
             for url in urls or self.BRAND_FAQS:
+                if not self._source_ok("brand_faq"):
+                    break
+                r = await self._guarded_get(c, "brand_faq", url)
+                if r is None:
+                    break
                 try:
-                    r = await c.get(url)
-                    if r.status_code != 200:
-                        continue
                     text = re.sub(r"<[^>]+>", " ", r.text)
                     text = re.sub(r"\s+", " ", text)
                     # FAQ pages often have Q...A pairs; extract question-like sentences

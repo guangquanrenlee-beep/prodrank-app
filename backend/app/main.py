@@ -4,9 +4,22 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+
+async def _background_worker():
+    """Every 30 min: process task queue + daily jobs (rank tracking, question collection).
+    Runs inside the app process — no external cron needed."""
+    from app.services.scheduler import run_pending
+    while True:
+        try:
+            run_pending()
+        except Exception as e:
+            print(f"[worker] {e}")
+        await asyncio.sleep(1800)
 
 from app.api import audit, rank, shopify, shopify_publish, shopify_webhook, woocommerce_publish, batch, data_api, optimize, intelligence, recommendation, citation, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api
 
@@ -14,7 +27,9 @@ from app.api import audit, rank, shopify, shopify_publish, shopify_webhook, wooc
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown events."""
+    task = asyncio.create_task(_background_worker())
     yield
+    task.cancel()
 
 
 app = FastAPI(

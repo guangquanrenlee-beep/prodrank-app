@@ -3,7 +3,7 @@ import json, time, os
 from app.services.task_queue import TaskQueue
 
 def run_pending():
-    """Called by cron every minute. Processes task queue and daily jobs."""
+    """Called periodically by the in-app worker. Processes task queue and daily jobs."""
     queue = TaskQueue()
     queue.process_pending()
 
@@ -13,13 +13,20 @@ def run_pending():
     today = time.strftime("%Y-%m-%d")
     try:
         with open(daily_file) as f: jobs = json.load(f)
-    except: jobs = {"last_run": "", "tracked_keywords": []}
+    except: jobs = {"last_run": "", "tracked_keywords": [], "last_collect": ""}
 
     if jobs.get("last_run") != today and jobs.get("tracked_keywords"):
         jobs["last_run"] = today
         for kw in jobs["tracked_keywords"]:
             queue.enqueue("rank_check", {"product_name": kw.get("brand",""), "keyword": kw.get("keyword",""), "brand": kw.get("brand","")})
         with open(daily_file, "w") as f: json.dump(jobs, f)
+
+    # Daily real-question collection (once per day, all categories)
+    if jobs.get("last_collect") != today:
+        jobs["last_collect"] = today
+        with open(daily_file, "w") as f: json.dump(jobs, f)
+        from app.services.data_collector import CATEGORY_CONFIG
+        queue.enqueue("collect_questions", {"categories": list(CATEGORY_CONFIG.keys())})
 
 def add_daily_keyword(brand: str, keyword: str):
     """Register a keyword for daily auto-tracking."""
