@@ -269,6 +269,22 @@ class DB:
                 .select("*").eq("shop", shop).eq("shopify_product_id", str(shopify_product_id))
                 .eq("field", field).order("version", desc=True).limit(limit).execute().data or [])
 
+    def get_monthly_generations(self, shop: str, month: str) -> int:
+        """Account-level monthly AI generation count for a shop."""
+        data = self.client.table("usage_tracking").select("ai_generations").eq("shop", shop).eq("month", month).limit(1).execute().data
+        return data[0]["ai_generations"] if data else 0
+
+    def increment_monthly_generations(self, shop: str, month: str, amount: int = 1) -> int:
+        """Increment the shop's monthly AI generation count (upsert). Returns new total."""
+        current = self.get_monthly_generations(shop, month)
+        new_total = current + amount
+        from datetime import datetime, timezone as _tz
+        self.client.table("usage_tracking").upsert({
+            "shop": shop, "month": month, "ai_generations": new_total,
+            "updated_at": datetime.now(_tz.utc).isoformat(),
+        }, on_conflict="shop,month").execute()
+        return new_total
+
     def count_generations(self, shop: str, shopify_product_id: str) -> int:
         """Count how many times generate has been called for this product.
         Counts distinct version groups across all fields (one generate call

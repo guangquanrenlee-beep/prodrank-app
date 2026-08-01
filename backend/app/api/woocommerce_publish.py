@@ -329,6 +329,12 @@ async def generate_content(req: WooGenerateRequest):
         if count >= MAX_GENERATIONS:
             raise HTTPException(status_code=429, detail=f"Limit reached: {MAX_GENERATIONS} AI generations per product. Please edit your existing draft manually.")
 
+        # Account-level monthly quota (anti-abuse)
+        from app.services.usage import check_quota, consume_generation
+        allowed, err, used, quota = check_quota(req.domain)
+        if not allowed:
+            raise HTTPException(status_code=429, detail=err)
+
         product = await _plugin_get(req.domain, f"/products/{req.product_id}")
         synced = _extract_woo_product(product)
 
@@ -351,6 +357,7 @@ async def generate_content(req: WooGenerateRequest):
                 content=content, status="draft", provenance=_provenance(),
             )
         remaining = MAX_GENERATIONS - db.count_generations(req.domain, str(req.product_id))
+        monthly_used = consume_generation(req.domain)
         return {
             "status": "drafted",
             "domain": req.domain,

@@ -22,10 +22,10 @@ const USE_CASES = [
 ];
 
 const PRICING = [
-  { name: "Free", price: "$0", period: "", cta: "Get Started", href: "#", features: ["1 site audit", "3 product audits", "Basic Schema check", "AI visibility quick scan"], featured: false },
-  { name: "Pro", price: "$79", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Unlimited site audits", "50 product audits/mo", "20 keyword AI tracking", "Shopify App & WP plugin", "Schema optimization", "14-day trial"], featured: true },
-  { name: "Growth", price: "$199", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Everything in Pro", "100 keyword tracking", "Competitor comparison", "Citation tracking", "Reason Engine", "Entity intelligence"], featured: false },
-  { name: "Agency", price: "$499", period: "/mo", cta: "Contact Us", href: "mailto:sales@prodrank.app", features: ["Everything in Growth", "500 keyword tracking", "Multi-brand", "API access", "White-label", "Dedicated support"], featured: false },
+  { name: "Free", price: "$0", period: "", cta: "Get Started", href: "#", features: ["1 site audit", "3 product audits", "3 AI content generations/mo", "1 keyword AI tracking", "Basic Schema check"], featured: false },
+  { name: "Pro", price: "$79", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Unlimited site audits", "50 AI content generations/mo", "Batch template (whole catalog)", "20 keyword AI tracking", "Shopify App & WP plugin", "Schema optimization", "14-day trial"], featured: true },
+  { name: "Growth", price: "$199", period: "/mo", cta: "Start Free Trial", href: "#", features: ["Everything in Pro", "200 AI content generations/mo", "100 keyword tracking", "Competitor comparison", "Citation tracking", "Reason Engine", "Entity intelligence"], featured: false },
+  { name: "Agency", price: "$499", period: "/mo", cta: "Contact Us", href: "mailto:sales@prodrank.app", features: ["Everything in Growth", "500 AI content generations/mo", "500 keyword tracking", "Multi-brand", "API access", "White-label", "Dedicated support"], featured: false },
 ];
 
 const FAQS = [

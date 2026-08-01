@@ -184,6 +184,12 @@ async def generate_content(req: GenerateRequest):
         if count >= MAX_GENERATIONS:
             raise HTTPException(status_code=429, detail=f"Limit reached: {MAX_GENERATIONS} AI generations per product.")
 
+        # Account-level monthly quota (anti-abuse)
+        from app.services.usage import check_quota, consume_generation
+        allowed, err, used, quota = check_quota(req.shop)
+        if not allowed:
+            raise HTTPException(status_code=429, detail=err)
+
         product = await _fetch_product(req.shop, token, req.product_id)
         shop_info = await _fetch_shop_info(req.shop, token)
 
@@ -210,6 +216,7 @@ async def generate_content(req: GenerateRequest):
                 provenance=_provenance({"product_title": product.get("title", "")}),
             )
         remaining = MAX_GENERATIONS - db.count_generations(req.shop, str(req.product_id))
+        monthly_used = consume_generation(req.shop)  # record this generation
         return {
             "status": "drafted",
             "shop": req.shop,
@@ -222,6 +229,7 @@ async def generate_content(req: GenerateRequest):
             "preview": generated,
             "generations_used": db.count_generations(req.shop, str(req.product_id)),
             "generations_remaining": max(0, remaining),
+            "monthly_generations_used": monthly_used,
         }
     except HTTPException:
         raise

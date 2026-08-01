@@ -35,6 +35,35 @@ export default function PublishPage() {
     finally { setLoading(false); }
   };
 
+  // ── Batch ──
+  const [batchGroups, setBatchGroups] = useState<any>(null);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchResult, setBatchResult] = useState<any>(null);
+
+  const handleBatchGroups = async () => {
+    if (!url.trim()) { setError("Enter your store URL first (any product page works)."); return; }
+    setBatchLoading(true); setError("");
+    const d = await apiPost("/api/batch/groups", { shop: new URL(url.startsWith("http") ? url : "https://" + url).hostname, platform });
+    if (d) setBatchGroups(d);
+    setBatchLoading(false);
+  };
+
+  const handleTemplate = async (category: string, sampleId: string) => {
+    setBatchLoading(true); setError("");
+    const shop = new URL(url.startsWith("http") ? url : "https://" + url).hostname;
+    const d = await apiPost("/api/batch/generate-template", { shop, platform, category, sample_id: String(sampleId) });
+    if (d) setBatchResult(d);
+    setBatchLoading(false);
+  };
+
+  const handleApply = async (category: string) => {
+    setBatchLoading(true); setError("");
+    const shop = new URL(url.startsWith("http") ? url : "https://" + url).hostname;
+    const d = await apiPost("/api/batch/apply", { shop, platform, category });
+    if (d) setBatchResult(d);
+    setBatchLoading(false);
+  };
+
   // ── Resolve URL ──
   const platform = url.includes("myshopify.com") ? "shopify" : "woocommerce";
 
@@ -312,6 +341,57 @@ export default function PublishPage() {
             <pre className="text-xs text-zinc-300 whitespace-pre-wrap max-h-80 overflow-y-auto">{JSON.stringify(result, null, 2)}</pre>
           </div>
         )}
+
+        {/* ── Batch template ── */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">⚡ Batch Template</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">Optimize your whole catalog by category — 1 AI call per category, applied to all matching products. <span className="text-zinc-600">({"{product_name}"} / {"{price}"} / {"{brand}"} placeholders substituted per product)</span></p>
+            </div>
+            <button onClick={handleBatchGroups} disabled={batchLoading || !url.trim()} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
+              {batchLoading ? "…" : "Scan catalog"}
+            </button>
+          </div>
+
+          {batchGroups && (
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-500">{batchGroups.total} products · {batchGroups.groups.length} categories</p>
+              {batchGroups.groups.map((g: any) => (
+                <div key={g.category} className="border border-zinc-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="text-sm font-medium text-emerald-400 capitalize">{g.label}</span>
+                      <span className="text-xs text-zinc-600 ml-2">{g.products.length} products</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleTemplate(g.category, g.products[0]?.id)} disabled={batchLoading || !g.products.length}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-xs rounded-lg">
+                        Generate template
+                      </button>
+                      <button onClick={() => handleApply(g.category)} disabled={batchLoading}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-700 text-white text-xs rounded-lg">
+                        Apply to {g.products.length}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {g.products.slice(0, 8).map((p: any) => (
+                      <span key={p.id} className="text-[10px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">{p.title.slice(0, 20)}</span>
+                    ))}
+                    {g.products.length > 8 && <span className="text-[10px] text-zinc-600 px-1 py-0.5">+{g.products.length - 8} more</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {batchResult && (
+            <div className="bg-zinc-950 border border-emerald-800 rounded-lg p-4">
+              <pre className="text-xs text-emerald-300 whitespace-pre-wrap max-h-60 overflow-y-auto">{JSON.stringify(batchResult, null, 2)}</pre>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
