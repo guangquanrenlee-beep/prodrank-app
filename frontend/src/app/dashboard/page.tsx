@@ -22,6 +22,7 @@ const NAV = [
   { label: "Source Marketplace", href: "/marketplace", icon: "🏪" },
   { label: "Action Center", href: "/actions", icon: "⚡" },
   { label: "Optimization Center", href: "/optimize", icon: "🔧" },
+  { label: "Install Store", href: "/install", icon: "🔌" },
   { label: "AI Studio", href: "/studio", icon: "✍️" },
   { label: "Verification", href: "/verify", icon: "📈" },
   { label: "Monitoring", href: "/monitoring", icon: "📡" },
