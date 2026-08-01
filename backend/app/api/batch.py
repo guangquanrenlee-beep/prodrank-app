@@ -126,7 +126,7 @@ async def generate_template(req: TemplateRequest):
         fields = [f for f in TEMPLATE_FIELDS if f in valid_fields]
 
         # Instruct the model to use placeholders for product-specific values
-        generated = await ai.generate_fields(sample, fields, category=req.category)
+        generated = await ai.generate_fields(sample, fields, category=req.category, template_mode=True)
         if "error" in generated:
             raise HTTPException(status_code=500, detail=generated["error"])
 
@@ -143,8 +143,6 @@ async def generate_template(req: TemplateRequest):
             )
         consume_generation(req.shop)
 
-        # Which products will this apply to
-        apply_to = [p for p in products if (await _detect_category_light(p)) == req.category or True]
         return {
             "status": "template_drafted",
             "category": req.category,
@@ -197,6 +195,13 @@ async def apply_template(req: ApplyRequest):
         if req.product_ids:
             ids = set(req.product_ids)
             targets = [p for p in products if str(p.get("shopify_id") or p.get("id") or "") in ids]
+        else:
+            # Default: only products belonging to this category (re-detect cheaply)
+            targets = []
+            for p in products:
+                cat, _ = await ai.detect_category(p)
+                if cat == req.category:
+                    targets.append(p)
 
         applied, errors = 0, 0
         for p in targets:

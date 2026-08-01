@@ -318,11 +318,15 @@ class ShopifyAIService:
         return "\n".join(parts)
 
     async def generate_fields(self, product: dict, fields: list[str],
-                              category: str | None = None) -> dict:
+                              category: str | None = None,
+                              template_mode: bool = False) -> dict:
         """Generate the requested content fields in one AI call.
         If `category` is provided, only modules applicable to that category are
         generated (category-specific fields are filtered before the LLM call).
         If `category` is None, the caller is responsible for filtering.
+        If `template_mode` is True, product-specific values are replaced with
+        {{product_name}} / {{price}} / {{brand}} placeholders so the result
+        can be applied across a whole category (batch templates).
 
         Returns {field: content} in the exact shapes of FIELD_SHAPES."""
         # If a category was given, intersect the requested fields with
@@ -342,6 +346,16 @@ class ShopifyAIService:
             for f in fields
         )
 
+        template_rule = ""
+        if template_mode:
+            template_rule = (
+                "\n\nTEMPLATE MODE: This content will be applied to MANY products in this category. "
+                "NEVER use the specific product name, price, brand, or vendor from the product data. "
+                "Instead use these exact placeholders wherever those values would appear: "
+                "{{product_name}}, {{price}}, {{brand}}. "
+                "Write the content so it works for any product in this category — no invented specifics."
+            )
+
         prompt = f"""You are a GEO (Generative Engine Optimization) content writer for e-commerce.
 
 PRODUCT CATEGORY: {cat_label}
@@ -349,6 +363,7 @@ PRODUCT DATA:
 {context}
 
 Generate ONLY the content fields listed below. This is a {cat_label} product — generate category-appropriate content. Do NOT fabricate specifications, certifications, or review data that is not in the product data. If unknown, say so honestly or omit. FAQs must be realistic customer questions with useful answers.
+{template_rule}
 
 FIELDS TO GENERATE ({len(fields)}):
 {shape_guide}
