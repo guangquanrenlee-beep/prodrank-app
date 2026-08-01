@@ -358,6 +358,8 @@ PRODUCT DATA:
 {context}
 
 Generate ONLY the content fields listed below. This is a {cat_label} product — generate category-appropriate content. Do NOT fabricate specifications, certifications, or review data that is not in the product data. If unknown, say so honestly or omit. FAQs must be realistic customer questions with useful answers.
+
+CONCISENESS (hard rule): Write tight, scannable copy. Description <= 120 words. FAQ answers <= 50 words. Pros/cons items <= 12 words each, 4-6 items. Buying guide steps <= 25 words. Comparison cells <= 15 words. No filler, no repeated marketing fluff, no preamble sentences.
 {template_rule}
 
 FIELDS TO GENERATE ({len(fields)}):
