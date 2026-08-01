@@ -58,7 +58,7 @@ async def _fetch_products(shop: str, platform: str) -> list[dict]:
     """Fetch all products in the shared sync shape."""
     if platform == "shopify":
         from app.services.shopify_service import ShopifyService, ShopifyStore
-        from app.services.shopify_publish import _resolve_token
+        from app.api.shopify_publish import _resolve_token
         svc = ShopifyService()
         token = _resolve_token(shop)
         store = ShopifyStore(shop=shop, access_token=token)
@@ -206,7 +206,7 @@ async def apply_template(req: ApplyRequest):
                     substituted = _substitute(draft["content"], p)
                     if req.platform == "shopify":
                         from app.services.shopify_service import ShopifyService, ShopifyStore
-                        from app.services.shopify_publish import _resolve_token
+                        from app.api.shopify_publish import _resolve_token
                         svc = ShopifyService()
                         token = _resolve_token(req.shop)
                         store = ShopifyStore(shop=req.shop, access_token=token)
