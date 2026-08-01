@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from app.services.db import DB
 from app.services.shopify_ai import ShopifyAIService, build_schema, CATEGORY_PROMPT_VERSION, MODEL, CATEGORY_RULES
+from app.services.knowledge_templates import detect_subcategory, generate_field_list
 
 router = APIRouter()
 ai = ShopifyAIService()
@@ -170,7 +171,7 @@ async def resolve_product_url(req: WooResolveUrlRequest):
 class WooGenerateRequest(BaseModel):
     domain: str
     product_id: int
-    fields: list[str] = DEFAULT_FIELDS
+    fields: list[str] | None = None  # None = four-layer template decides
 
 
 class WooPublishRequest(BaseModel):
@@ -319,6 +320,16 @@ async def sync(req: WooSyncRequest):
 
 MAX_GENERATIONS = 3
 
+
+def _layer_of(field: str, knowledge: list[str], decision: list[str], trust: list[str]) -> str:
+    if field in knowledge:
+        return "knowledge"
+    if field in decision:
+        return "decision"
+    if field in trust:
+        return "trust"
+    return "knowledge"
+
 @router.post("/publish/generate")
 async def generate_content(req: WooGenerateRequest):
     """⑥ Step 1 — AI-generate content fields (draft only, versioned in Supabase).
@@ -338,17 +349,28 @@ async def generate_content(req: WooGenerateRequest):
         product = await _plugin_get(req.domain, f"/products/{req.product_id}")
         synced = _extract_woo_product(product)
 
-        # Step 1: category detection
+        # Step 1: category + subcategory detection
         category, confidence = await ai.detect_category(synced)
+        subcategory = detect_subcategory(synced, category)
 
-        # Step 2: filter fields to category-applicable only
-        valid_fields = ai.modules_for_category(category)
-        filtered_fields = [f for f in req.fields if f in valid_fields]
+        # Step 2: four-layer template drives the field set
+        identity_fields, knowledge_fields, decision_fields, trust_fields = generate_field_list(category, subcategory)
+        template_fields = knowledge_fields + decision_fields + trust_fields  # identity read from data, not generated
+        requested = req.fields if req.fields else template_fields
+        filtered_fields = [f for f in requested if f in template_fields]
 
         # Step 3: generate with category context
         generated = await ai.generate_fields(synced, filtered_fields, category=category)
         if "error" in generated:
             raise HTTPException(status_code=500, detail=generated["error"])
+
+        # Missing: requested + template-allowed but NOT generated (data absent — never fabricated)
+        missing = [f for f in filtered_fields if f not in generated]
+        missing_details = [
+            {"field": f, "layer": _layer_of(f, knowledge_fields, decision_fields, trust_fields),
+             "reason": "not found in product data — fill manually or skip"}
+            for f in missing
+        ]
 
         versions: dict[str, int] = {}
         for field, content in generated.items():
@@ -363,8 +385,16 @@ async def generate_content(req: WooGenerateRequest):
             "domain": req.domain,
             "product_id": req.product_id,
             "category": {"key": category, "label": CATEGORY_RULES.get(category, {}).get("label", "General"), "confidence": confidence},
+            "subcategory": subcategory,
+            "layers": {
+                "identity": identity_fields,
+                "knowledge": [f for f in knowledge_fields if f in generated],
+                "decision": [f for f in decision_fields if f in generated],
+                "trust": [f for f in trust_fields if f in generated],
+            },
             "generated": list(generated.keys()),
-            "skipped": list(set(req.fields) - set(filtered_fields)),
+            "skipped": list(set(requested) - set(filtered_fields)),
+            "missing": missing_details,
             "versions": versions,
             "preview": generated,
             "generations_used": db.count_generations(req.domain, str(req.product_id)),

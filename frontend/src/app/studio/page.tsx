@@ -17,6 +17,8 @@ export default function PublishPage() {
 
   const [resolved, setResolved] = useState<any>(null); // { domain, product, has_token }
   const [preview, setPreview] = useState<Record<string, any> | null>(null);
+  const [missing, setMissing] = useState<any[]>([]);
+  const [subcategory, setSubcategory] = useState("");
   const [edited, setEdited] = useState<Record<string, any>>({});
   const [editField, setEditField] = useState<string | null>(null);
   const [genUsed, setGenUsed] = useState(0);
@@ -127,6 +129,8 @@ export default function PublishPage() {
     const d = await apiPost(apiBase() + "/publish/generate", apiBody());
     if (!d) return;
     setPreview(d.preview); setEdited({});
+    setMissing(d.missing || []);
+    setSubcategory(d.subcategory || "");
     setGenUsed(d.generations_used || 1); setGenRemaining(d.generations_remaining ?? 2);
     setStep("preview");
   };
@@ -137,6 +141,8 @@ export default function PublishPage() {
       apiBody());
     if (!d) return;
     setPreview(d.preview); setEdited({});
+    setMissing(d.missing || []);
+    setSubcategory(d.subcategory || "");
     setGenUsed(d.generations_used || 1); setGenRemaining(d.generations_remaining ?? 2);
   };
 
@@ -147,7 +153,7 @@ export default function PublishPage() {
       await apiPost(editPath, { shop: resolved.domain, product_id: resolved.product.id, fields: edited });
     }
     const d = await apiPost(apiBase() + "/publish",
-      { shop: resolved.domain, product_id: resolved.product.id, overwrite_description: overwrite, fields: DEFAULT_FIELDS });
+      { shop: resolved.domain, product_id: resolved.product.id, overwrite_description: overwrite, fields: preview ? Object.keys(preview) : undefined });
     if (d) { setResult(d); setStep("published"); }
   };
 
@@ -274,7 +280,7 @@ export default function PublishPage() {
               <div className="flex items-center justify-between sticky top-0 bg-zinc-900 py-2 z-10 border-b border-zinc-800 pb-3">
                 <div>
                   <h2 className="text-lg font-bold">{resolved?.product?.title || "Review"}</h2>
-                  <p className="text-xs text-zinc-500">{resolved?.domain}</p>
+                  <p className="text-xs text-zinc-500">{resolved?.domain}{subcategory ? ` · ${subcategory}` : ""}</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={handleRegenerate} disabled={loading || genRemaining <= 0} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-700 text-white text-xs rounded-lg">🔄 ({genRemaining})</button>
@@ -283,6 +289,36 @@ export default function PublishPage() {
                   <button onClick={() => { setStep("idle"); setEditField(null); }} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none">✕</button>
                 </div>
               </div>
+
+              {/* Mandatory review notice */}
+              <div className="bg-sky-900/20 border border-sky-800 rounded-lg p-3 flex items-start gap-2">
+                <span className="text-sky-400 text-lg leading-none mt-0.5">⚠️</span>
+                <div>
+                  <p className="text-sm text-sky-300 font-medium">Please review everything below before publishing.</p>
+                  <p className="text-xs text-sky-500 mt-0.5">Check each section — edit anything that looks wrong, then publish.</p>
+                </div>
+              </div>
+
+              {/* Missing fields — never fabricated, merchant decides */}
+              {missing.length > 0 && (
+                <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-3">
+                  <p className="text-sm text-amber-300 font-medium mb-2">
+                    ⚠️ {missing.length} item{missing.length > 1 ? "s" : ""} could not be generated — not found in your product data (never invented).
+                  </p>
+                  <p className="text-xs text-amber-500 mb-2">Fill them manually, or skip — skipped sections won't appear on the page.</p>
+                  <div className="space-y-1.5">
+                    {missing.map((m: any) => (
+                      <div key={m.field} className="flex items-center gap-2 bg-zinc-950/50 border border-amber-800/50 rounded p-2">
+                        <span className="text-amber-400">⚠️</span>
+                        <span className="text-xs text-zinc-300 capitalize w-32">{m.field.replace(/_/g, " ")}</span>
+                        <span className="text-[10px] text-zinc-500 flex-1">{m.reason}</span>
+                        <button onClick={() => startEdit(m.field)} className="text-xs text-emerald-400 hover:text-emerald-300 whitespace-nowrap">✎ Fill manually</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {genRemaining <= 0 && <p className="text-sm text-amber-400 bg-amber-900/20 border border-amber-800 rounded-lg p-3">AI limit reached. Edit manually below, then publish.</p>}
               <div className="space-y-2">
                 {DEFAULT_FIELDS.filter(f => edited[f] || preview[f]).map(field => {

@@ -19,8 +19,20 @@ from pydantic import BaseModel
 from app.services.db import DB
 from app.services.shopify_service import ShopifyService, ShopifyStore, admin_api_base
 from app.services.shopify_ai import ShopifyAIService, build_schema, CATEGORY_RULES
+from app.services.knowledge_templates import detect_subcategory, generate_field_list
 
 MAX_GENERATIONS = 3
+
+
+def _layer_of(field: str, knowledge: list[str], decision: list[str], trust: list[str]) -> str:
+    if field in knowledge:
+        return "knowledge"
+    if field in decision:
+        return "decision"
+    if field in trust:
+        return "trust"
+    return "knowledge"
+
 
 router = APIRouter()
 shopify = ShopifyService()
@@ -31,8 +43,7 @@ class GenerateRequest(BaseModel):
     shop: str
     access_token: str = ""  # optional — resolved from sites table when empty
     product_id: int
-    fields: list[str] = ["description", "faq", "pros", "cons", "comparison",
-                         "use_cases", "buying_guide", "specification", "ai_summary"]
+    fields: list[str] | None = None  # None = four-layer template decides
 
 
 class PublishRequest(BaseModel):
@@ -199,14 +210,24 @@ async def generate_content(req: GenerateRequest):
         site_id = sites[0]["id"] if sites else ""
         db.save_products_batch(site_id, [synced])
 
-        # Category detection
+        # Category + subcategory detection (four-layer template)
         category, confidence = await ai.detect_category(synced)
-        valid_fields = ai.modules_for_category(category)
-        filtered_fields = [f for f in req.fields if f in valid_fields]
+        subcategory = detect_subcategory(synced, category)
+        identity_fields, knowledge_fields, decision_fields, trust_fields = generate_field_list(category, subcategory)
+        template_fields = knowledge_fields + decision_fields + trust_fields
+        requested = req.fields if req.fields else template_fields
+        filtered_fields = [f for f in requested if f in template_fields]
 
         generated = await ai.generate_fields(synced, filtered_fields, category=category)
         if "error" in generated:
             raise HTTPException(status_code=500, detail=generated["error"])
+
+        missing = [f for f in filtered_fields if f not in generated]
+        missing_details = [
+            {"field": f, "layer": _layer_of(f, knowledge_fields, decision_fields, trust_fields),
+             "reason": "not found in product data — fill manually or skip"}
+            for f in missing
+        ]
 
         versions: dict[str, int] = {}
         for field, content in generated.items():
@@ -223,8 +244,16 @@ async def generate_content(req: GenerateRequest):
             "product_id": req.product_id,
             "product_title": product.get("title", ""),
             "category": {"key": category, "label": CATEGORY_RULES.get(category, {}).get("label", "General"), "confidence": confidence},
+            "subcategory": subcategory,
+            "layers": {
+                "identity": identity_fields,
+                "knowledge": [f for f in knowledge_fields if f in generated],
+                "decision": [f for f in decision_fields if f in generated],
+                "trust": [f for f in trust_fields if f in generated],
+            },
             "generated": list(generated.keys()),
-            "skipped": list(set(req.fields) - set(filtered_fields)),
+            "skipped": list(set(requested) - set(filtered_fields)),
+            "missing": missing_details,
             "versions": versions,
             "preview": generated,
             "generations_used": db.count_generations(req.shop, str(req.product_id)),
