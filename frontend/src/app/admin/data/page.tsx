@@ -80,7 +80,7 @@ export default function AdminDataPage() {
           </div>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
             <div className="text-xs text-zinc-500">Today</div>
-            <div className="text-4xl font-bold">{data?.last_7_days ? Object.values(data.last_7_days).pop() : 0}</div>
+            <div className="text-4xl font-bold">{data?.last_7_days ? (Object.values(data.last_7_days) as number[]).pop() : 0}</div>
           </div>
         </div>
 
