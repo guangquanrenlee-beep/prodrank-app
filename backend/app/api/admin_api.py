@@ -109,8 +109,8 @@ async def data_summary(request: Request):
     from app.services.db import DB
     db = DB()
 
-    # Pull category + created_at for aggregation (library is small, thousands of rows)
-    rows = db.client.table("questions").select("category,created_at").limit(50000).execute().data or []
+    # Pull category + added_at for aggregation (library is small, thousands of rows)
+    rows = db.client.table("questions").select("category,added_at").limit(50000).execute().data or []
     total = len(rows)
 
     # Per category dimension distribution: category = "fashion:Size"
@@ -129,7 +129,7 @@ async def data_summary(request: Request):
     today = datetime.now(timezone.utc).date()
     days = defaultdict(int)
     for r in rows:
-        ts = r.get("created_at", "")
+        ts = r.get("added_at", "")
         if ts:
             try:
                 d = datetime.fromisoformat(ts.replace("Z", "+00:00")).date()
