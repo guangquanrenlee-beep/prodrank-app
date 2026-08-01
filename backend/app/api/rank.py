@@ -37,6 +37,21 @@ async def check_rank(req: RankCheckRequest):
             keyword=req.keyword,
             brand=req.brand,
         )
+
+        # Persist results to Supabase (was dead code after return — fixed)
+        from app.services.db import DB
+        db = DB()
+        for r in report.results:
+            db.save_ai_response(
+                product_id="",  # no product record yet — store by keyword
+                ai_agent=r.ai_agent, keyword=req.keyword,
+                rank=r.rank, total=r.total_mentioned,
+                description=r.description, sentiment=r.sentiment,
+                raw=r.raw_response,
+            )
+            for src in r.cited_sources:
+                db.save_citation(ai_response_id="", source_url=src)
+
         return {
             "product_name": report.product_name,
             "keyword": report.keyword,
@@ -57,19 +72,6 @@ async def check_rank(req: RankCheckRequest):
                 for r in report.results
             ],
         }
-        # Persist results to Supabase
-        from app.services.db import DB
-        db = DB()
-        for r in report.results:
-            db.save_ai_response(
-                product_id="",  # no product record yet — store by keyword
-                ai_agent=r.ai_agent, keyword=req.keyword,
-                rank=r.rank, total=r.total_mentioned,
-                description=r.description, sentiment=r.sentiment,
-                raw=r.raw_response,
-            )
-            for src in r.cited_sources:
-                db.save_citation(ai_response_id="", source_url=src)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

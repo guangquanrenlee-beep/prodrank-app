@@ -121,10 +121,18 @@ class DB:
     def save_ai_response(self, product_id: str, ai_agent: str, keyword: str,
                          rank: int | None, total: int = 0, description: str = "",
                          sentiment: str = "", raw: str = "") -> dict:
-        if not product_id:
-            return {}  # skip if no product record yet
+        # product_id is a uuid FK — keyword-level checks (brand names etc.)
+        # pass a non-uuid string; store as NULL instead of failing/skipping.
+        pid = None
+        if product_id:
+            try:
+                import uuid as _uuid
+                _uuid.UUID(str(product_id))
+                pid = product_id
+            except ValueError:
+                pid = None
         return self.client.table("ai_responses").insert({
-            "product_id": product_id, "ai_agent": ai_agent, "keyword": keyword,
+            "product_id": pid, "ai_agent": ai_agent, "keyword": keyword,
             "rank_position": rank, "total_mentioned": total,
             "description": description, "sentiment": sentiment,
             "raw_response": raw,

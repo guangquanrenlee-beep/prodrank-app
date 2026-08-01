@@ -7,7 +7,9 @@ interface RankSnap { ai_agent: string; rank: number | null; description: string;
 export default function MonitoringPage() {
   const [keyword, setKeyword] = useState(""); const [brand, setBrand] = useState("");
   const [snapshot, setSnapshot] = useState<any>(null); const [history, setHistory] = useState<Record<string, RankSnap[]>>({});
+  const [mentions, setMentions] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMentions, setLoadingMentions] = useState(false);
 
   const runTrack = async () => {
     setLoading(true);
@@ -27,6 +29,16 @@ export default function MonitoringPage() {
       }
     } catch {}
     setLoading(false);
+  };
+
+  const runMentions = async () => {
+    if (!keyword || !brand) return;
+    setLoadingMentions(true);
+    try {
+      const r = await fetch("/api/mentions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_name: brand, keyword, brand }) });
+      if (r.ok) setMentions(await r.json());
+    } catch {}
+    setLoadingMentions(false);
   };
 
   const rankIcon = (r: number | null, prev: number | null) => {
@@ -58,6 +70,58 @@ export default function MonitoringPage() {
       <button onClick={runTrack} disabled={loading || !keyword || !brand} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-medium rounded-lg transition">
         {loading ? "Querying 4 AI agents & saving history..." : "Track Now & Save"}
       </button>
+
+      <button onClick={runMentions} disabled={loadingMentions || !keyword || !brand} className="w-full py-3 bg-sky-600 hover:bg-sky-500 disabled:bg-zinc-700 text-white font-medium rounded-lg transition">
+        {loadingMentions ? "Querying & aggregating..." : "📊 AI Mentions Stats (daily)"}
+      </button>
+
+      {/* Daily Mentions */}
+      {mentions && (
+        <div className="bg-zinc-900 border border-emerald-800 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-emerald-400">📡 AI Mentions — "{mentions.keyword}"</h3>
+            <span className="text-xs text-zinc-500">{mentions.today?.mentioned ? "mentioned today" : "not mentioned today"}</span>
+          </div>
+
+          {/* Today summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="bg-zinc-800/50 rounded-lg p-4">
+              <div className="text-xs text-zinc-500">Today</div>
+              <div className="text-2xl font-bold text-emerald-400">{mentions.today?.mentioned ? "✓ Mentioned" : "✗ Not mentioned"}</div>
+            </div>
+            <div className="bg-zinc-800/50 rounded-lg p-4">
+              <div className="text-xs text-zinc-500">Mentioned by</div>
+              <div className="text-xl font-bold capitalize">{mentions.today?.mentioned_agents?.join(", ") || "—"}</div>
+            </div>
+            <div className="bg-zinc-800/50 rounded-lg p-4">
+              <div className="text-xs text-zinc-500">Best rank today</div>
+              <div className="text-2xl font-bold">{mentions.today?.best_rank ? `#${mentions.today.best_rank}` : "—"}</div>
+            </div>
+            <div className="bg-zinc-800/50 rounded-lg p-4">
+              <div className="text-xs text-zinc-500">Live best rank</div>
+              <div className="text-2xl font-bold">{mentions.live?.best_rank ? `#${mentions.live.best_rank}` : "—"}</div>
+            </div>
+          </div>
+
+          {/* 14-day trend */}
+          <h4 className="text-xs text-zinc-500 uppercase mb-2">Last 14 days</h4>
+          <div className="space-y-1">
+            {mentions.daily?.map((d: any) => (
+              <div key={d.date} className="flex items-center gap-3 text-sm">
+                <span className="w-24 text-zinc-500">{d.date.slice(5)}</span>
+                <span className={`w-32 font-medium ${d.mentioned ? "text-emerald-400" : "text-zinc-600"}`}>
+                  {d.mentioned ? `✓ ${d.mentioned_count} AI · best #${d.best_rank}` : "✗ not mentioned"}
+                </span>
+                <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${d.mentioned ? "bg-emerald-500" : "bg-zinc-700"}`}
+                    style={{ width: `${Math.min(100, (d.mentioned_count / 4) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+            {!mentions.daily?.length && <p className="text-xs text-zinc-600">No historical data yet — run "Track Now & Save" daily to build the trend.</p>}
+          </div>
+        </div>
+      )}
 
       {/* Current Snapshot */}
       {snapshot && (
