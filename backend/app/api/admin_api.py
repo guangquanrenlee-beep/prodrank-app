@@ -1,10 +1,29 @@
-"""Admin API — Server setup and configuration (no auth, localhost only)."""
+"""Admin API — Server setup, configuration, and internal data panels.
+
+Data panel endpoints require X-Admin-Key matching ADMIN_KEY env var —
+the question library is the company's moat data, never shown to users.
+"""
 
 import os
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app.core.config import get_settings
+
 router = APIRouter()
+
+
+def _check_admin(request: Request):
+    """X-Admin-Key must match ADMIN_KEY env var."""
+    key = get_settings().admin_key
+    if not key:
+        raise HTTPException(status_code=503, detail="ADMIN_KEY not configured on server")
+    sent = request.headers.get("X-Admin-Key", "")
+    if sent != key:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
 
 
 class SetupEnvRequest(BaseModel):
@@ -79,3 +98,53 @@ async def setup_env(req: SetupEnvRequest, request: Request):
         return {"status": "saved", "message": f"Written to {env_path}, restarting..."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@router.get("/data/summary")
+async def data_summary(request: Request):
+    """Internal data asset panel — question library stats.
+    Requires X-Admin-Key. Returns: totals, per-category dimension
+    distribution, last collection time, 7-day growth."""
+    _check_admin(request)
+    from app.services.db import DB
+    db = DB()
+
+    # Pull category + created_at for aggregation (library is small, thousands of rows)
+    rows = db.client.table("questions").select("category,created_at").limit(50000).execute().data or []
+    total = len(rows)
+
+    # Per category dimension distribution: category = "fashion:Size"
+    by_category: dict[str, dict] = {}
+    for r in rows:
+        cat_full = r.get("category", "")
+        if ":" in cat_full:
+            cat, dim = cat_full.split(":", 1)
+        else:
+            cat, dim = cat_full, "other"
+        c = by_category.setdefault(cat, {"total": 0, "dimensions": Counter()})
+        c["total"] += 1
+        c["dimensions"][dim] += 1
+
+    # 7-day growth
+    today = datetime.now(timezone.utc).date()
+    days = defaultdict(int)
+    for r in rows:
+        ts = r.get("created_at", "")
+        if ts:
+            try:
+                d = datetime.fromisoformat(ts.replace("Z", "+00:00")).date()
+                diff = (today - d).days
+                if 0 <= diff < 7:
+                    days[str(d)] += 1
+            except Exception:
+                pass
+
+    return {
+        "total_questions": total,
+        "categories": {
+            cat: {"total": c["total"], "dimensions": dict(sorted(c["dimensions"].items(), key=lambda x: -x[1]))}
+            for cat, c in by_category.items()
+        },
+        "last_7_days": dict(sorted(days.items())),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }

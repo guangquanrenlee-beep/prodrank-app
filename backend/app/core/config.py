@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_key: str = ""
+    admin_key: str = ""  # X-Admin-Key for internal data panels — set in production .env
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
