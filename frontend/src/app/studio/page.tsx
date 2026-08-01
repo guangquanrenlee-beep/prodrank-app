@@ -36,61 +36,67 @@ export default function PublishPage() {
   };
 
   // ── Resolve URL ──
+  const platform = url.includes("myshopify.com") ? "shopify" : "woocommerce";
+
   const handleResolve = async () => {
-    const d = await apiPost("/api/woocommerce/resolve-url", { url: url.trim() });
+    const apiPath = platform === "shopify"
+      ? "/api/shopify/resolve-url"
+      : "/api/woocommerce/resolve-url";
+    const d = await apiPost(apiPath, { url: url.trim() });
     if (!d) return;
-    setResolved(d);
+    setResolved({ ...d, _platform: platform });
     setStep("idle"); setPreview(null); setResult(null);
-    if (!d.has_token) setError("⚠ Store not connected — connect in Settings first, or we'll work with page content only.");
+    if (!d.has_token) setError("⚠ Store not connected — connect in Settings first.");
     else setError("");
   };
 
   // ── Generate ──
+  const apiBase = () => resolved?._platform === "shopify" ? "/api/shopify" : "/api/woocommerce";
+  const apiBody = () => resolved?._platform === "shopify"
+    ? { shop: resolved.domain, product_id: resolved.product.id }
+    : { domain: resolved.domain, product_id: resolved.product.id };
+
   const handleGenerate = async () => {
     if (!resolved) return;
-    const d = await apiPost("/api/woocommerce/publish/generate",
-      { domain: resolved.domain, product_id: resolved.product.id });
+    const d = await apiPost(apiBase() + "/publish/generate", apiBody());
     if (!d) return;
     setPreview(d.preview); setEdited({});
-    setGenUsed(d.generations_used); setGenRemaining(d.generations_remaining);
+    setGenUsed(d.generations_used || 1); setGenRemaining(d.generations_remaining ?? 2);
     setStep("preview");
   };
 
-  // ── Regenerate ──
   const handleRegenerate = async () => {
     if (!resolved) return;
-    const d = await apiPost("/api/woocommerce/publish/generate",
-      { domain: resolved.domain, product_id: resolved.product.id });
+    const d = await apiPost(apiBase() + "/publish/generate",
+      apiBody());
     if (!d) return;
     setPreview(d.preview); setEdited({});
-    setGenUsed(d.generations_used); setGenRemaining(d.generations_remaining);
+    setGenUsed(d.generations_used || 1); setGenRemaining(d.generations_remaining ?? 2);
   };
 
-  // ── Publish ──
   const handlePublish = async () => {
     if (!resolved) return;
     if (Object.keys(edited).length > 0) {
-      await apiPost("/api/woocommerce/drafts/edit",
-        { domain: resolved.domain, product_id: resolved.product.id, fields: edited });
+      const editPath = resolved._platform === "shopify" ? "/api/shopify/drafts/edit" : "/api/woocommerce/drafts/edit";
+      await apiPost(editPath, { shop: resolved.domain, product_id: resolved.product.id, fields: edited });
     }
-    const d = await apiPost("/api/woocommerce/publish",
-      { domain: resolved.domain, product_id: resolved.product.id, overwrite_description: overwrite, fields: DEFAULT_FIELDS });
+    const d = await apiPost(apiBase() + "/publish",
+      { shop: resolved.domain, product_id: resolved.product.id, overwrite_description: overwrite, fields: DEFAULT_FIELDS });
     if (d) { setResult(d); setStep("published"); }
   };
 
-  // ── Verify ──
   const handleVerify = async () => {
     if (!resolved) return;
-    const d = await apiPost("/api/woocommerce/verify",
-      { domain: resolved.domain, product_id: resolved.product.id });
+    const d = await apiPost(apiBase() + "/verify",
+      apiBody());
     if (d) { setResult(d); setStep("verified"); }
   };
 
-  // ── History ──
   const handleHistory = async () => {
     if (!resolved) return;
     try {
-      const r = await fetch(`/api/woocommerce/drafts?domain=${resolved.domain}&product_id=${resolved.product.id}`);
+      const qp = resolved._platform === "shopify" ? `shop=${resolved.domain}` : `domain=${resolved.domain}`;
+      const r = await fetch(apiBase() + `/drafts?${qp}&product_id=${resolved.product.id}`);
       setHistory((await r.json()).history || {});
       setStep("history");
     } catch (e: any) { setError(e.message); }

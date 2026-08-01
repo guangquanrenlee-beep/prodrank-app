@@ -18,7 +18,9 @@ from pydantic import BaseModel
 
 from app.services.db import DB
 from app.services.shopify_service import ShopifyService, ShopifyStore
-from app.services.shopify_ai import ShopifyAIService, build_schema
+from app.services.shopify_ai import ShopifyAIService, build_schema, CATEGORY_RULES
+
+MAX_GENERATIONS = 3
 
 router = APIRouter()
 shopify = ShopifyService()
@@ -94,45 +96,132 @@ def _provenance(extra: dict | None = None) -> dict:
     return p
 
 
+class ResolveUrlRequest(BaseModel):
+    url: str
+
+
+@router.post("/resolve-url")
+async def resolve_product_url(req: ResolveUrlRequest):
+    """Parse a Shopify product URL - domain + product data."""
+    from urllib.parse import urlparse
+    from bs4 import BeautifulSoup
+    url = req.url.strip()
+    if not url.startswith("http"):
+        url = f"https://{url}"
+    parsed = urlparse(url)
+    domain = parsed.netloc.lower()
+    path_parts = [p for p in parsed.path.strip("/").split("/") if p]
+    handle = ""
+    for i, part in enumerate(path_parts):
+        if part in ("products", "product", "item"):
+            handle = path_parts[i + 1] if i + 1 < len(path_parts) else ""
+            break
+    if not handle:
+        handle = path_parts[-1] if path_parts else ""
+
+    token = ""
+    try:
+        token = _resolve_token(domain)
+    except Exception:
+        pass
+
+    product = {"url": url, "title": handle.replace("-", " ").title() or "Product",
+               "description": "", "price": "", "images": [], "id": "", "handle": handle}
+
+    if token and handle:
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"https://{domain}/admin/api/2024-10/products.json",
+                    headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
+                    params={"handle": handle, "limit": 1}, timeout=15,
+                )
+                resp.raise_for_status()
+                products = resp.json().get("products", [])
+                if products:
+                    p = products[0]
+                    v = (p.get("variants") or [{}])[0] if p.get("variants") else {}
+                    product["title"] = p.get("title", "")
+                    product["description"] = (p.get("body_html") or "")[:3000]
+                    product["price"] = str(v.get("price", ""))
+                    product["sku"] = v.get("sku", "")
+                    product["brand"] = p.get("vendor", "")
+                    product["images"] = [img["src"] for img in (p.get("images") or [])[:5] if img.get("src")]
+                    product["id"] = str(p.get("id", ""))
+                    product["found_via"] = "admin_api"
+        except Exception:
+            pass
+
+    if not product.get("id"):
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+                resp = await client.get(url, headers={"User-Agent": "Chrome/131.0"})
+                html = resp.text
+            soup = BeautifulSoup(html, "lxml")
+            title = soup.find("title")
+            product["title"] = title.text.strip()[:200] if title else product["title"]
+            og_title = soup.find("meta", attrs={"property": "og:title"})
+            if og_title and og_title.get("content"):
+                product["title"] = og_title["content"][:200]
+            product["images"] = [img["content"] for img in soup.find_all("meta", attrs={"property": "og:image"}) if img.get("content")][:5]
+            product["found_via"] = "page_crawl"
+        except Exception:
+            pass
+
+    return {"status": "ok", "domain": domain, "has_token": bool(token), "platform": "shopify", "product": product}
+
+
 @router.post("/publish/generate")
 async def generate_content(req: GenerateRequest):
     """⑥ Step 1 — AI-generate content fields (draft only, nothing written yet).
-    Every generation is versioned + provenance-stamped in content_drafts."""
+    Category-aware: detects product category, filters to applicable modules.
+    Max 3 generations per product."""
     token = _resolve_token(req.shop, req.access_token)
     store = ShopifyStore(shop=req.shop, access_token=token)
     try:
+        db = DB()
+        count = db.count_generations(req.shop, str(req.product_id))
+        if count >= MAX_GENERATIONS:
+            raise HTTPException(status_code=429, detail=f"Limit reached: {MAX_GENERATIONS} AI generations per product.")
+
         product = await _fetch_product(req.shop, token, req.product_id)
         shop_info = await _fetch_shop_info(req.shop, token)
 
-        # ② Product Sync: keep Supabase products row fresh before generating
+        # ② Product Sync
         synced = shopify.extract_product_sync_data(product, req.shop)
-        sites = DB().client.table("sites").select("id").eq("domain", req.shop).eq("platform", "shopify").limit(1).execute().data
+        sites = db.client.table("sites").select("id").eq("domain", req.shop).eq("platform", "shopify").limit(1).execute().data
         site_id = sites[0]["id"] if sites else ""
-        DB().save_products_batch(site_id, [synced])
+        db.save_products_batch(site_id, [synced])
 
-        generated = await ai.generate_fields(synced, req.fields)
+        # Category detection
+        category, confidence = await ai.detect_category(synced)
+        valid_fields = ai.modules_for_category(category)
+        filtered_fields = [f for f in req.fields if f in valid_fields]
+
+        generated = await ai.generate_fields(synced, filtered_fields, category=category)
         if "error" in generated:
             raise HTTPException(status_code=500, detail=generated["error"])
 
-        # Version + provenance each field, keep as draft
         versions: dict[str, int] = {}
-        db = DB()
         for field, content in generated.items():
-            version = db.save_content_draft(
+            versions[field] = db.save_content_draft(
                 shop=req.shop, shopify_product_id=str(req.product_id), field=field,
                 content=content, status="draft",
                 provenance=_provenance({"product_title": product.get("title", "")}),
             )
-            versions[field] = version
-
+        remaining = MAX_GENERATIONS - db.count_generations(req.shop, str(req.product_id))
         return {
             "status": "drafted",
             "shop": req.shop,
             "product_id": req.product_id,
             "product_title": product.get("title", ""),
+            "category": {"key": category, "label": CATEGORY_RULES.get(category, {}).get("label", "General"), "confidence": confidence},
             "generated": list(generated.keys()),
+            "skipped": list(set(req.fields) - set(filtered_fields)),
             "versions": versions,
             "preview": generated,
+            "generations_used": db.count_generations(req.shop, str(req.product_id)),
+            "generations_remaining": max(0, remaining),
         }
     except HTTPException:
         raise
@@ -267,6 +356,44 @@ async def verify(req: VerifyRequest):
         }
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class EditDraftRequest(BaseModel):
+    shop: str
+    product_id: int
+    fields: dict
+
+
+@router.post("/drafts/edit")
+async def save_edited_draft(req: EditDraftRequest):
+    """Save manually-edited content as a new draft version with provenance."""
+    try:
+        db = DB()
+        prov = _provenance()
+        prov["human_edited"] = True
+        prov["note"] = "manually edited by merchant"
+        versions: dict[str, int] = {}
+        for field, content in req.fields.items():
+            if not isinstance(content, dict) or not content:
+                continue
+            versions[field] = db.save_content_draft(
+                shop=req.shop, shopify_product_id=str(req.product_id), field=field,
+                content=content, status="draft", provenance=prov,
+            )
+        return {"status": "saved", "product_id": req.product_id, "versions": versions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/drafts/count")
+async def generation_count(shop: str = Query(...), product_id: int = Query(...)):
+    """How many times has this product been generated? (max 3)"""
+    try:
+        db = DB()
+        count = db.count_generations(shop, str(product_id))
+        return {"product_id": product_id, "generations_used": count, "generations_remaining": max(0, MAX_GENERATIONS - count)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
