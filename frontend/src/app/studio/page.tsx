@@ -46,8 +46,45 @@ export default function PublishPage() {
     if (!d) return;
     setResolved({ ...d, _platform: platform });
     setStep("idle"); setPreview(null); setResult(null);
+    setGenUsed(0); setGenRemaining(MAX);
+    // Load any existing generations + generation count
+    if (d.product?.id) {
+      loadExisting(d.domain, d.product.id, platform);
+    }
     if (!d.has_token) setError("⚠ Store not connected — connect in Settings first.");
     else setError("");
+  };
+
+  const loadExisting = async (domain: string, pid: string | number, pf: string) => {
+    try {
+      const qp = pf === "shopify" ? `shop=${domain}` : `domain=${domain}`;
+      const r = await fetch(`/api/${pf === "shopify" ? "shopify" : "woocommerce"}/drafts/count?${qp}&product_id=${pid}`);
+      const c = await r.json();
+      setGenUsed(c.generations_used || 0);
+      setGenRemaining(c.generations_remaining ?? MAX);
+    } catch { /* ignore */ }
+  };
+
+  /** Load the latest generated content (already drafted) into preview mode —
+   *  usable even at the 3-generation limit (edit + publish still allowed). */
+  const handleLoadExisting = async () => {
+    if (!resolved) return;
+    try {
+      const qp = resolved._platform === "shopify" ? `shop=${resolved.domain}` : `domain=${resolved.domain}`;
+      const r = await fetch(apiBase() + `/drafts?${qp}&product_id=${resolved.product.id}`);
+      const d = await r.json();
+      const hist = d.history || {};
+      const latest: Record<string, any> = {};
+      for (const [field, versions] of Object.entries(hist) as any) {
+        if (versions?.length) latest[field] = versions[0].content;
+      }
+      if (Object.keys(latest).length === 0) {
+        setError("No generated content yet — click Generate Draft.");
+        return;
+      }
+      setPreview(latest); setEdited({});
+      setStep("preview");
+    } catch (e: any) { setError(e.message); }
   };
 
   // ── Generate ──
@@ -176,13 +213,20 @@ export default function PublishPage() {
                 </button>
               </>
             ) : (
-              <button onClick={handleGenerate} disabled={loading || !resolved || genRemaining <= 0} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
-                {genRemaining <= 0 ? "Limit reached" : loading ? "Generating…" : "1 · Generate Draft"}
-              </button>
+              <>
+                <button onClick={handleGenerate} disabled={loading || !resolved || genRemaining <= 0} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
+                  {genRemaining <= 0 ? "Limit reached" : loading ? "Generating…" : "1 · Generate Draft"}
+                </button>
+                {genRemaining <= 0 && genUsed > 0 && (
+                  <button onClick={handleLoadExisting} disabled={loading} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition">
+                    ✍️ Edit existing content
+                  </button>
+                )}
+              </>
             )}
           </div>
           {genRemaining <= 0 && step === "preview" && (
-            <p className="text-sm text-amber-400">⚠ Generation limit reached. Edit the draft below, then publish.</p>
+            <p className="text-sm text-amber-400">⚠ Generation limit reached. You can still edit and publish the existing draft.</p>
           )}
           {error && <p className={`text-sm p-3 rounded-lg ${error.startsWith("⚠") ? "text-amber-400 bg-amber-900/20 border border-amber-800" : error.startsWith("✅") ? "text-emerald-400 bg-emerald-900/20 border border-emerald-800" : "text-red-400 bg-red-900/20 border border-red-800"}`}>{error}</p>}
         </div>
