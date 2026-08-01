@@ -10,7 +10,7 @@ import os
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from app.services.shopify_service import ShopifyService, ShopifyStore
+from app.services.shopify_service import ShopifyService, ShopifyStore, admin_api_base
 
 router = APIRouter()
 
@@ -141,7 +141,7 @@ async def sync_single_product(req: SyncProductRequest):
     try:
         async with __import__("httpx").AsyncClient() as client:
             resp = await client.get(
-                f"https://{req.shop}/admin/api/2024-10/products/{req.product_id}.json",
+                f"{admin_api_base(req.shop)}/admin/api/2024-10/products/{req.product_id}.json",
                 headers={"X-Shopify-Access-Token": req.access_token, "Content-Type": "application/json"},
                 timeout=15,
             )

@@ -21,6 +21,7 @@ import httpx
 from fastapi import APIRouter, Request, Response
 
 from app.services.db import DB
+from app.services.shopify_service import admin_api_base
 
 router = APIRouter()
 
@@ -57,7 +58,7 @@ async def _sync_product(shop: str, token: str, product_id) -> None:
     """⑧ products/update|create — re-sync one product into Supabase (idempotent)."""
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"https://{shop}/admin/api/2024-10/products/{product_id}.json",
+            f"{admin_api_base(shop)}/admin/api/2024-10/products/{product_id}.json",
             headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
             timeout=15,
         )
