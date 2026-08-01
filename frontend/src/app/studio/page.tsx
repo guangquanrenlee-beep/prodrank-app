@@ -233,7 +233,14 @@ export default function PublishPage() {
 
         {/* Preview Modal */}
         {step === "preview" && preview && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 pb-10 overflow-auto bg-black/70" onClick={() => setStep("idle")}>
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 pb-10 overflow-auto bg-black/70"
+            onMouseDown={e => { (e.currentTarget as HTMLElement).dataset.down = `${e.clientX},${e.clientY}`; }}
+            onMouseUp={e => {
+              const down = (e.currentTarget as HTMLElement).dataset.down || "";
+              const [x, y] = down.split(",").map(Number);
+              // close only on a stationary click — dragging to select text must not close
+              if (x === e.clientX && y === e.clientY) setStep("idle");
+            }}>
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-3xl max-h-full overflow-y-auto p-6 space-y-4" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between sticky top-0 bg-zinc-900 py-2 z-10 border-b border-zinc-800 pb-3">
                 <div>
@@ -274,7 +281,13 @@ export default function PublishPage() {
 
         {/* History Modal */}
         {step === "history" && history && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 pb-10 overflow-auto bg-black/70" onClick={() => setStep("preview")}>
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 pb-10 overflow-auto bg-black/70"
+            onMouseDown={e => { (e.currentTarget as HTMLElement).dataset.down = `${e.clientX},${e.clientY}`; }}
+            onMouseUp={e => {
+              const down = (e.currentTarget as HTMLElement).dataset.down || "";
+              const [x, y] = down.split(",").map(Number);
+              if (x === e.clientX && y === e.clientY) setStep("preview");
+            }}>
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-full overflow-y-auto p-6 space-y-4" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between"><h2 className="text-lg font-bold">History</h2><button onClick={() => setStep("preview")} className="text-zinc-500 hover:text-zinc-300 text-xl">✕</button></div>
               {Object.entries(history).map(([field, versions]: any) => (
