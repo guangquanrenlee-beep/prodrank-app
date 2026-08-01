@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import audit, rank, shopify, shopify_publish, shopify_webhook, woocommerce_publish, batch, optimize, intelligence, recommendation, citation, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api
+from app.api import audit, rank, shopify, shopify_publish, shopify_webhook, woocommerce_publish, batch, data_api, optimize, intelligence, recommendation, citation, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api
 
 
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.include_router(shopify_publish.router, prefix="/api/shopify", tags=["Shopify
 app.include_router(shopify_webhook.router, prefix="/api/shopify/webhook", tags=["Shopify Webhooks"])
 app.include_router(woocommerce_publish.router, prefix="/api/woocommerce", tags=["WooCommerce Publish"])
 app.include_router(batch.router, prefix="/api/batch", tags=["Batch Template"])
+app.include_router(data_api.router, prefix="/api/data", tags=["Data Collection"])
 app.include_router(optimize.router, prefix="/api/optimize", tags=["Optimize"])
 app.include_router(intelligence.router, prefix="/api/intel", tags=["Intelligence"])
 app.include_router(recommendation.router, prefix="/api/rec", tags=["Recommendation"])
