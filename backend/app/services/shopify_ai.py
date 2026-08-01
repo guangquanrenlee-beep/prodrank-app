@@ -329,12 +329,10 @@ class ShopifyAIService:
         can be applied across a whole category (batch templates).
 
         Returns {field: content} in the exact shapes of FIELD_SHAPES."""
-        # If a category was given, intersect the requested fields with
-        # what's valid for this category. Non-applicable fields are silently
-        # skipped (no "Compatibility" for T-shirts).
-        if category:
-            valid = set(self.modules_for_category(category))
-            fields = [f for f in fields if f in valid]
+        # Field set is decided by the API layer via the four-layer knowledge
+        # template (authoritative). Here we only drop fields with no known
+        # shape — a safety net, never a category filter.
+        fields = [f for f in fields if f in FIELD_SHAPES]
 
         if not fields:
             return {}

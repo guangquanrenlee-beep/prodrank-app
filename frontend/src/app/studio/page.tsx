@@ -321,7 +321,7 @@ export default function PublishPage() {
 
               {genRemaining <= 0 && <p className="text-sm text-amber-400 bg-amber-900/20 border border-amber-800 rounded-lg p-3">AI limit reached. Edit manually below, then publish.</p>}
               <div className="space-y-2">
-                {DEFAULT_FIELDS.filter(f => edited[f] || preview[f]).map(field => {
+                {Object.keys(preview).filter(f => edited[f] || preview[f]).map(field => {
                   const data = edited[field] || preview[field];
                   return (
                     <div key={field} className="border border-zinc-800 rounded-xl overflow-hidden">

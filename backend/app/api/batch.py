@@ -122,8 +122,10 @@ async def generate_template(req: TemplateRequest):
         if not sample:
             raise HTTPException(status_code=404, detail="Sample product not found")
 
-        valid_fields = ai.modules_for_category(req.category)
-        fields = [f for f in TEMPLATE_FIELDS if f in valid_fields]
+        # Four-layer template decides the field set for this category
+        from app.services.knowledge_templates import generate_field_list
+        _i, k_fields, d_fields, t_fields = generate_field_list(req.category, None)
+        fields = [f for f in (k_fields + d_fields + t_fields) if f in TEMPLATE_FIELDS or f in ("description", "faq", "pros", "cons", "comparison", "ai_summary")]
 
         # Instruct the model to use placeholders for product-specific values
         generated = await ai.generate_fields(sample, fields, category=req.category, template_mode=True)
