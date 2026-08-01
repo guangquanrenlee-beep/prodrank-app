@@ -83,13 +83,9 @@ class AIParseEngine:
     }
 
     def __init__(self):
-        settings = get_settings()
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
+        from app.services.llm import get_content_client
+        self.client, self.model_deep = get_content_client()
         self.model_fast = "google/gemini-3.6-flash"
-        self.model_deep = "anthropic/claude-haiku-4.5"
 
     async def validate_product(self, url: str, title: str, brand: str = "") -> ParseReport:
         """Full AI parse validation: Schema vs real AI understanding."""

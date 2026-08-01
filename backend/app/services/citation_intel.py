@@ -68,12 +68,8 @@ class CitationEngine:
     """Tracks source citations across AI agents and calculates influence."""
 
     def __init__(self):
-        settings = get_settings()
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
-        self.model = "anthropic/claude-haiku-4.5"
+        from app.services.llm import get_content_client
+        self.client, self.model = get_content_client()
         self.model_fast = "google/gemini-3.6-flash"
         # In-memory store (replace with DB for production)
         self._citations: list[SourceCitation] = []

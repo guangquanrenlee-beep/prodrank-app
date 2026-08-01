@@ -46,12 +46,8 @@ class QuestionLibrary:
     """Self-growing library of consumer shopping questions for AI agent testing."""
 
     def __init__(self, storage_path: str = ""):
-        settings = get_settings()
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
-        self.model = "anthropic/claude-haiku-4.5"
+        from app.services.llm import get_content_client
+        self.client, self.model = get_content_client()
         self._storage = storage_path or os.path.join(
             os.path.dirname(__file__), "..", "..", "data", "question_library.json"
         )

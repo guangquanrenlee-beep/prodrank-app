@@ -36,10 +36,8 @@ def _get_user_id(request: Request) -> str | None:
 @router.post("/ai-summary")
 async def ai_dashboard_summary(req: AIWhyRequest, request: Request):
     """Generate AI-powered dashboard summary and actionable insights."""
-    from openai import AsyncOpenAI
-    from app.core.config import get_settings
-    settings = get_settings()
-    client = AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+    from app.services.llm import get_content_client
+    client, _model = get_content_client()
 
     # Build a rich prompt from the scores
     pillar_details = []
@@ -109,7 +107,7 @@ Return ONLY valid JSON, no other text."""
 
     try:
         resp = await client.chat.completions.create(
-            model="anthropic/claude-haiku-4.5",
+            model=_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=1200,

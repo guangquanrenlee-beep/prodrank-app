@@ -142,8 +142,8 @@ class Optimizer:
 
         # Try AI enhancement for description
         try:
-            from app.services.ai_query import AIQueryService
-            ai = AIQueryService()
+            from app.services.llm import get_content_client
+            ai, _model = get_content_client()
 
             # Use deep model for better descriptions
             enhanced_desc = await self._ai_enhance_description(
@@ -190,7 +190,7 @@ class Optimizer:
         )
         try:
             response = await ai.client.chat.completions.create(
-                model=ai.model_b,  # Haiku — fast, good enough for rewriting
+                model=_model,  # DeepSeek v4-flash — fast, good for rewriting
                 messages=[
                     {"role": "system", "content": "You are a product copywriter. Write compelling, factual descriptions that help AI agents understand and recommend products."},
                     {"role": "user", "content": prompt},
@@ -215,7 +215,7 @@ class Optimizer:
         )
         try:
             response = await ai.client.chat.completions.create(
-                model=ai.model_b,
+                model=_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=600,

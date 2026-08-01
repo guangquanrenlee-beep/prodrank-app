@@ -135,7 +135,7 @@ CATEGORY_RULES: dict[str, dict] = {
 }
 
 CATEGORY_PROMPT_VERSION = "v2"   # bumped: category-aware generation
-MODEL = "anthropic/claude-haiku-4.5"
+MODEL = "deepseek-v4-flash"  # DeepSeek official (llm.get_content_client handles fallback)
 
 
 def build_schema(product: dict, shop_info: dict, faq: list[dict] | None = None) -> dict:
@@ -217,11 +217,8 @@ class ShopifyAIService:
     """Generate GEO-optimized, category-aware content for a product."""
 
     def __init__(self):
-        settings = get_settings()
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
+        from app.services.llm import get_content_client
+        self.client, self.model = get_content_client()
 
     # ── Step 1: Category detection ──
 
@@ -267,7 +264,7 @@ class ShopifyAIService:
         # AI fallback: let the LLM classify
         try:
             resp = await self.client.chat.completions.create(
-                model=MODEL,
+                model=self.model,
                 messages=[{
                     "role": "system",
                     "content": "You classify products into categories. Reply with ONLY the category key and confidence. No other text.",
@@ -371,10 +368,10 @@ Return ONLY valid JSON (no markdown, no explanation), an object with one key per
 
         try:
             resp = await self.client.chat.completions.create(
-                model=MODEL,
+                model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.6,
-                max_tokens=3000,
+                max_tokens=6000,
                 timeout=45.0,
             )
             text = (resp.choices[0].message.content or "").strip()
