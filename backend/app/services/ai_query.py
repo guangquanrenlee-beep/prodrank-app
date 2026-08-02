@@ -83,6 +83,26 @@ class AIQueryService:
             f"If it's not in the top 5, say so."
         )
 
+    # ── Cheap mode (DeepSeek flash) — for statistical tasks where the model's
+    # identity doesn't matter (Trend Radar, regression attribution). ~40x
+    # cheaper than the ofox multi-model setup. ──
+
+    async def query_cheap(self, prompt: str, max_tokens: int = 500) -> str:
+        """One call via the DeepSeek content client. Returns raw text."""
+        from app.services.llm import get_content_client
+        client, model = get_content_client()
+        try:
+            resp = await client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=max_tokens,
+                timeout=30.0,
+            )
+            return (resp.choices[0].message.content or "").strip()
+        except Exception:
+            return ""
+
     async def _query_model(self, agent_name: str, model: str, prompt: str) -> AIRankResult:
         """Generic query wrapper — extracts keyword from existing data."""
         try:
@@ -94,7 +114,7 @@ class AIQueryService:
                 ],
                 temperature=0.3,
                 max_tokens=500,
-                timeout=15.0,
+                timeout=45.0,
             )
             raw = response.choices[0].message.content or ""
             # Extract keyword from prompt for the result

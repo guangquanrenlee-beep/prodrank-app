@@ -70,6 +70,7 @@ export default function DashboardPage() {
   const [compAdding, setCompAdding] = useState(false);
   const [weeklySending, setWeeklySending] = useState(false);
   const [weeklyStatus, setWeeklyStatus] = useState("");
+  const [citationDist, setCitationDist] = useState<any[]>([]);
 
   const handleAddCompetitor = async () => {
     if (!domain || !compDomain.trim()) return;
@@ -84,6 +85,13 @@ export default function DashboardPage() {
     try {
       const r = await fetch(`/api/competitors?shop=${encodeURIComponent(shop)}`);
       if (r.ok) setCompetitors((await r.json()).competitors || []);
+    } catch {}
+  };
+
+  const loadCitations = async () => {
+    try {
+      const r = await fetch(`/api/citations/trend?days=30`);
+      if (r.ok) setCitationDist((await r.json()).distribution || []);
     } catch {}
   };
 
@@ -170,6 +178,7 @@ export default function DashboardPage() {
       else if (last.ai_visibility_score) setScore({ ai_visibility_score: last.ai_visibility_score, label: last.ai_visibility_score >= 60 ? "Good" : "Poor", breakdown: {}, recommendation: "" });
       loadHealth(last.domain);
       loadCompetitors(last.domain);
+      loadCitations();
     }
   };
 
@@ -484,6 +493,28 @@ export default function DashboardPage() {
                   )}
                 </div>
 
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <h3 className="font-semibold text-sm mb-3">📰 Citation Trend</h3>
+                  <p className="text-xs text-zinc-500 mb-3">Which sources AI agents cite when recommending products (30 days).</p>
+                  {citationDist.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {citationDist.slice(0, 6).map((c: any) => (
+                        <div key={c.domain} className="flex items-center gap-2 text-xs">
+                          <span className="w-32 truncate text-zinc-400">{c.domain}</span>
+                          <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${Math.min(100, c.pct * 3)}%` }} />
+                          </div>
+                          <span className="text-zinc-500 w-10 text-right">{c.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-600">Collecting… daily real-model queries build the distribution.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                   <h3 className="font-semibold text-sm mb-3">📧 Weekly Report</h3>
                   <p className="text-xs text-zinc-500 mb-3">Monday mornings you get an email: content generated, alerts, citations, health trend — SQL aggregates + AI polish.</p>

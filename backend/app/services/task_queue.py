@@ -83,6 +83,12 @@ class TaskQueue:
             elif task["type"] == "weekly_report":
                 from app.services.weekly_report import run_weekly_reports
                 return loop.run_until_complete(run_weekly_reports())
+            elif task["type"] == "citation_watch":
+                from app.services.citation_watch import run_citation_watch
+                return loop.run_until_complete(run_citation_watch())
+            elif task["type"] == "regression_monitor":
+                from app.services.regression_monitor import run_regression_monitor
+                return loop.run_until_complete(run_regression_monitor())
             return {"error": "unknown task type"}
         except Exception as e:
             return {"error": str(e)}

@@ -40,6 +40,18 @@ def run_pending():
         with open(daily_file, "w") as f: json.dump(jobs, f)
         queue.enqueue("competitor_watch", {})
 
+    # Daily Citation Watch (real-model queries — what sources AI cites)
+    if jobs.get("last_citations") != today:
+        jobs["last_citations"] = today
+        with open(daily_file, "w") as f: json.dump(jobs, f)
+        queue.enqueue("citation_watch", {})
+
+    # Daily Recommendation Regression scan
+    if jobs.get("last_regression") != today:
+        jobs["last_regression"] = today
+        with open(daily_file, "w") as f: json.dump(jobs, f)
+        queue.enqueue("regression_monitor", {})
+
     # Weekly Opportunity Report (Monday only)
     weekday = time.strftime("%A")
     if weekday == "Monday" and jobs.get("last_weekly") != today:

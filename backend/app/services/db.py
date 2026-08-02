@@ -155,8 +155,18 @@ class DB:
     def save_citation(self, ai_response_id: str, source_url: str,
                       source_domain: str = "", source_type: str = "",
                       influence: float = 0.0):
+        # ai_response_id is a uuid FK — non-uuid values (e.g. "" for
+        # keyword-level citation watches) are stored as NULL.
+        rid = None
+        if ai_response_id:
+            try:
+                import uuid as _uuid
+                _uuid.UUID(str(ai_response_id))
+                rid = ai_response_id
+            except ValueError:
+                rid = None
         self.client.table("citations").insert({
-            "ai_response_id": ai_response_id, "source_url": source_url,
+            "ai_response_id": rid, "source_url": source_url,
             "source_domain": source_domain or self._domain_from_url(source_url),
             "source_type": source_type, "influence_weight": influence,
         }).execute()
