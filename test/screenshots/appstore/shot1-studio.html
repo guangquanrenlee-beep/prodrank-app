@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,'Segoe UI',Roboto,sans-serif}
+body{background:#09090b;color:#e4e4e7;width:1200px;height:900px;overflow:hidden}
+nav{display:flex;align-items:center;gap:26px;padding:18px 36px;background:#18181b;border-bottom:1px solid #27272a}
+.logo{font-weight:800;font-size:19px;color:#34d399;letter-spacing:.5px}
+nav a{color:#71717a;font-size:14px;text-decoration:none}
+nav a.active{color:#34d399;font-weight:600}
+nav .right{margin-left:auto;color:#a1a1aa;font-size:13px}
+.container{display:flex;gap:26px;padding:26px 36px;height:780px}
+.left{width:400px;flex-shrink:0;display:flex;flex-direction:column;gap:16px}
+.card{background:#18181b;border:1px solid #27272a;border-radius:14px;padding:22px}
+label{font-size:12px;color:#a1a1aa;font-weight:600}
+input{width:100%;margin-top:9px;padding:11px 14px;background:#09090b;border:1px solid #3f3f46;border-radius:9px;color:#34d399;font-size:14px;font-family:ui-monospace,monospace}
+.badge{display:inline-block;margin-top:13px;padding:5px 12px;background:#064e3b;color:#34d399;border-radius:999px;font-size:12px;font-weight:600}
+.small{font-size:12px;color:#71717a;margin-top:10px;line-height:1.6}
+.btn{background:#059669;color:#fff;padding:13px 22px;border:none;border-radius:9px;font-size:14px;font-weight:700;margin-top:18px;width:100%}
+.quota{display:flex;justify-content:space-between;margin-top:14px;font-size:12px;color:#71717a}
+.right{flex:1;display:flex;flex-direction:column;gap:14px}
+.layer{background:#18181b;border:1px solid #27272a;border-radius:14px;padding:18px 22px;flex:1}
+.layer .head{display:flex;align-items:center;gap:10px}
+.layer .tag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:#27272a;color:#a1a1aa}
+.layer h3{font-size:15px;color:#e4e4e7}
+.layer .sub{font-size:12px;color:#71717a;margin-left:auto}
+.fields{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{background:#27272a;border:1px solid #3f3f46;color:#d4d4d8;padding:5px 11px;border-radius:7px;font-size:12px}
+.chip.green{background:#064e3b;border-color:#065f46;color:#34d399}
+.preview{background:#09090b;border:1px solid #3f3f46;border-radius:8px;padding:11px 13px;font-size:12px;color:#a1a1aa;font-family:ui-monospace,monospace;margin-top:12px;line-height:1.6}
+</style></head><body>
+<nav>
+  <div class="logo">▲ ProdRank</div>
+  <a>Dashboard</a><a class="active">AI Studio</a><a>Monitoring</a><a>Settings</a>
+  <div class="right">hello@yourstore.com · Pro plan</div>
+</nav>
+<div class="container">
+  <div class="left">
+    <div class="card">
+      <label>PRODUCT URL</label>
+      <input value="urban-backpack.myshopify.com/products/urban-canvas-backpack">
+      <div><span class="badge">✓ Platform: Shopify</span> <span class="badge">✓ Category: Fashion → Backpacks</span></div>
+      <p class="small">Detected subcategory: <b style="color:#34d399">Backpacks</b> — generating with the Fashion knowledge template (Identity · Knowledge · Decision · Trust).</p>
+      <button class="btn">⚡ Generate AI Content</button>
+      <div class="quota"><span>Monthly quota</span><span>2 of 3 free generations left</span></div>
+    </div>
+  </div>
+  <div class="right">
+    <div class="layer"><div class="head"><div class="tag">LAYER 1</div><h3>Identity — who you are</h3><div class="sub">✓ generated</div></div>
+      <div class="fields"><span class="chip green">product_name</span><span class="chip">brand_story</span><span class="chip">target_audience</span><span class="chip">unique_selling_points</span><span class="chip">brand_values</span></div>
+      <div class="preview">"Urban Canvas Backpack — built for daily commuters who refuse to choose between style and durability. Water-resistant 600D canvas, 20L capacity, padded 15\" laptop sleeve."</div></div>
+    <div class="layer"><div class="head"><div class="tag">LAYER 2</div><h3>Knowledge — what it does</h3><div class="sub">✓ generated</div></div>
+      <div class="fields"><span class="chip green">description</span><span class="chip">specifications</span><span class="chip">materials</span><span class="chip">care_instructions</span><span class="chip">comparison</span></div></div>
+    <div class="layer"><div class="head"><div class="tag">LAYER 3</div><h3>Decision — why choose it</h3><div class="sub">✓ generated</div></div>
+      <div class="fields"><span class="chip">faq</span><span class="chip">pros_cons</span><span class="chip">use_cases</span><span class="chip">buying_guide</span><span class="chip green">social_proof</span></div></div>
+    <div class="layer"><div class="head"><div class="tag">LAYER 4</div><h3>Trust — proof it works</h3><div class="sub">✓ generated</div></div>
+      <div class="fields"><span class="chip">reviews</span><span class="chip">guarantee</span><span class="chip">shipping_returns</span><span class="chip">certifications</span></div></div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,'Segoe UI',Roboto,sans-serif}
+body{background:#09090b;color:#e4e4e7;width:1200px;height:900px;overflow:hidden}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+.modal{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:1040px;background:#18181b;border:1px solid #27272a;border-radius:16px;overflow:hidden}
+.head{display:flex;align-items:center;padding:20px 26px;border-bottom:1px solid #27272a}
+.head h2{font-size:17px}
+.head .steps{margin-left:auto;font-size:12px;color:#71717a}
+.head .steps b{color:#34d399}
+.body{display:flex;gap:24px;padding:24px 26px;max-height:640px}
+.left-col{flex:1.2;min-width:0}
+.sect{font-size:12px;color:#a1a1aa;font-weight:700;margin-bottom:9px;display:flex;justify-content:space-between}
+.sect span:last-child{color:#34d399;font-weight:600}
+.code{background:#09090b;border:1px solid #3f3f46;border-radius:9px;padding:16px;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.75;color:#a1a1aa;white-space:pre;overflow:hidden;margin-bottom:16px}
+.code .k{color:#c4b5fd}.code .s{color:#6ee7b7}.code .n{color:#fbbf24}
+.right-col{width:340px;flex-shrink:0;display:flex;flex-direction:column;gap:14px}
+.missing{background:#451a03;border:1px solid #92400e;border-radius:11px;padding:16px}
+.missing h4{font-size:13px;color:#fbbf24;margin-bottom:10px}
+.miss-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #3f3f46;font-size:13px}
+.miss-row:last-child{border-bottom:none}
+.miss-row .fill{color:#34d399;font-size:12px;font-weight:600;cursor:pointer}
+.ok{background:#064e3b;border:1px solid #065f46;border-radius:11px;padding:13px 16px;font-size:12.5px;color:#6ee7b7;margin-top:auto}
+.foot{display:flex;justify-content:flex-end;gap:12px;padding:16px 26px;border-top:1px solid #27272a}
+.btn-ghost{background:#27272a;color:#d4d4d8;border:none;padding:11px 20px;border-radius:8px;font-size:13px;font-weight:600}
+.btn-pub{background:#059669;color:#fff;border:none;padding:11px 24px;border-radius:8px;font-size:13px;font-weight:700}
+</style></head><body>
+<div class="dim"></div>
+<div class="modal">
+  <div class="head"><h2>Review AI content — Urban Canvas Backpack</h2><div class="steps">Step <b>3</b> of 4 · Review &amp; Publish</div></div>
+  <div class="body">
+    <div class="left-col">
+      <div class="sect"><span>PRODUCT SCHEMA (JSON-LD)</span><span>✓ 12 fields detected</span></div>
+      <div class="code"><span class="k">{</span>
+  <span class="s">"@context"</span>: <span class="s">"https://schema.org/"</span>,
+  <span class="s">"@type"</span>: <span class="s">"Product"</span>,
+  <span class="s">"name"</span>: <span class="s">"Urban Canvas Backpack"</span>,
+  <span class="s">"description"</span>: <span class="s">"Water-resistant 600D canvas backpack with padded 15\" laptop sleeve."</span>,
+  <span class="s">"brand"</span>: {<span class="s">"@type"</span>: <span class="s">"Brand"</span>, <span class="s">"name"</span>: <span class="s">"Urban Carry Co."</span>},
+  <span class="s">"offers"</span>: {<span class="s">"price"</span>: <span class="s">"89.00"</span>, <span class="s">"priceCurrency"</span>: <span class="s">"USD"</span>},
+  <span class="s">"aggregateRating"</span>: {<span class="s">"ratingValue"</span>: <span class="n">"4.8"</span>, <span class="s">"reviewCount"</span>: <span class="n">"214"</span>}<span class="k">}</span></div>
+      <div class="sect"><span>FAQ MODULE</span><span>✓ 4 questions</span></div>
+      <div class="code"><span class="k">{</span>
+  <span class="s">"@type"</span>: <span class="s">"FAQPage"</span>,
+  <span class="s">"mainEntity"</span>: [<span class="s">"What is the capacity of the Urban Canvas Backpack?"</span>,
+  <span class="s">"Is it waterproof?"</span>, <span class="s">"Does it fit a 15-inch laptop?"</span>,
+  <span class="s">"What is the return policy?"</span>]<span class="k">}</span></div>
+    </div>
+    <div class="right-col">
+      <div class="missing"><h4>⚠ Missing fields — never fabricated</h4>
+        <div class="miss-row"><span>material</span><span class="fill">Fill manually</span></div>
+        <div class="miss-row"><span>fit / sizing</span><span class="fill">Fill manually</span></div>
+        <div class="miss-row"><span>care_instructions</span><span class="fill">Fill manually</span></div>
+      </div>
+      <div class="ok">✓ All other fields generated from real product data. AI never invents missing values — you decide.</div>
+    </div>
+  </div>
+  <div class="foot"><button class="btn-ghost">Regenerate</button><button class="btn-pub">✓ Approve &amp; Publish</button></div>
+</div>
+</body></html>

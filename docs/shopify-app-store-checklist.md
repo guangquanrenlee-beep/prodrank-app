@@ -44,8 +44,8 @@
 | 支持邮箱 support@prodrank.app | ✅ |
 | 隐私政策 https://prodrank.app/privacy | ✅ 已扩展 GDPR 内容 |
 | 服务条款 https://prodrank.app/terms | ✅ |
-| App 图标 1024×1024 | ⏳ 需制作（规格在 listing 文档） |
-| 截图 ×5（1200×900） | ⏳ 需从本地环境截取（清单见 listing 文档） |
+| App 图标 1024×1024 | ✅ `docs/appstore-assets/app-icon-1024.png` |
+| 截图 ×5（1200×900） | ✅ `docs/appstore-assets/screenshot-1..5.png`（2400×1800 高清） |
 
 ## 提交前自检（Shopify 官方要求对照）
 

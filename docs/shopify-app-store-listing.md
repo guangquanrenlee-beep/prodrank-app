@@ -54,23 +54,22 @@ Questions? Contact support@prodrank.app — we typically respond within 24 hours
 ai seo, seo, ai visibility, generative engine optimization, geo, schema, structured data, faq, chatgpt, ai agents
 ```
 
-## 截图（5 张，1200×900 PNG）
+## 截图（已生成 ✅，2400×1800 高清 = 1200×900 的 2x）
 
-| # | 画面 | 内容要点 |
-|---|---|---|
-| 1 | AI Studio 主界面 | 输入产品 URL → 品类识别 → 四层内容生成，展示审核流程 |
-| 2 | Schema 审核视图 | 显示的 JSON-LD + 缺失字段提示（missing 清单） |
-| 3 | 批量生成面板 | 品类模板 + 一键应用到全店（200+ 产品） |
-| 4 | AI 排名监控 | ChatGPT/Gemini/Claude/Grok 排名 + 提及统计图表 |
-| 5 | 安装后产品页效果 | 产品页的 FAQ 模块 + Schema 注入演示 |
+输出目录：`docs/appstore-assets/`（源文件 `test/screenshots/appstore/*.html`，重新生成跑 `node test/screenshots/shots-appstore.js`）
 
-截图建议从 `test/screenshots/` 已有素材 + 本地 mock 环境重新截取，统一 1200×900。
+| # | 文件 | 画面 | 内容要点 |
+|---|---|---|---|
+| 1 | `screenshot-1.png` | AI Studio 主界面 | 输入产品 URL → 品类识别 → 四层内容生成（Identity/Knowledge/Decision/Trust） |
+| 2 | `screenshot-2.png` | Schema 审核视图 | 显示的 JSON-LD + 缺失字段提示（missing 清单 → Fill manually） |
+| 3 | `screenshot-3.png` | 批量生成面板 | 品类模板 + 占位符 + 一键应用到全店（243 产品仅 5 次 AI 调用） |
+| 4 | `screenshot-4.png` | AI 排名监控 | ChatGPT/Gemini/Claude/Grok 排名 + 趋势图 + 提及统计 |
+| 5 | `screenshot-5.png` | 安装后产品页效果 | 产品页的 FAQ 模块 + Schema 验证横幅 |
 
-## App 图标规格
+## App 图标（已生成 ✅）
 
-- 1024×1024 PNG，无圆角（Shopify 自动裁切）
-- 建议：深色背景（#0a0a0a）上放绿色 📊/⚡ 风格符号 + "PR" 或排名箭头图形
-- 参考现有 favicon/brand 色（emerald #10b981）
+- `docs/appstore-assets/app-icon-1024.png` — 1024×1024 PNG，无圆角（Shopify 自动裁切）
+- 设计：深色阴影 + emerald 渐变圆角方块，白色上升柱状图 + 箭头（排名上升语义）
 
 ## 嵌入类型
 

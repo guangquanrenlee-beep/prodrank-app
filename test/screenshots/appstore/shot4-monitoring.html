@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,'Segoe UI',Roboto,sans-serif}
+body{background:#09090b;color:#e4e4e7;width:1200px;height:900px;overflow:hidden}
+nav{display:flex;align-items:center;gap:26px;padding:18px 36px;background:#18181b;border-bottom:1px solid #27272a}
+.logo{font-weight:800;font-size:19px;color:#34d399}
+nav a{color:#71717a;font-size:14px;text-decoration:none}
+nav a.active{color:#34d399;font-weight:600}
+nav .right{margin-left:auto;color:#a1a1aa;font-size:13px}
+.container{padding:26px 36px;display:flex;gap:26px}
+.agents{width:340px;flex-shrink:0;display:flex;flex-direction:column;gap:14px}
+.agent{background:#18181b;border:1px solid #27272a;border-radius:13px;padding:17px 20px}
+.agent .top{display:flex;align-items:center;gap:12px}
+.avatar{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px}
+.agent h3{font-size:14px}
+.agent .sub{font-size:11.5px;color:#71717a}
+.rank{margin-left:auto;text-align:right}
+.rank .num{font-size:22px;font-weight:800;color:#34d399}
+.rank .label{font-size:10px;color:#71717a;text-transform:uppercase}
+.chart{flex:1;background:#18181b;border:1px solid #27272a;border-radius:13px;padding:22px}
+.chart h2{font-size:15px;margin-bottom:4px}
+.chart .sub{font-size:12px;color:#71717a;margin-bottom:18px}
+.bars{display:flex;align-items:flex-end;gap:26px;height:300px;padding:0 10px}
+.col{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1}
+.col .bar{width:100%;background:linear-gradient(180deg,#10b981,#065f46);border-radius:8px 8px 0 0}
+.col .lbl{font-size:11px;color:#71717a}
+.statrow{display:flex;gap:14px;margin-top:26px}
+.stat{flex:1;background:#09090b;border:1px solid #27272a;border-radius:10px;padding:13px 16px}
+.stat .v{font-size:20px;font-weight:800;color:#fff}
+.stat .v.g{color:#34d399}
+.stat .t{font-size:11px;color:#71717a;margin-top:3px}
+</style></head><body>
+<nav>
+  <div class="logo">▲ ProdRank</div>
+  <a>Dashboard</a><a>AI Studio</a><a class="active">Monitoring</a><a>Settings</a>
+  <div class="right">hello@yourstore.com · Pro plan</div>
+</nav>
+<div class="container">
+  <div class="agents">
+    <div class="agent"><div class="top"><div class="avatar">🤖</div><div><h3>ChatGPT</h3><div class="sub">+2 positions this month</div></div><div class="rank"><div class="num">#2</div><div class="label">rank</div></div></div></div>
+    <div class="agent"><div class="top"><div class="avatar">💬</div><div><h3>Gemini</h3><div class="sub">+1 position this month</div></div><div class="rank"><div class="num">#4</div><div class="label">rank</div></div></div></div>
+    <div class="agent"><div class="top"><div class="avatar">✦</div><div><h3>Claude</h3><div class="sub">+3 positions this month</div></div><div class="rank"><div class="num">#3</div><div class="label">rank</div></div></div></div>
+    <div class="agent"><div class="top"><div class="avatar">🔮</div><div><h3>Grok</h3><div class="sub">newly mentioned</div></div><div class="rank"><div class="num">#7</div><div class="label">rank</div></div></div></div>
+  </div>
+  <div class="chart">
+    <h2>AI visibility trend — "best canvas backpack"</h2>
+    <div class="sub">Average rank across ChatGPT · Gemini · Claude · Grok · Apr — Jul 2026</div>
+    <div class="bars">
+      <div class="col"><div class="bar" style="height:38%"></div><div class="lbl">Apr</div></div>
+      <div class="col"><div class="bar" style="height:48%"></div><div class="lbl">May</div></div>
+      <div class="col"><div class="bar" style="height:62%"></div><div class="lbl">Jun</div></div>
+      <div class="col"><div class="bar" style="height:82%"></div><div class="lbl">Jul</div></div>
+    </div>
+    <div class="statrow">
+      <div class="stat"><div class="v g">+12</div><div class="t">Mentions this month</div></div>
+      <div class="stat"><div class="v">87</div><div class="t">AI visibility score (was 51)</div></div>
+      <div class="stat"><div class="v">4/4</div><div class="t">AI agents citing your products</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,'Segoe UI',Roboto,sans-serif}
+body{background:#09090b;color:#e4e4e7;width:1200px;height:900px;overflow:hidden}
+nav{display:flex;align-items:center;gap:26px;padding:18px 36px;background:#18181b;border-bottom:1px solid #27272a}
+.logo{font-weight:800;font-size:19px;color:#34d399}
+nav a{color:#71717a;font-size:14px;text-decoration:none}
+nav a.active{color:#34d399;font-weight:600}
+nav .right{margin-left:auto;color:#a1a1aa;font-size:13px}
+.container{padding:26px 36px}
+.banner{background:#064e3b;border:1px solid #065f46;border-radius:12px;padding:16px 22px;font-size:14px;color:#6ee7b7;margin-bottom:22px}
+.banner b{color:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.tpl{background:#18181b;border:1px solid #27272a;border-radius:14px;padding:20px 22px}
+.tpl .head{display:flex;align-items:center}
+.tpl h3{font-size:15px}
+.tpl .cost{margin-left:auto;background:#27272a;color:#a1a1aa;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px}
+.tpl .fields{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+.chip{background:#27272a;border:1px solid #3f3f46;color:#d4d4d8;padding:4px 10px;border-radius:6px;font-size:11.5px;font-family:ui-monospace,monospace}
+.chip.g{background:#064e3b;border-color:#065f46;color:#34d399}
+.tpl .prod{margin-top:12px;font-size:12px;color:#71717a}
+.tpl .prod b{color:#d4d4d8;font-weight:600}
+.apply{background:#059669;color:#fff;border:none;border-radius:10px;padding:15px 26px;font-size:15px;font-weight:700;margin-top:22px}
+.note{margin-top:14px;font-size:12.5px;color:#71717a;line-height:1.7}
+</style></head><body>
+<nav>
+  <div class="logo">▲ ProdRank</div>
+  <a>Dashboard</a><a class="active">AI Studio</a><a>Monitoring</a><a>Settings</a>
+  <div class="right">hello@yourstore.com · Pro plan</div>
+</nav>
+<div class="container">
+  <div class="banner">🎯 <b>Batch optimization</b> — one AI generation per category template, applied across your whole catalog. <b>243 products</b> · 5 templates · <b>5 AI calls total</b> instead of 243.</div>
+  <div class="grid">
+    <div class="tpl"><div class="head"><h3>Fashion</h3><span class="cost">1 AI call · 87 products</span></div>
+      <div class="fields"><span class="chip g"># best seller</span><span class="chip">What is the {{product_name}}?</span><span class="chip">Is {{product_name}} true to size?</span></div>
+      <div class="prod">Applies to: <b>T-shirts · Hoodies · Jeans · Dresses</b></div></div>
+    <div class="tpl"><div class="head"><h3>Electronics</h3><span class="cost">1 AI call · 54 products</span></div>
+      <div class="fields"><span class="chip g">Battery life of {{product_name}}?</span><span class="chip">Is {{product_name}} compatible with…?</span><span class="chip">Warranty on {{product_name}}</span></div>
+      <div class="prod">Applies to: <b>Headphones · Chargers · Cables</b></div></div>
+    <div class="tpl"><div class="head"><h3>Home &amp; Kitchen</h3><span class="cost">1 AI call · 62 products</span></div>
+      <div class="fields"><span class="chip g">Is {{product_name}} dishwasher safe?</span><span class="chip">Size of {{product_name}}</span></div>
+      <div class="prod">Applies to: <b>Cookware · Storage · Decor</b></div></div>
+    <div class="tpl"><div class="head"><h3>Beauty</h3><span class="cost">1 AI call · 40 products</span></div>
+      <div class="fields"><span class="chip g">Skin type for {{product_name}}?</span><span class="chip">Is {{product_name}} cruelty-free?</span></div>
+      <div class="prod">Applies to: <b>Skincare · Makeup · Haircare</b></div></div>
+  </div>
+  <button class="apply">⚡ Generate &amp; Apply to all 243 products</button>
+  <p class="note">Placeholders {{product_name}}, {{price}}, {{brand}} are filled per product at apply time. Each product stays under its 3-generation limit. Review every product before publishing — nothing goes live unapproved.</p>
+</div>
+</body></html>
