@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import ShopifyConnect from "@/components/ShopifyConnect";
 
 interface AgentResult {
   ai_agent: string;
@@ -166,7 +167,7 @@ function DomainRankContent() {
             While web-searching AIs (ChatGPT with search, Perplexity) may already find your brand, adding structured Schema and FAQ data improves how ALL AI models understand and recommend your products.
           </p>
           <div className="flex justify-center gap-4">
-            <a href="/api/shopify/install?shop=yourstore.myshopify.com" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Install for Shopify</a>
+            <ShopifyConnect shop="yourstore.myshopify.com" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition">Install for Shopify</ShopifyConnect>
             <Link href="/wordpress" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-medium rounded-lg transition">Install for WordPress</Link>
           </div>
         </div>

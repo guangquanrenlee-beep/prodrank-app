@@ -38,7 +38,12 @@ class SyncProductRequest(BaseModel):
 
 @router.get("/install")
 async def install_url(shop: str = Query(...)):
-    """Get the Shopify OAuth install URL for a shop."""
+    """Get the Shopify OAuth install URL for a shop.
+
+    Returns JSON, not a redirect: the frontend fetches this cross-origin and
+    navigates with window.location. A 302 would be followed by fetch() into
+    Shopify's domain, which has no CORS headers for us → "Failed to fetch".
+    """
     if not SHOPIFY_CLIENT_ID or not SHOPIFY_CLIENT_SECRET:
         raise HTTPException(
             status_code=500,
@@ -46,8 +51,7 @@ async def install_url(shop: str = Query(...)):
         )
     redirect_uri = f"{APP_URL}/api/shopify/callback"
     url = shopify.build_install_url(shop=shop, redirect_uri=redirect_uri)
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=url, status_code=302)
+    return {"install_url": url}
 
 
 @router.get("/callback")

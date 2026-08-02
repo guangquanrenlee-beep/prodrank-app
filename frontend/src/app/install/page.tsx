@@ -20,12 +20,10 @@ export default function InstallPage() {
     setInstalling(true); setError("");
     try {
       const r = await fetch(`/api/shopify/install?shop=${encodeURIComponent(d)}`);
-      if (!r.ok) {
-        const err = await r.json();
-        throw new Error(err.detail || "Install failed");
-      }
-      setInstallUrl(r.url); // RedirectResponse
-      window.location.href = r.url;
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "Install failed");
+      setInstallUrl(data.install_url);
+      window.location.href = data.install_url;
     } catch (e: any) {
       setError(e.message);
     } finally {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import ShopifyConnect from "@/components/ShopifyConnect";
 
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -100,7 +101,7 @@ export default function SettingsPage() {
           {/* Shopify */}
           <div className="flex items-center justify-between">
             <div><div className="text-sm text-zinc-200">Shopify</div><div className="text-xs text-zinc-500">Connect your store via OAuth</div></div>
-            <Link href="/api/shopify/install?shop=yourstore.myshopify.com" className="text-sm text-emerald-400 hover:text-emerald-300">Connect →</Link>
+            <ShopifyConnect shop="yourstore.myshopify.com" className="text-sm text-emerald-400 hover:text-emerald-300">Connect →</ShopifyConnect>
           </div>
 
           {/* WordPress / WooCommerce — token-based connect */}
