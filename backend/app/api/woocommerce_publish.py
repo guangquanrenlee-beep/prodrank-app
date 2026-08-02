@@ -306,15 +306,19 @@ async def connect(req: WooConnectRequest, authorization: str = Header(default=""
         raise HTTPException(status_code=400, detail=f"Plugin unreachable or token invalid: {str(e)[:150]}")
 
     db = DB()
-    existing = db.client.table("sites").select("id").eq("domain", domain).eq("platform", "woocommerce").limit(1).execute().data
-
-    # Store limits: a new store (not an existing one being re-connected)
-    # counts against the plan's store allowance.
-    if user_id and not existing:
-        from app.services.usage import check_site_limit
-        allowed, detail, _current, _limit = check_site_limit(user_id)
-        if not allowed:
-            raise HTTPException(status_code=403, detail=detail)
+    # The same domain may exist both as an unbound row (previous connect
+    # without auth) and as the user's row (added from the dashboard) — the
+    # (user_id, domain) unique constraint would collide on update. Resolve by
+    # upserting on (user_id, domain) and cleaning up leftover unbound rows.
+    if user_id:
+        existing = db.client.table("sites").select("id").eq("domain", domain).eq("user_id", user_id).limit(1).execute().data
+        # Store limits: a genuinely new store (not a re-connect) counts
+        # against the plan's store allowance.
+        if not existing:
+            from app.services.usage import check_site_limit
+            allowed, detail, _current, _limit = check_site_limit(user_id)
+            if not allowed:
+                raise HTTPException(status_code=403, detail=detail)
 
     fields = {
         "platform": "woocommerce",
@@ -324,10 +328,15 @@ async def connect(req: WooConnectRequest, authorization: str = Header(default=""
     }
     if user_id:
         fields["user_id"] = user_id
-    if existing:
-        db.client.table("sites").update(fields).eq("id", existing[0]["id"]).execute()
-    else:
-        db.client.table("sites").insert({"domain": domain, **fields}).execute()
+    try:
+        db.client.table("sites").upsert(
+            {"domain": domain, **fields}, on_conflict="user_id,domain"
+        ).execute()
+        if user_id:
+            # Remove leftover unbound rows for this domain (NULL user_id)
+            db.client.table("sites").delete().eq("domain", domain).is_("user_id", None).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save connection: {str(e)[:150]}")
 
     return {"status": "connected", "domain": domain, "plugin": status, "user_id": user_id or None}
 

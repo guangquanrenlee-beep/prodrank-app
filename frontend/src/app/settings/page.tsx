@@ -147,10 +147,10 @@ function SettingsContent() {
                     method: "POST", headers: { "Content-Type": "application/json", ...(sess.session?.access_token ? { Authorization: `Bearer ${sess.session.access_token}` } : {}) },
                     body: JSON.stringify({ domain: wpDomain.trim(), api_token: wpToken.trim() }),
                   });
-                  const d = await r.json();
+                  const d = await r.json().catch(() => ({}));
                   if (r.ok) setWpStatus({ ok: true, msg: `Connected to ${d.domain} — plugin v${d.plugin?.plugin || "?"}` });
-                  else setWpStatus({ ok: false, msg: d.detail || "Connection failed" });
-                } catch { setWpStatus({ ok: false, msg: "Network error" }); }
+                  else setWpStatus({ ok: false, msg: d.detail || d.message || `Connection failed (${r.status})` });
+                } catch { setWpStatus({ ok: false, msg: "Network error — is the local backend running?" }); }
                 finally { setWpConnecting(false); }
               }}
               disabled={wpConnecting} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
