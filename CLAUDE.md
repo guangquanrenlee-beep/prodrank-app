@@ -38,5 +38,6 @@ cd test && python mock_shopify.py
 
 ## 当前状态与下一步
 
-- 已完成：双平台接入、AI Studio（URL→品类→生成→审核→发布）、批量模板、月度配额、真实问题采集器、AI 提及监控、DeepSeek 切换
-- 待办：Shopify Partner 账号（大陆区受限，需 VPN/海外）；wordpress.org 提交上架（材料已备齐，`docs/wordpress-org-submission-checklist.md`）；知识图谱可视化页；数据反哺生成（品类高频词注入 FAQ）
+- 已完成：双平台接入、AI Studio（URL→品类→生成→审核→发布）、批量模板、月度配额、真实问题采集器、AI 提及监控、DeepSeek 切换、Shopify App Store 上架材料与合规代码（OAuth HMAC/state 验证、GDPR 三条 webhook、API 2026-07）
+- Shopify 上架（B 策略：Free to install，高级功能站外 Paddle 订阅）：材料在 `docs/shopify-app-store-listing.md`，清单在 `docs/shopify-app-store-checklist.md`，GDPR 说明在 `docs/gdpr-compliance.md`；Partner Dashboard 待办（webhook 订阅、redirect URL、图标截图）
+- 待办：Shopify Partner 账号（大陆区受限，需 VPN/海外）；wordpress.org 提交上架（材料已备齐，`docs/wordpress-org-submission-checklist.md`）；知识图谱可视化页；数据反哺生成（品类高频词注入 FAQ）；测试脚本 `test/test_shopify_appstore.py` 覆盖 OAuth 安全与 GDPR
