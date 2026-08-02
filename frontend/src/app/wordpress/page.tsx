@@ -16,7 +16,7 @@ export default function WordPressPage() {
             <span className="bg-emerald-900/50 text-emerald-400 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0">1</span>
             <div>
               <div className="font-medium text-zinc-200">Download the plugin</div>
-              <a href="/prodrank-ai-seo.zip" className="text-sm text-emerald-400 hover:text-emerald-300">prodrank-ai-seo.zip</a>
+              <a href="/downloads/prodrank-ai-seo.zip" className="text-sm text-emerald-400 hover:text-emerald-300">prodrank-ai-seo.zip</a>
             </div>
           </div>
           <div className="flex items-start gap-3">
