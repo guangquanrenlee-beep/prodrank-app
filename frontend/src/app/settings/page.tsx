@@ -22,6 +22,15 @@ function SettingsContent() {
   const [wpToken, setWpToken] = useState("");
   const [wpConnecting, setWpConnecting] = useState(false);
   const [wpStatus, setWpStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [connectedSites, setConnectedSites] = useState<any[]>([]);
+
+  // Show the user's actually-connected stores (so a fresh page load doesn't
+  // look like the connection was lost — the inputs are just local state).
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("sites").select("domain,platform,access_token").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(10)
+      .then(({ data }) => setConnectedSites((data || []).filter((s: any) => s.access_token)));
+  }, [user]);
 
   // Strip the install markers from the URL after showing them once.
   useEffect(() => {
@@ -133,6 +142,16 @@ function SettingsContent() {
           {/* WordPress / WooCommerce — token-based connect */}
           <div className="border-t border-zinc-800 pt-3 space-y-3">
             <div><div className="text-sm text-zinc-200">WordPress / WooCommerce</div><div className="text-xs text-zinc-500">Install the ProdRank plugin, then paste the API token from WooCommerce → ProdRank SEO</div></div>
+            {connectedSites.length > 0 && (
+              <div className="space-y-1">
+                {connectedSites.map((s: any) => (
+                  <div key={s.id} className="flex items-center justify-between text-xs">
+                    <span className="text-emerald-400">✅ {s.domain}</span>
+                    <span className="text-zinc-600 capitalize">{s.platform}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <input value={wpDomain} onChange={e => setWpDomain(e.target.value)} placeholder="yourstore.com" className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
               <input value={wpToken} onChange={e => setWpToken(e.target.value)} placeholder="API token" className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500" />

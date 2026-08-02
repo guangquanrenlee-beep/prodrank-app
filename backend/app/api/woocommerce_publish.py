@@ -22,7 +22,7 @@ from app.services.knowledge_templates import detect_subcategory, generate_field_
 router = APIRouter()
 ai = ShopifyAIService()
 
-DEFAULT_FIELDS = ["description", "faq", "pros", "cons", "comparison",
+DEFAULT_FIELDS = ["description", "faq", "pros", "comparison",
                   "use_cases", "buying_guide", "specification", "ai_summary"]
 
 
@@ -45,8 +45,9 @@ async def resolve_product_url(req: WooResolveUrlRequest):
     from urllib.parse import urlparse
     parsed = urlparse(url)
     domain = parsed.netloc or parsed.path.split("/")[0]
-    # Remove www. and port
-    domain = domain.replace("www.", "").split(":")[0]
+    # Remove www. — keep the port! localhost:8081 must stay intact,
+    # and production domains (myshop.com) have no port anyway.
+    domain = domain.replace("www.", "").lower()
 
     # Try to resolve token
     token = ""
@@ -206,11 +207,16 @@ def _plugin_base(domain: str) -> str:
     return f"{scheme}://{domain}/wp-json/prodrank/v1"
 
 
-async def _plugin_headers(domain: str) -> dict:
+def _resolve_token(domain: str) -> str:
+    """Look up the plugin token for a domain from the sites table."""
     data = DB().client.table("sites").select("access_token").eq("domain", domain).eq("platform", "woocommerce").limit(1).execute().data
     if not data or not data[0].get("access_token"):
         raise HTTPException(status_code=401, detail=f"No connection for {domain}. Save the plugin API token first (/api/woocommerce/connect).")
-    return {"X-ProdRank-Token": data[0]["access_token"], "Content-Type": "application/json"}
+    return data[0]["access_token"]
+
+
+async def _plugin_headers(domain: str) -> dict:
+    return {"X-ProdRank-Token": _resolve_token(domain), "Content-Type": "application/json"}
 
 
 def _extract_woo_product(p: dict) -> dict:
