@@ -45,9 +45,8 @@ def collect_weekly_stats(shop: str) -> dict:
         t = a.get("type", "other")
         stats["alerts_by_type"][t] = stats["alerts_by_type"].get(t, 0) + 1
 
-    # Citations this week
-    stats["citations"] = db.client.table("citations").select("id").gte("created_at", f"{start}T00:00:00").execute().data and len(
-        db.client.table("citations").select("id").gte("created_at", f"{start}T00:00:00").execute().data) or 0
+    # Citations this week (citations uses cited_at, not created_at)
+    stats["citations"] = len(db.client.table("citations").select("id").gte("cited_at", f"{start}T00:00:00").execute().data or [])
 
     # AI ranking snapshots this week (ai_responses)
     ai = (db.client.table("ai_responses").select("ai_agent,rank_position").eq("keyword", shop)

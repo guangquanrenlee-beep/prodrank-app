@@ -89,7 +89,8 @@ def _extract_desc_len(html: str) -> int:
 async def _crawl_competitor(domain: str) -> dict:
     """Fetch the homepage + product listing + up to N product pages.
     Returns {url: metrics} for one competitor."""
-    base = f"https://{domain}"
+    scheme = "http" if domain.startswith(("localhost", "127.")) else "https"
+    base = f"{scheme}://{domain}"
     urls = [base]
     html = await _fetch(base)
     if html:

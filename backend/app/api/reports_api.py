@@ -152,7 +152,7 @@ class WeeklyReportRequest(BaseModel):
     email: str
 
 
-@router.post("/reports/weekly")
+@router.post("/weekly")
 async def weekly_report(req: WeeklyReportRequest):
     """Build + email the weekly report for one store (manual trigger/test)."""
     from app.services.weekly_report import send_weekly_report
@@ -162,7 +162,7 @@ async def weekly_report(req: WeeklyReportRequest):
         raise HTTPException(status_code=500, detail=str(e)[:150])
 
 
-@router.get("/reports/weekly/preview")
+@router.get("/weekly/preview")
 async def weekly_preview(shop: str = Query(...)):
     """Preview the weekly numbers without sending (debug)."""
     from app.services.weekly_report import collect_weekly_stats

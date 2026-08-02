@@ -267,7 +267,7 @@ class DB:
     def save_competitor(self, shop: str, domain: str, name: str = "") -> dict:
         data = self.client.table("competitors").upsert({
             "shop": shop, "domain": domain, "name": name or domain,
-            "status": "active", "updated_at": datetime.now(timezone.utc).isoformat(),
+            "status": "active",
         }, on_conflict="shop,domain").execute().data
         return data[0] if data else {}
 
