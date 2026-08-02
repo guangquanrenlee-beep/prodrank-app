@@ -8,6 +8,9 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+
+from app.services.rate_limit import RateLimitMiddleware
 
 
 async def _background_worker():
@@ -46,6 +49,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Per-IP rate limiting (anti-scraper / anti-abuse for expensive endpoints)
+app.add_middleware(RateLimitMiddleware)
+# GZip API responses (>500 bytes) — cuts bandwidth ~60-80% for JSON
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Routes
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])

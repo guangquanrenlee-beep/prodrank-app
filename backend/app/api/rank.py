@@ -1,6 +1,7 @@
 """Rank API — AI agent product ranking + domain brand discovery."""
 
 import re
+import time
 import httpx
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, HTTPException
@@ -10,6 +11,23 @@ from app.services.ai_query import AIQueryService
 
 router = APIRouter()
 ai_query = AIQueryService()
+
+# In-process cache for expensive AI queries (anti-abuse + cost control).
+# Repeated checks for the same (product, keyword, brand) within the TTL
+# are served from memory without re-querying the AI agents.
+_CACHE: dict[tuple, tuple[float, dict]] = {}
+_CACHE_TTL = 1800  # 30 min
+
+
+def _cached(key: tuple) -> dict | None:
+    hit = _CACHE.get(key)
+    if hit and time.time() - hit[0] < _CACHE_TTL:
+        return hit[1]
+    return None
+
+
+def _store(key: tuple, payload: dict) -> None:
+    _CACHE[key] = (time.time(), payload)
 
 
 class RankCheckRequest(BaseModel):
@@ -31,6 +49,10 @@ class RankCheckResponse(BaseModel):
 @router.post("/check")
 async def check_rank(req: RankCheckRequest):
     """Check product ranking across all AI agents for a keyword."""
+    key = ("check", req.product_name, req.keyword, req.brand)
+    cached = _cached(key)
+    if cached:
+        return cached
     try:
         report = await ai_query.query_all(
             product_name=req.product_name,
@@ -52,7 +74,7 @@ async def check_rank(req: RankCheckRequest):
             for src in r.cited_sources:
                 db.save_citation(ai_response_id="", source_url=src)
 
-        return {
+        payload = {
             "product_name": report.product_name,
             "keyword": report.keyword,
             "best_rank": report.best_rank,
@@ -72,6 +94,8 @@ async def check_rank(req: RankCheckRequest):
                 for r in report.results
             ],
         }
+        _store(key, payload)
+        return payload
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -124,13 +148,15 @@ async def check_domain_rank(req: DomainRankRequest):
 
     brand_known = bool(mentioned)
 
-    return {
+    payload = {
         "domain": req.domain,
         "brand_name": brand_name,
         "category": category,
         "brand_known": brand_known,
         "reports": reports_data,
     }
+    _store(("domain", domain), payload)
+    return payload
 
 
 def _extract_brand(domain: str) -> str:
