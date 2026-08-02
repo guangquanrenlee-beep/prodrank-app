@@ -65,7 +65,7 @@ class ProdRank_Admin {
         $pending = ProdRank_Sync::pending_count();
         ?>
         <div class="wrap">
-            <h1>ProdRank — AI Agent Commerce SEO</h1>
+            <h1>ProdRank — Let AI discover and recommend your products.</h1>
             <p>Get ChatGPT, Gemini, Perplexity, and Claude to recommend your product.</p>
 
             <hr>

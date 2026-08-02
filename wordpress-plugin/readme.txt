@@ -1,4 +1,4 @@
-=== ProdRank — AI Agent Commerce SEO ===
+=== ProdRank — Let AI discover and recommend your products. ===
 Contributors: prodrank
 Tags: seo, schema, structured data, json-ld, ai, generative engine optimization, geo, woocommerce
 Requires at least: 6.0

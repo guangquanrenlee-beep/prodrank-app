@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:  ProdRank — AI Agent Commerce SEO
+ * Plugin Name:  ProdRank — Let AI discover and recommend your products.
  * Plugin URI:   https://prodrank.app
  * Description:  GEO (Generative Engine Optimization) for WooCommerce. AI content stored in post meta (never touches your original content), rendered via shortcodes/Gutenberg, JSON-LD Schema output server-side. Compatible with Yoast SEO and Rank Math.
  * Version:      0.2.0
