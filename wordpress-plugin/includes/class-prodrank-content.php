@@ -10,7 +10,7 @@
  * (extensions/schema-inject/blocks/ai-content.liquid):
  *   description:    {title, html}
  *   ai_summary:     {title, html}
- *   pros/cons:      {title, items: []}
+ *   pros:           {title, items: []}
  *   faq:            {title, questions: [{question, answer}]}
  *   comparison:     {title, competitor, rows: [{ours, typical}]}
  *   use_cases:      {title, items: [{title, description}]}
@@ -28,7 +28,7 @@ class ProdRank_Content {
     const META_PREFIX = '_prodrank_';
 
     const FIELDS = [
-        'description', 'faq', 'pros', 'cons', 'comparison',
+        'description', 'faq', 'pros', 'comparison',
         'use_cases', 'buying_guide', 'specification', 'schema', 'ai_summary',
     ];
 
@@ -36,7 +36,6 @@ class ProdRank_Content {
         'description'   => 'prodrank_description',
         'ai_summary'    => 'prodrank_ai_summary',
         'pros'          => 'prodrank_pros',
-        'cons'          => 'prodrank_cons',
         'faq'           => 'prodrank_faq',
         'comparison'    => 'prodrank_comparison',
         'use_cases'     => 'prodrank_use_cases',
@@ -139,7 +138,11 @@ class ProdRank_Content {
         if (isset($rules[$field])) {
             return (bool) $rules[$field];
         }
-        return true; // default: show everything that exists
+        // Defaults: consumer-facing blocks show; description and summary are
+        // hidden unless the merchant opts in (description only replaces the
+        // native one via explicit publish-time opt-in).
+        $hidden = ['description', 'ai_summary'];
+        return !in_array($field, $hidden, true);
     }
 
     // ── Rendering ──
@@ -185,17 +188,6 @@ class ProdRank_Content {
             $lis .= '<li>' . esc_html($item) . '</li>';
         }
         return '<div class="prodrank-section" data-prodrank="pros"><h2>' . $title . '</h2><ul>' . $lis . '</ul></div>';
-    }
-
-    private function render_cons($c): string {
-        $items = $c['items'] ?? [];
-        if (!$items) return '';
-        $title = esc_html($c['title'] ?? __('Cons', 'prodrank-ai-seo'));
-        $lis = '';
-        foreach ($items as $item) {
-            $lis .= '<li>' . esc_html($item) . '</li>';
-        }
-        return '<div class="prodrank-section" data-prodrank="cons"><h2>' . $title . '</h2><ul>' . $lis . '</ul></div>';
     }
 
     private function render_faq($c): string {

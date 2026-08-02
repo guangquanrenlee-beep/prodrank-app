@@ -19,7 +19,6 @@ class ProdRank_Admin {
         'description'   => 'AI Description',
         'ai_summary'    => 'AI Summary',
         'pros'          => 'Pros',
-        'cons'          => 'Cons',
         'faq'           => 'FAQ',
         'comparison'    => 'Comparison',
         'use_cases'     => 'Use Cases',
@@ -141,7 +140,7 @@ class ProdRank_Admin {
                 <li>✅ Organization + WebSite Schema — site-wide brand info</li>
                 <li>✅ Product Schema — full JSON-LD (SaaS-generated, falls back to live generation)</li>
                 <li>✅ FAQPage Schema — from AI FAQ post meta</li>
-                <li>✅ AI content via shortcodes: <code>[prodrank_faq]</code> <code>[prodrank_pros]</code> <code>[prodrank_cons]</code> <code>[prodrank_comparison]</code> <code>[prodrank_buying_guide]</code> <code>[prodrank_description]</code></li>
+                <li>✅ AI content via shortcodes: <code>[prodrank_faq]</code> <code>[prodrank_pros]</code> <code>[prodrank_comparison]</code> <code>[prodrank_buying_guide]</code> <code>[prodrank_description]</code></li>
                 <li>✅ All AI content stored in post meta — never touches your original content</li>
                 <li>✅ Compatible with Yoast SEO and Rank Math</li>
             </ul>

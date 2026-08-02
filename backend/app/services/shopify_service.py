@@ -485,7 +485,7 @@ class ShopifyService:
     #      source (CSS/HTML/Liquid/JS), images.
 
     AI_CONTENT_FIELDS = [
-        "description", "faq", "pros", "cons", "comparison",
+        "description", "faq", "pros", "comparison",
         "use_cases", "buying_guide", "specification", "schema", "ai_summary",
     ]
 
@@ -517,9 +517,12 @@ class ShopifyService:
 
     async def set_rendering_rules(self, store: ShopifyStore, rules: dict) -> dict:
         """Rendering Rules — shop-level metafield controlling which AI sections render.
-        Example: {"faq": true, "pros": true, "cons": false, "comparison": true,
-                   "use_cases": true, "buying_guide": true, "ai_summary": true,
-                   "description": false}
+        Example: {"faq": true, "pros": true, "comparison": true,
+                   "use_cases": true, "buying_guide": true,
+                   "ai_summary": false, "description": false}
+        Defaults (no rules set): description + ai_summary hidden unless
+        explicitly enabled (description only replaces the native one via
+        publish-time opt-in); everything else shows.
         The schema JSON-LD block is ALWAYS output regardless of these rules.
         (Theme app extensions can only read defined metafields; if the shop-level
         metafield is not readable in Liquid, the block falls back to "render all".)"""

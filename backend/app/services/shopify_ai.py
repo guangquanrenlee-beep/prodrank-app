@@ -28,7 +28,6 @@ ALL_MODULES: dict[str, str] = {  # field_key → human-readable label
     "ai_summary":      "One-paragraph product summary",
     "faq":             "Frequently asked questions",
     "pros":            "Product strengths / advantages",
-    "cons":            "Product weaknesses / limitations",
     "comparison":      "Side-by-side competitor comparison table",
     "use_cases":       "Ideal use cases / scenarios",
     "buying_guide":    "Step-by-step purchasing guide",
@@ -63,7 +62,6 @@ FIELD_SHAPES: dict[str, Any] = {
     "description":     {"title": "str", "html": "str"},
     "ai_summary":      {"title": "str", "html": "str"},
     "pros":            {"title": "str", "items": ["str"]},
-    "cons":            {"title": "str", "items": ["str"]},
     "faq":            {"title": "str", "questions": [{"question": "str", "answer": "str"}]},
     "comparison":     {"title": "str", "competitor": "str", "rows": [{"ours": "str", "typical": "str"}]},
     "use_cases":      {"title": "str", "items": [{"title": "str", "description": "str"}]},
@@ -101,36 +99,36 @@ CATEGORY_RULES: dict[str, dict] = {
     "fashion": {
         "label": "Fashion & Apparel",
         "modules": ["description", "target_audience", "occasion", "season", "fit", "size_guide",
-                     "material", "care", "faq", "pros", "cons", "ai_summary", "comparison"],
+                     "material", "care", "faq", "pros", "ai_summary", "comparison"],
     },
     "electronics": {
         "label": "Electronics & Gadgets",
         "modules": ["description", "specifications", "compatibility", "dimensions", "warranty",
-                     "package_includes", "faq", "pros", "cons", "comparison", "ai_summary"],
+                     "package_includes", "faq", "pros", "comparison", "ai_summary"],
     },
     "beauty": {
         "label": "Beauty & Cosmetics",
         "modules": ["description", "ingredients", "benefits", "how_to_use", "warnings",
-                     "certifications", "faq", "pros", "cons", "ai_summary"],
+                     "certifications", "faq", "pros", "ai_summary"],
     },
     "home": {
         "label": "Home & Kitchen",
         "modules": ["description", "specifications", "dimensions", "material", "cleaning",
-                     "capacity", "warranty", "faq", "pros", "cons", "comparison", "ai_summary"],
+                     "capacity", "warranty", "faq", "pros", "comparison", "ai_summary"],
     },
     "food": {
         "label": "Food & Beverage",
         "modules": ["description", "ingredients", "nutrition", "benefits", "warnings",
-                     "storage", "certifications", "faq", "pros", "cons", "ai_summary"],
+                     "storage", "certifications", "faq", "pros", "ai_summary"],
     },
     "sports": {
         "label": "Sports & Outdoors",
         "modules": ["description", "specifications", "target_audience", "material", "care",
-                     "fit", "faq", "pros", "cons", "comparison", "ai_summary"],
+                     "fit", "faq", "pros", "comparison", "ai_summary"],
     },
     "generic": {
         "label": "General Product",
-        "modules": ["description", "faq", "pros", "cons", "ai_summary", "comparison"],
+        "modules": ["description", "faq", "pros", "ai_summary", "comparison"],
     },
 }
 
@@ -359,7 +357,7 @@ PRODUCT DATA:
 
 Generate ONLY the content fields listed below. This is a {cat_label} product — generate category-appropriate content. Do NOT fabricate specifications, certifications, or review data that is not in the product data. If unknown, say so honestly or omit. FAQs must be realistic customer questions with useful answers.
 
-CONCISENESS (hard rule): Write tight, scannable copy. Description <= 120 words. FAQ answers <= 50 words. Pros/cons items <= 12 words each, 4-6 items. Buying guide steps <= 25 words. Comparison cells <= 15 words. No filler, no repeated marketing fluff, no preamble sentences.
+CONCISENESS (hard rule): Write tight, scannable copy. Description <= 120 words. FAQ answers <= 50 words. Pros items <= 12 words each, 4-6 items. Buying guide steps <= 25 words. Comparison cells <= 15 words. No filler, no repeated marketing fluff, no preamble sentences.
 {template_rule}
 
 FIELDS TO GENERATE ({len(fields)}):
