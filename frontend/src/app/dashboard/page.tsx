@@ -65,6 +65,38 @@ export default function DashboardPage() {
   const [healthDelta, setHealthDelta] = useState<number | null>(null);
   const [healthSummary, setHealthSummary] = useState("");
   const [healthAlerts, setHealthAlerts] = useState<any[]>([]);
+  const [competitors, setCompetitors] = useState<any[]>([]);
+  const [compDomain, setCompDomain] = useState("");
+  const [compAdding, setCompAdding] = useState(false);
+  const [weeklySending, setWeeklySending] = useState(false);
+  const [weeklyStatus, setWeeklyStatus] = useState("");
+
+  const handleAddCompetitor = async () => {
+    if (!domain || !compDomain.trim()) return;
+    setCompAdding(true);
+    try {
+      const r = await fetch("/api/competitors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: domain, domain: compDomain.trim() }) });
+      if (r.ok) { setCompDomain(""); loadCompetitors(domain); }
+    } finally { setCompAdding(false); }
+  };
+
+  const loadCompetitors = async (shop: string) => {
+    try {
+      const r = await fetch(`/api/competitors?shop=${encodeURIComponent(shop)}`);
+      if (r.ok) setCompetitors((await r.json()).competitors || []);
+    } catch {}
+  };
+
+  const handleWeeklyReport = async () => {
+    if (!domain || !user?.email) { setWeeklyStatus("Need a store + account email"); return; }
+    setWeeklySending(true); setWeeklyStatus("");
+    try {
+      const r = await fetch("/api/reports/weekly", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shop: domain, email: user.email }) });
+      const d = await r.json();
+      setWeeklyStatus(d.status || "done");
+    } catch { setWeeklyStatus("failed"); }
+    finally { setWeeklySending(false); }
+  };
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [scoreHistory, setScoreHistory] = useState<{date:string;score:number}[]>([]);
   const [scoreTrend, setScoreTrend] = useState<"up"|"down"|"flat">("flat");
@@ -137,6 +169,7 @@ export default function DashboardPage() {
       if (last.score_data) setScore(last.score_data as ScoreData);
       else if (last.ai_visibility_score) setScore({ ai_visibility_score: last.ai_visibility_score, label: last.ai_visibility_score >= 60 ? "Good" : "Poor", breakdown: {}, recommendation: "" });
       loadHealth(last.domain);
+      loadCompetitors(last.domain);
     }
   };
 
@@ -419,6 +452,46 @@ export default function DashboardPage() {
                   ) : (
                     <p className="text-sm text-zinc-600">No alerts. All quiet.</p>
                   )}
+                </div>
+              </div>
+
+              {/* ── ROW 4.7: Competitor Watch + Weekly Report ── */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-sm">⚔️ Competitor Watch</h3>
+                    <Link href="/competitors" className="text-xs text-emerald-400 hover:text-emerald-300">Details →</Link>
+                  </div>
+                  <div className="flex gap-2 mb-3">
+                    <input value={compDomain} onChange={e => setCompDomain(e.target.value)} placeholder="nike.com"
+                           className="flex-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-xs placeholder:text-zinc-600 focus:outline-none" />
+                    <button onClick={handleAddCompetitor} disabled={compAdding || !compDomain.trim()}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-xs font-medium rounded-lg transition">
+                      {compAdding ? "…" : "Watch"}
+                    </button>
+                  </div>
+                  {competitors.length > 0 ? (
+                    <div className="space-y-2">
+                      {competitors.map((c: any) => (
+                        <div key={c.id} className="flex items-center justify-between text-xs">
+                          <span className="text-zinc-300">🌐 {c.name || c.domain}</span>
+                          <span className="text-zinc-600">{c.pages ? `${c.pages} pages · ${c.last_snapshot || ""}` : "not snapshotted yet"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-600">Watch competitors to see their FAQ/Schema/price changes daily.</p>
+                  )}
+                </div>
+
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <h3 className="font-semibold text-sm mb-3">📧 Weekly Report</h3>
+                  <p className="text-xs text-zinc-500 mb-3">Monday mornings you get an email: content generated, alerts, citations, health trend — SQL aggregates + AI polish.</p>
+                  <button onClick={handleWeeklyReport} disabled={weeklySending}
+                          className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 text-white text-xs font-medium rounded-lg transition">
+                    {weeklySending ? "Sending…" : "Send test report now"}
+                  </button>
+                  {weeklyStatus && <p className={`text-xs mt-2 ${weeklyStatus.includes("sent") ? "text-emerald-400" : "text-amber-400"}`}>{weeklyStatus}</p>}
                 </div>
               </div>
 

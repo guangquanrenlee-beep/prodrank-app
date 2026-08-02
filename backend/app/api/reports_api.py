@@ -3,7 +3,8 @@ Reports API — Weekly/daily report generation from score snapshots.
 """
 
 from datetime import datetime, timezone
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from app.services.db import DB
 
@@ -142,3 +143,30 @@ async def weekly_report(request: Request):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+# ── Weekly Opportunity Report (feature 3) — SQL aggregates + LLM polish + email ──
+
+class WeeklyReportRequest(BaseModel):
+    shop: str
+    email: str
+
+
+@router.post("/reports/weekly")
+async def weekly_report(req: WeeklyReportRequest):
+    """Build + email the weekly report for one store (manual trigger/test)."""
+    from app.services.weekly_report import send_weekly_report
+    try:
+        return await send_weekly_report(req.shop, req.email.strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:150])
+
+
+@router.get("/reports/weekly/preview")
+async def weekly_preview(shop: str = Query(...)):
+    """Preview the weekly numbers without sending (debug)."""
+    from app.services.weekly_report import collect_weekly_stats
+    try:
+        return {"shop": shop, "stats": collect_weekly_stats(shop)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:150])

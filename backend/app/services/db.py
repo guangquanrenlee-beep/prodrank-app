@@ -262,6 +262,36 @@ class DB:
         return (self.client.table("alerts")
                 .select("*").eq("shop", shop).order("created_at", desc=True).limit(limit).execute().data or [])
 
+    # ── Competitor Watch ──
+
+    def save_competitor(self, shop: str, domain: str, name: str = "") -> dict:
+        data = self.client.table("competitors").upsert({
+            "shop": shop, "domain": domain, "name": name or domain,
+            "status": "active", "updated_at": datetime.now(timezone.utc).isoformat(),
+        }, on_conflict="shop,domain").execute().data
+        return data[0] if data else {}
+
+    def get_competitors(self, shop: str) -> list[dict]:
+        return (self.client.table("competitors").select("*").eq("shop", shop)
+                .order("created_at").execute().data or [])
+
+    def delete_competitor(self, competitor_id: str) -> None:
+        self.client.table("competitors").delete().eq("id", competitor_id).execute()
+
+    def save_competitor_snapshot(self, competitor_id: str, snapshot_date: str,
+                                 product_count: int, details: dict) -> None:
+        self.client.table("competitor_snapshots").upsert({
+            "competitor_id": competitor_id, "snapshot_date": snapshot_date,
+            "product_count": product_count, "details": details or {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }, on_conflict="competitor_id,snapshot_date").execute()
+
+    def get_competitor_snapshots(self, competitor_id: str, limit: int = 30) -> list[dict]:
+        data = (self.client.table("competitor_snapshots")
+                .select("*").eq("competitor_id", competitor_id)
+                .order("snapshot_date", desc=True).limit(limit).execute().data or [])
+        return sorted(data, key=lambda r: r.get("snapshot_date", ""))
+
     # ── GDPR — data deletion (shop/redact webhook) ──
 
     def delete_shop_data(self, shop: str) -> None:
