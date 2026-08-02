@@ -150,6 +150,21 @@ export default function DashboardPage() {
       const cmsRes = await fetch("/api/cms", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: cleanDomain }) });
       const cmsData = await cmsRes.json();
       setCms(cmsData);
+
+      // Store limit check — only counts when adding a NEW store
+      const alreadyBound = sites.some((s: any) => s.domain === cleanDomain);
+      if (!alreadyBound) {
+        const { data: siteRows } = await supabase.from("sites").select("id").eq("user_id", user.id);
+        const { data: subs } = await supabase.from("subscriptions").select("plan").eq("user_id", user.id).limit(1);
+        const plan = (subs?.[0]?.plan as string) || "free";
+        const LIMITS: Record<string, number> = { free: 1, pro: 1, growth: 3, agency: 10 };
+        if ((siteRows?.length ?? 0) >= (LIMITS[plan] ?? 1)) {
+          setError(`Store limit reached (${siteRows?.length}/${LIMITS[plan]}) on your ${plan} plan. Upgrade to Growth to add more stores.`);
+          setLoading(false);
+          return;
+        }
+      }
+
       await supabase.from("sites").upsert({ user_id: user.id, domain: cleanDomain, platform: cmsData.platform, platform_confidence: cmsData.confidence, auth_method: cmsData.auth_method, updated_at: new Date().toISOString() }, { onConflict: "user_id,domain" });
       const scoreRes = await fetch("/api/calculate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: `https://${cleanDomain}`, product_name: cleanDomain }) });
       if (scoreRes.ok) {
@@ -388,7 +403,9 @@ export default function DashboardPage() {
                       {sites.slice(0, 2).map((s: any) => (
                         <div key={s.id} className="flex items-center justify-between py-1.5">
                           <div className="flex items-center gap-2">
+                            <span className="text-xs">{s.platform === "shopify" ? "🛒" : s.platform === "woocommerce" || s.platform === "wordpress" ? "📝" : "🌐"}</span>
                             <span className="text-xs text-zinc-300">{s.domain}</span>
+                            {s.access_token ? <span className="text-[10px] text-emerald-400">● connected</span> : <span className="text-[10px] text-zinc-600">○ unbound</span>}
                           </div>
                           <span className={`text-xs font-bold ${sc(s.ai_visibility_score || 0)}`}>{s.ai_visibility_score ?? "—"}</span>
                         </div>

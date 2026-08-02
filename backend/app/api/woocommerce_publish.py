@@ -12,7 +12,7 @@ Supabase keep the version history + provenance on the SaaS side (⑦ Rollback).
 """
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from app.services.db import DB
@@ -267,10 +267,32 @@ def _provenance() -> dict:
 
 # ── endpoints ──
 
+def _user_id_from_auth(authorization: str) -> str | None:
+    """Resolve the Supabase user id from an Authorization: Bearer <jwt> header.
+    None if no/invalid token — the store is then bound to no account (free
+    plan) instead of failing, keeping direct-API callers working."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        return None
+    try:
+        from app.services.db import DB
+        user = DB().client.auth.get_user(token)
+        return user.user.id if user and user.user else None
+    except Exception:
+        return None
+
+
 @router.post("/connect")
-async def connect(req: WooConnectRequest):
-    """Save the plugin API token and verify it works by calling plugin /status."""
+async def connect(req: WooConnectRequest, authorization: str = Header(default="")):
+    """Save the plugin API token and verify it works by calling plugin /status.
+    Binds the store to the authenticated account (Authorization: Bearer
+    Supabase JWT) so plan quotas + store limits apply. Without a token the
+    store is stored unbound (free plan)."""
     domain = req.domain.strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
+    user_id = _user_id_from_auth(authorization)
+
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = await client.get(
@@ -282,19 +304,31 @@ async def connect(req: WooConnectRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Plugin unreachable or token invalid: {str(e)[:150]}")
 
-    existing = DB().client.table("sites").select("id").eq("domain", domain).eq("platform", "woocommerce").limit(1).execute().data
+    db = DB()
+    existing = db.client.table("sites").select("id").eq("domain", domain).eq("platform", "woocommerce").limit(1).execute().data
+
+    # Store limits: a new store (not an existing one being re-connected)
+    # counts against the plan's store allowance.
+    if user_id and not existing:
+        from app.services.usage import check_site_limit
+        allowed, detail, _current, _limit = check_site_limit(user_id)
+        if not allowed:
+            raise HTTPException(status_code=403, detail=detail)
+
     fields = {
         "platform": "woocommerce",
         "platform_confidence": 90,
         "auth_method": "plugin",
         "access_token": req.api_token,
     }
+    if user_id:
+        fields["user_id"] = user_id
     if existing:
-        DB().client.table("sites").update(fields).eq("id", existing[0]["id"]).execute()
+        db.client.table("sites").update(fields).eq("id", existing[0]["id"]).execute()
     else:
-        DB().client.table("sites").insert({"domain": domain, **fields}).execute()
+        db.client.table("sites").insert({"domain": domain, **fields}).execute()
 
-    return {"status": "connected", "domain": domain, "plugin": status}
+    return {"status": "connected", "domain": domain, "plugin": status, "user_id": user_id or None}
 
 
 @router.post("/sync")

@@ -142,8 +142,9 @@ function SettingsContent() {
                 if (!wpDomain.trim() || !wpToken.trim()) return;
                 setWpConnecting(true); setWpStatus(null);
                 try {
+                  const { data: sess } = await supabase.auth.getSession();
                   const r = await fetch("/api/woocommerce/connect", {
-                    method: "POST", headers: { "Content-Type": "application/json" },
+                    method: "POST", headers: { "Content-Type": "application/json", ...(sess.session?.access_token ? { Authorization: `Bearer ${sess.session.access_token}` } : {}) },
                     body: JSON.stringify({ domain: wpDomain.trim(), api_token: wpToken.trim() }),
                   });
                   const d = await r.json();
