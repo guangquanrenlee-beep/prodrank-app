@@ -56,7 +56,7 @@ class DB:
         if existing:
             self.client.table("sites").update(fields).eq("id", existing[0]["id"]).execute()
         else:
-            self.client.table("sites").insert({"domain": shop, "user_id": "", **fields}).execute()
+            self.client.table("sites").insert({"domain": shop, "user_id": None, **fields}).execute()
 
     def get_sites(self, user_id: str) -> list[dict]:
         return self.client.table("sites").select("*").eq("user_id", user_id).execute().data or []

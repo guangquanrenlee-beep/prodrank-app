@@ -53,7 +53,7 @@ def _persist_oauth_state(shop: str, state: str) -> None:
         db.client.table("sites").update({"oauth_state": state, "updated_at": now}).eq("id", existing[0]["id"]).execute()
     else:
         db.client.table("sites").insert({
-            "domain": shop, "user_id": "", "platform": "shopify",
+            "domain": shop, "user_id": None, "platform": "shopify",
             "auth_method": "oauth", "oauth_state": state, "updated_at": now,
         }).execute()
 
