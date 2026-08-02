@@ -49,7 +49,8 @@ function HealthContent() {
   const runNow = async () => {
     setRunning(true);
     try {
-      await fetch("/api/health-check/run", { method: "POST" });
+      const { data: sess } = await supabase.auth.getSession();
+      await fetch("/api/health-check/run", { method: "POST", headers: sess.session?.access_token ? { Authorization: `Bearer ${sess.session.access_token}` } : {} });
       if (shop) load(shop);
     } finally { setRunning(false); }
   };

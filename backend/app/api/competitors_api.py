@@ -1,9 +1,10 @@
 """Competitor Watch API — add/manage competitors, snapshot + diff."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from app.services.db import DB
+from app.services.auth import user_id_from_auth
 
 router = APIRouter()
 
@@ -53,8 +54,11 @@ async def list_competitors(shop: str = Query(...)):
 
 
 @router.post("/competitors/snapshot")
-async def snapshot(req: CompetitorSnapshotRequest):
-    """Crawl + snapshot one competitor now (diff vs yesterday → alerts)."""
+async def snapshot(req: CompetitorSnapshotRequest, authorization: str = Header(default="")):
+    """Crawl + snapshot one competitor now (diff vs yesterday → alerts).
+    Signed-in users only — crawling external sites costs bandwidth/time."""
+    if not user_id_from_auth(authorization):
+        raise HTTPException(status_code=401, detail="Sign in required")
     from app.services.competitor_watch import snapshot_competitor
     try:
         db = DB()
@@ -69,8 +73,11 @@ async def snapshot(req: CompetitorSnapshotRequest):
 
 
 @router.post("/competitors/run")
-async def run_all():
-    """Snapshot every active competitor (daily job + manual trigger)."""
+async def run_all(authorization: str = Header(default="")):
+    """Snapshot every active competitor (daily job + manual trigger).
+    Signed-in users only."""
+    if not user_id_from_auth(authorization):
+        raise HTTPException(status_code=401, detail="Sign in required")
     from app.services.competitor_watch import run_competitor_watch
     try:
         return await run_competitor_watch()

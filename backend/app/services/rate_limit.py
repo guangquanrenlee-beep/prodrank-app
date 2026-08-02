@@ -20,6 +20,7 @@ _RULES: list[tuple[str, int, int]] = [
     ("/api/woocommerce/publish", 5, 60),
     ("/api/batch/", 5, 60),                # batch generation — expensive
     ("/api/rank/", 5, 60),                 # AI agent queries — expensive
+    ("/api/scan", 5, 60),                  # page scan — LLM call per page
     ("/api/audit/", 10, 60),
     ("/api/cms", 10, 60),
     ("/api/score/", 15, 60),

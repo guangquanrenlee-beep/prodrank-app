@@ -1,8 +1,9 @@
 """Citation Watch + Regression Monitor API (features 5+7)."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from app.services.db import DB
+from app.services.auth import user_id_from_auth
 
 router = APIRouter()
 
@@ -34,8 +35,11 @@ async def citation_trend(days: int = Query(default=30, ge=1, le=90)):
 
 
 @router.post("/citations/run")
-async def run_citations():
-    """Manually run the daily citation watch (real-model queries)."""
+async def run_citations(authorization: str = Header(default="")):
+    """Manually run the daily citation watch (signed-in users only —
+    real-model queries cost money)."""
+    if not user_id_from_auth(authorization):
+        raise HTTPException(status_code=401, detail="Sign in required")
     from app.services.citation_watch import run_citation_watch
     try:
         return await run_citation_watch()
@@ -44,8 +48,10 @@ async def run_citations():
 
 
 @router.post("/regression/run")
-async def run_regression():
-    """Manually run the recommendation-regression scan."""
+async def run_regression(authorization: str = Header(default="")):
+    """Manually run the recommendation-regression scan (signed-in users only)."""
+    if not user_id_from_auth(authorization):
+        raise HTTPException(status_code=401, detail="Sign in required")
     from app.services.regression_monitor import run_regression_monitor
     try:
         return await run_regression_monitor()

@@ -49,7 +49,8 @@ function CompetitorsContent() {
   const snapshot = async (id: string) => {
     setSnapshotting(id); setLastResult(null);
     try {
-      const r = await fetch("/api/competitors/snapshot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ competitor_id: id }) });
+      const { data: sess } = await supabase.auth.getSession();
+      const r = await fetch("/api/competitors/snapshot", { method: "POST", headers: { "Content-Type": "application/json", ...(sess.session?.access_token ? { Authorization: `Bearer ${sess.session.access_token}` } : {}) }, body: JSON.stringify({ competitor_id: id }) });
       if (r.ok) setLastResult(await r.json());
     } finally { setSnapshotting(null); load(shop); }
   };
@@ -57,7 +58,8 @@ function CompetitorsContent() {
   const runAll = async () => {
     setRunning(true); setLastResult(null);
     try {
-      const r = await fetch("/api/competitors/run", { method: "POST" });
+      const { data: sess } = await supabase.auth.getSession();
+      const r = await fetch("/api/competitors/run", { method: "POST", headers: sess.session?.access_token ? { Authorization: `Bearer ${sess.session.access_token}` } : {} });
       if (r.ok) setLastResult(await r.json());
     } finally { setRunning(false); load(shop); }
   };
