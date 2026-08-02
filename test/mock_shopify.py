@@ -1,13 +1,13 @@
 """
 Mock Shopify Admin API — local test server for ProdRank's Shopify chain.
 Simulates the endpoints Shopify exposes to our SaaS backend:
-  /admin/api/2024-10/shop.json              → store info
-  /admin/api/2024-10/products.json          → product list / by handle
-  /admin/api/2024-10/products/{id}.json     → single product (GET/PUT)
-  /admin/api/2024-10/products/{id}/metafields.json → metafield read/write
-  /admin/api/2024-10/themes.json            → themes
-  /admin/api/2024-10/collections.json       → collections
-  /admin/api/2024-10/metafields.json        → shop-level metafields
+  /admin/api/2026-07/shop.json              → store info
+  /admin/api/2026-07/products.json          → product list / by handle
+  /admin/api/2026-07/products/{id}.json     → single product (GET/PUT)
+  /admin/api/2026-07/products/{id}/metafields.json → metafield read/write
+  /admin/api/2026-07/themes.json            → themes
+  /admin/api/2026-07/collections.json       → collections
+  /admin/api/2026-07/metafields.json        → shop-level metafields
 
 Usage:
   python mock_shopify.py            # serves on :8443
@@ -137,14 +137,14 @@ def _clean_product(p: dict) -> dict:
 
 # ── Routes ──
 
-@app.get("/admin/api/2024-10/shop.json")
+@app.get("/admin/api/2026-07/shop.json")
 async def get_shop(request: Request):
     if not _check_token(request):
         return JSONResponse({"errors": "Invalid token"}, status_code=401)
     return {"shop": SHOP}
 
 
-@app.get("/admin/api/2024-10/products.json")
+@app.get("/admin/api/2026-07/products.json")
 async def list_products(request: Request, handle: str | None = None, limit: int = 250):
     if not _check_token(request):
         return JSONResponse({"errors": "Invalid token"}, status_code=401)
@@ -154,7 +154,7 @@ async def list_products(request: Request, handle: str | None = None, limit: int 
     return {"products": [_clean_product(p) for p in PRODUCTS[:limit]]}
 
 
-@app.get("/admin/api/2024-10/products/{pid}.json")
+@app.get("/admin/api/2026-07/products/{pid}.json")
 async def get_product(pid: int, request: Request):
     if not _check_token(request):
         return JSONResponse({"errors": "Invalid token"}, status_code=401)
@@ -164,7 +164,7 @@ async def get_product(pid: int, request: Request):
     return {"product": _clean_product(p)}
 
 
-@app.put("/admin/api/2024-10/products/{pid}.json")
+@app.put("/admin/api/2026-07/products/{pid}.json")
 async def update_product(pid: int, request: Request):
     """Simulate body_html overwrite (⑥ opt-in description overwrite)."""
     if not _check_token(request):
@@ -179,7 +179,7 @@ async def update_product(pid: int, request: Request):
     return {"product": _clean_product(p)}
 
 
-@app.get("/admin/api/2024-10/products/{pid}/metafields.json")
+@app.get("/admin/api/2026-07/products/{pid}/metafields.json")
 async def list_product_metafields(pid: int, request: Request, namespace: str | None = None):
     if not _check_token(request):
         return JSONResponse({"errors": "Invalid token"}, status_code=401)
@@ -199,7 +199,7 @@ async def list_product_metafields(pid: int, request: Request, namespace: str | N
     return {"metafields": items}
 
 
-@app.post("/admin/api/2024-10/products/{pid}/metafields.json")
+@app.post("/admin/api/2026-07/products/{pid}/metafields.json")
 async def create_product_metafield(pid: int, request: Request):
     if not _check_token(request):
         return JSONResponse({"errors": "Invalid token"}, status_code=401)
@@ -218,21 +218,21 @@ async def create_product_metafield(pid: int, request: Request):
     return {"metafield": {"id": uuid.uuid4().int % (2**63), "namespace": ns, "key": key, "value": raw, "type": mf.get("type", "json")}}
 
 
-@app.get("/admin/api/2024-10/themes.json")
+@app.get("/admin/api/2026-07/themes.json")
 async def list_themes(request: Request):
     if not _check_token(request):
         return JSONResponse({"errors": "Invalid token"}, status_code=401)
     return {"themes": THEMES}
 
 
-@app.get("/admin/api/2024-10/collections.json")
+@app.get("/admin/api/2026-07/collections.json")
 async def list_collections(request: Request):
     if not _check_token(request):
         return JSONResponse({"errors": "Invalid token"}, status_code=401)
     return {"collections": COLLECTIONS}
 
 
-@app.post("/admin/api/2024-10/metafields.json")
+@app.post("/admin/api/2026-07/metafields.json")
 async def create_shop_metafield(request: Request):
     """Shop-level metafields (rendering rules, org schema)."""
     if not _check_token(request):
@@ -251,7 +251,7 @@ async def create_shop_metafield(request: Request):
     return {"metafield": {"id": uuid.uuid4().int % (2**63), "namespace": ns, "key": key, "value": raw, "type": mf.get("type", "json")}}
 
 
-@app.get("/admin/api/2024-10/webhooks.json")
+@app.get("/admin/api/2026-07/webhooks.json")
 async def list_webhooks(request: Request):
     if not _check_token(request):
         return JSONResponse({"errors": "Invalid token"}, status_code=401)

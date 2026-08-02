@@ -18,8 +18,12 @@ import json
 import hashlib
 import hmac
 import os
-import time
+import secrets
 from urllib.parse import urlencode
+
+# Shopify Admin API version — always use the latest stable version.
+# App Store review requires a recent stable version (not deprecated/unstable).
+SHOPIFY_API_VERSION = "2026-07"
 
 
 def admin_api_base(shop: str) -> str:
@@ -62,8 +66,13 @@ class ShopifyService:
 
     # ── OAuth ──
 
-    def build_install_url(self, shop: str, redirect_uri: str, scopes: list[str] | None = None) -> str:
-        """Build Shopify OAuth install URL."""
+    def build_install_url(self, shop: str, redirect_uri: str, scopes: list[str] | None = None, state: str | None = None) -> str:
+        """Build Shopify OAuth install URL.
+
+        `state` is a caller-supplied nonce (CSRF protection) — the caller
+        persists it and validates it in the callback. If omitted, a secure
+        random nonce is generated (but then it can't be validated).
+        """
         if scopes is None:
             scopes = [
                 "read_products",
@@ -73,12 +82,13 @@ class ShopifyService:
                 "read_content",
                 "write_content",
             ]
-        nonce = hashlib.sha256(str(time.time()).encode()).hexdigest()[:16]
+        if state is None:
+            state = secrets.token_urlsafe(32)
         params = {
             "client_id": self.client_id,
             "scope": ",".join(scopes),
             "redirect_uri": redirect_uri,
-            "state": nonce,
+            "state": state,
         }
         return f"https://{shop}/admin/oauth/authorize?{urlencode(params)}"  # OAuth always real domain
 
@@ -115,7 +125,7 @@ class ShopifyService:
         """Fetch products from Shopify store."""
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"{admin_api_base(store.shop)}/admin/api/2024-10/products.json",
+                f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/products.json",
                 headers={
                     "X-Shopify-Access-Token": store.access_token,
                     "Content-Type": "application/json",
@@ -230,7 +240,7 @@ class ShopifyService:
                 }
             }
             resp = await client.post(
-                f"{admin_api_base(store.shop)}/admin/api/2024-10/products/{product_id}/metafields.json",
+                f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/products/{product_id}/metafields.json",
                 headers={
                     "X-Shopify-Access-Token": store.access_token,
                     "Content-Type": "application/json",
@@ -315,9 +325,9 @@ class ShopifyService:
         # For MVP, we store it in each product's injection point.
         # Later: use metaobject instead.
         async with httpx.AsyncClient() as client:
-            # Use shop metaobject for site-wide data (2024-10+ API)
+            # Use shop metaobject for site-wide data (2026-07+ API)
             resp = await client.post(
-                f"{admin_api_base(store.shop)}/admin/api/2024-10/metafields.json",
+                f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/metafields.json",
                 headers={
                     "X-Shopify-Access-Token": store.access_token,
                     "Content-Type": "application/json",
@@ -372,7 +382,7 @@ class ShopifyService:
         """Fetch store-level info: name, email, plan, timezone, currency."""
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"{admin_api_base(store.shop)}/admin/api/2024-10/shop.json",
+                f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/shop.json",
                 headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
                 timeout=15,
             )
@@ -383,7 +393,7 @@ class ShopifyService:
         """List the store's themes (to detect which one is live)."""
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"{admin_api_base(store.shop)}/admin/api/2024-10/themes.json",
+                f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/themes.json",
                 headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
                 timeout=15,
             )
@@ -394,7 +404,7 @@ class ShopifyService:
         """List the store's collections."""
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"{admin_api_base(store.shop)}/admin/api/2024-10/collections.json",
+                f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/collections.json",
                 headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
                 params={"limit": limit},
                 timeout=15,
@@ -410,7 +420,7 @@ class ShopifyService:
         import re
 
         products: list[dict] = []
-        url = f"{admin_api_base(store.shop)}/admin/api/2024-10/products.json?limit=250"
+        url = f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/products.json?limit=250"
         async with httpx.AsyncClient() as client:
             while url:
                 resp = await client.get(
@@ -487,7 +497,7 @@ class ShopifyService:
         """Read ALL prodrank metafields for a product (used by ⑨ Verification)."""
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"{admin_api_base(store.shop)}/admin/api/2024-10/products/{product_id}/metafields.json",
+                f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/products/{product_id}/metafields.json",
                 headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
                 params={"namespace": "prodrank"},
                 timeout=15,
@@ -517,7 +527,7 @@ class ShopifyService:
         shop_id = info.get("id")
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"{admin_api_base(store.shop)}/admin/api/2024-10/metafields.json",
+                f"{admin_api_base(store.shop)}/admin/api/{SHOPIFY_API_VERSION}/metafields.json",
                 headers={"X-Shopify-Access-Token": store.access_token, "Content-Type": "application/json"},
                 json={"metafield": {
                     "namespace": "prodrank",

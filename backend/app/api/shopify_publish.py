@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.services.db import DB
-from app.services.shopify_service import ShopifyService, ShopifyStore, admin_api_base
+from app.services.shopify_service import ShopifyService, ShopifyStore, admin_api_base, SHOPIFY_API_VERSION
 from app.services.shopify_ai import ShopifyAIService, build_schema, CATEGORY_RULES
 from app.services.knowledge_templates import detect_subcategory, generate_field_list
 
@@ -81,7 +81,7 @@ async def _fetch_product(shop: str, access_token: str, product_id: int) -> dict:
     """Fetch one product from Shopify (raw Admin API product dict)."""
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{admin_api_base(shop)}/admin/api/2024-10/products/{product_id}.json",
+            f"{admin_api_base(shop)}/admin/api/{SHOPIFY_API_VERSION}/products/{product_id}.json",
             headers={"X-Shopify-Access-Token": access_token, "Content-Type": "application/json"},
             timeout=15,
         )
@@ -143,7 +143,7 @@ async def resolve_product_url(req: ResolveUrlRequest):
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    f"{admin_api_base(domain)}/admin/api/2024-10/products.json",
+                    f"{admin_api_base(domain)}/admin/api/{SHOPIFY_API_VERSION}/products.json",
                     headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
                     params={"handle": handle, "limit": 1}, timeout=15,
                 )
@@ -316,7 +316,7 @@ async def publish(req: PublishRequest):
             if ai_desc:
                 async with httpx.AsyncClient() as client:
                     resp = await client.put(
-                        f"{admin_api_base(req.shop)}/admin/api/2024-10/products/{req.product_id}.json",
+                        f"{admin_api_base(req.shop)}/admin/api/{SHOPIFY_API_VERSION}/products/{req.product_id}.json",
                         headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
                         json={"product": {"id": req.product_id, "body_html": ai_desc}},
                         timeout=15,
@@ -482,7 +482,7 @@ async def rollback(req: RollbackRequest):
             if html:
                 async with httpx.AsyncClient() as client:
                     resp = await client.put(
-                        f"{admin_api_base(req.shop)}/admin/api/2024-10/products/{req.product_id}.json",
+                        f"{admin_api_base(req.shop)}/admin/api/{SHOPIFY_API_VERSION}/products/{req.product_id}.json",
                         headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
                         json={"product": {"id": req.product_id, "body_html": html}},
                         timeout=15,

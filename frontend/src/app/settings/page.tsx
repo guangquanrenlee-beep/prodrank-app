@@ -1,19 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import ShopifyConnect from "@/components/ShopifyConnect";
 
 export default function SettingsPage() {
+  return <Suspense fallback={<main className="min-h-screen flex items-center justify-center bg-zinc-950"><p className="text-zinc-400">Loading…</p></main>}><SettingsContent /></Suspense>;
+}
+
+function SettingsContent() {
   const { user, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const installedShop = searchParams.get("shop") || "";
+  const installError = searchParams.get("error") || "";
   const [email, setEmail] = useState("");
   const [saved, setSaved] = useState(false);
   const [wpDomain, setWpDomain] = useState("");
   const [wpToken, setWpToken] = useState("");
   const [wpConnecting, setWpConnecting] = useState(false);
   const [wpStatus, setWpStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // Strip the install markers from the URL after showing them once.
+  useEffect(() => {
+    if (installedShop || installError) {
+      history.replaceState({}, "", "/settings");
+    }
+  }, [installedShop, installError]);
 
   useEffect(() => {
     if (user?.email) setEmail(user.email);
@@ -52,6 +67,17 @@ export default function SettingsPage() {
       </aside>
       <main className="flex-1 max-w-2xl px-10 py-10 space-y-6">
         <h1 className="text-2xl font-bold">Settings</h1>
+
+        {installedShop && (
+          <div className="bg-emerald-900/30 border border-emerald-700 rounded-xl p-4 text-sm text-emerald-300">
+            ✅ Shopify store connected: <strong>{installedShop}</strong>. Your products are being synced — go to <Link href="/studio" className="underline">AI Studio</Link> to generate content.
+          </div>
+        )}
+        {installError === "denied" && (
+          <div className="bg-amber-900/30 border border-amber-700 rounded-xl p-4 text-sm text-amber-300">
+            ⚠️ Shopify authorization was declined — no changes were made to your store.
+          </div>
+        )}
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
           <h3 className="font-semibold">Account</h3>
@@ -101,7 +127,7 @@ export default function SettingsPage() {
           {/* Shopify */}
           <div className="flex items-center justify-between">
             <div><div className="text-sm text-zinc-200">Shopify</div><div className="text-xs text-zinc-500">Connect your store via OAuth</div></div>
-            <ShopifyConnect shop="yourstore.myshopify.com" className="text-sm text-emerald-400 hover:text-emerald-300">Connect →</ShopifyConnect>
+            <ShopifyConnect shop={installedShop || "yourstore.myshopify.com"} className="text-sm text-emerald-400 hover:text-emerald-300">Connect →</ShopifyConnect>
           </div>
 
           {/* WordPress / WooCommerce — token-based connect */}

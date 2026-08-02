@@ -231,6 +231,30 @@ class DB:
         data = self.client.table("subscriptions").select("*").eq("user_id", user_id).execute().data
         return data[0] if data else None
 
+    # ── GDPR — data deletion (shop/redact webhook) ──
+
+    def delete_shop_data(self, shop: str) -> None:
+        """GDPR shop/redact — purge all data for a shop.
+
+        content_drafts and usage_tracking are keyed by the shop text and have
+        no FKs, so they are deleted explicitly; deleting the sites row
+        cascades to products and everything below them (ai_responses,
+        citations, verifications, etc.). Each step is best-effort so the
+        webhook can still acknowledge with 200.
+        """
+        try:
+            self.client.table("content_drafts").delete().eq("shop", shop).execute()
+        except Exception:
+            pass
+        try:
+            self.client.table("usage_tracking").delete().eq("shop", shop).execute()
+        except Exception:
+            pass
+        try:
+            self.client.table("sites").delete().eq("domain", shop).eq("platform", "shopify").execute()
+        except Exception:
+            pass
+
     # ── AI Content Drafts (⑥ publish + ⑦ rollback versioning) ──
 
     def save_content_draft(self, shop: str, shopify_product_id: str, field: str,
