@@ -30,7 +30,7 @@ function SettingsContent() {
   // input and shows a masked token — no need to re-type after connecting.
   useEffect(() => {
     if (!user) return;
-    supabase.from("sites").select("domain,platform,access_token").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(10)
+    supabase.from("sites").select("id,domain,platform,access_token").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(10)
       .then(({ data }) => {
         const connected = (data || []).filter((s: any) => s.access_token);
         setConnectedSites(connected);
