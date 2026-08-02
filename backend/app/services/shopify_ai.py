@@ -246,7 +246,8 @@ class ShopifyAIService:
                       "hair", "face", "skin", "bath", "soap"],
             "home": ["kitchen", "cook", "bake", "furniture", "decor", "bed", "pillow", "blanket",
                     "towel", "lamp", "light", "rug", "curtain", "storage", "organizer", "home",
-                    "household", "dinner", "plate", "cup", "mug", "pan", "pot", "appliance"],
+                    "household", "dinner", "plate", "cup", "mug", "pan", "pot", "appliance",
+                    "oven", "kettle", "cookware", "dutch", "fry", "knife", "container", "vacuum"],
             "food": ["food", "beverage", "drink", "snack", "coffee", "tea", "chocolate", "candy",
                     "supplement", "vitamin", "protein", "nutrition", "organic", "gluten", "vegan"],
             "sports": ["sport", "fitness", "exercise", "yoga", "gym", "running", "hiking", "camping",
@@ -257,6 +258,10 @@ class ShopifyAIService:
             if score >= 3:     # strong match — 3+ keywords hit
                 return (cat, 95)
             if score >= 1 and cat == "fashion" and any(k in combined for k in ["shirt", "dress", "shoe", "jacket", "pant"]):
+                return (cat, 92)
+            if score >= 1 and cat == "home" and any(k in combined for k in ["oven", "kettle", "cookware", "knife", "dutch", "fry pan", "vacuum"]):
+                return (cat, 92)
+            if score >= 1 and cat == "sports" and any(k in combined for k in ["yoga", "dumbbell", "resistance band", "jump rope", "treadmill", "fitness tracker"]):
                 return (cat, 92)
 
         # AI fallback: let the LLM classify

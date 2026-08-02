@@ -172,6 +172,7 @@ class WooGenerateRequest(BaseModel):
     domain: str
     product_id: int
     fields: list[str] | None = None  # None = four-layer template decides
+    skip_fields: list[str] = []      # fields already on the page (scan) — don't regenerate
 
 
 class WooPublishRequest(BaseModel):
@@ -397,7 +398,7 @@ async def generate_content(req: WooGenerateRequest):
         identity_fields, knowledge_fields, decision_fields, trust_fields = generate_field_list(category, subcategory)
         template_fields = knowledge_fields + decision_fields + trust_fields  # identity read from data, not generated
         requested = req.fields if req.fields else template_fields
-        filtered_fields = [f for f in requested if f in template_fields]
+        filtered_fields = [f for f in requested if f in template_fields and f not in req.skip_fields]
 
         # Step 3: generate with category context
         generated = await ai.generate_fields(synced, filtered_fields, category=category)

@@ -25,6 +25,9 @@ export default function PublishPage() {
   const [genRemaining, setGenRemaining] = useState(MAX);
   const [history, setHistory] = useState<Record<string, any[]> | null>(null);
   const [result, setResult] = useState<any>(null);
+  const [scanResult, setScanResult] = useState<any>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [forceFields, setForceFields] = useState<Set<string>>(new Set()); // "found" fields the merchant wants regenerated anyway
 
   const apiPost = async (path: string, body: any) => {
     setLoading(true); setError("");
@@ -124,9 +127,34 @@ export default function PublishPage() {
     ? { shop: resolved.domain, product_id: resolved.product.id }
     : { domain: resolved.domain, product_id: resolved.product.id };
 
+  /** Scan the live product page first: what info already exists (found),
+   *  what's vague (fuzzy) and what's absent (missing). Only missing + fuzzy
+   *  get generated — "found" fields are skipped unless the merchant opts in. */
+  const handleScan = async () => {
+    if (!resolved) return;
+    setScanLoading(true); setError("");
+    try {
+      const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: resolved.product.url || url.trim() }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "Scan failed");
+      setScanResult(d); setForceFields(new Set());
+    } catch (e: any) { setError(e.message); }
+    finally { setScanLoading(false); }
+  };
+
+  const toggleForce = (field: string) => {
+    setForceFields(prev => {
+      const next = new Set(prev);
+      if (next.has(field)) next.delete(field); else next.add(field);
+      return next;
+    });
+  };
+
   const handleGenerate = async () => {
     if (!resolved) return;
-    const d = await apiPost(apiBase() + "/publish/generate", apiBody());
+    // Skip fields the scan found on the page (unless the merchant forced them)
+    const skipFields = (scanResult?.summary?.found || []).filter((f: string) => !forceFields.has(f));
+    const d = await apiPost(apiBase() + "/publish/generate", { ...apiBody(), skip_fields: skipFields });
     if (!d) return;
     setPreview(d.preview); setEdited({});
     setMissing(d.missing || []);
@@ -191,7 +219,7 @@ export default function PublishPage() {
   };
 
   const fieldLabel = (f: string) =>
-    ({ description: "Description", faq: "FAQ", pros: "Pros", cons: "Cons", comparison: "Comparison", use_cases: "Use Cases", buying_guide: "Buying Guide", specification: "Specifications", ai_summary: "AI Summary" }[f] || f);
+    ({ description: "Description", faq: "FAQ", pros: "Pros", comparison: "Comparison", use_cases: "Use Cases", buying_guide: "Buying Guide", specification: "Specifications", ai_summary: "AI Summary" }[f] || f);
 
   return (
     <main className="min-h-screen bg-zinc-950">
@@ -223,6 +251,41 @@ export default function PublishPage() {
             </div>
           )}
 
+          {/* Scan — what the page already has (pre-generation decision) */}
+          {resolved && !scanResult && (
+            <button onClick={handleScan} disabled={scanLoading} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
+              {scanLoading ? "Scanning page…" : "🔍 Scan page first"}
+            </button>
+          )}
+          {scanResult && (
+            <div className="border border-zinc-800 rounded-xl p-4 space-y-3 bg-zinc-950/50">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-zinc-300 font-semibold">📋 Page scan — only <span className="text-emerald-400">missing</span> + <span className="text-amber-400">fuzzy</span> will be generated</div>
+                <button onClick={() => setScanResult(null)} className="text-xs text-zinc-500 hover:text-zinc-300">✕ dismiss</button>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div className="space-y-1.5">
+                  <div className="text-emerald-400 font-semibold">✅ Already on page ({scanResult.summary.found.length})</div>
+                  {scanResult.summary.found.map((f: string) => (
+                    <label key={f} className="flex items-center gap-1.5 text-zinc-400 cursor-pointer">
+                      <input type="checkbox" checked={forceFields.has(f)} onChange={() => toggleForce(f)} className="accent-emerald-500" />
+                      {fieldLabel(f)} <span className="text-zinc-600">(re-generate?)</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="space-y-1.5">
+                  <div className="text-amber-400 font-semibold">△ Vague ({scanResult.summary.fuzzy.length})</div>
+                  {scanResult.summary.fuzzy.map((f: string) => <div key={f} className="text-zinc-300">• {fieldLabel(f)}</div>)}
+                </div>
+                <div className="space-y-1.5">
+                  <div className="text-red-400 font-semibold">✗ Missing ({scanResult.summary.missing.length})</div>
+                  {scanResult.summary.missing.map((f: string) => <div key={f} className="text-zinc-300">• {fieldLabel(f)}</div>)}
+                </div>
+              </div>
+              {scanResult.category && <p className="text-[11px] text-zinc-600">Category: {scanResult.category.key} {scanResult.subcategory ? `→ ${scanResult.subcategory}` : ""}</p>}
+            </div>
+          )}
+
           <div className="flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
               <input type="checkbox" checked={overwrite} onChange={e => setOverwrite(e.target.checked)} className="accent-emerald-500" />
@@ -250,7 +313,7 @@ export default function PublishPage() {
             ) : (
               <>
                 <button onClick={handleGenerate} disabled={loading || !resolved || genRemaining <= 0} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
-                  {genRemaining <= 0 ? "Limit reached" : loading ? "Generating…" : "1 · Generate Draft"}
+                  {genRemaining <= 0 ? "Limit reached" : loading ? "Generating…" : scanResult ? `1 · Generate missing (${scanResult.summary.missing.length + scanResult.summary.fuzzy.length})` : "1 · Generate Draft"}
                 </button>
                 {genRemaining <= 0 && genUsed > 0 && (
                   <button onClick={handleLoadExisting} disabled={loading} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition">

@@ -44,13 +44,14 @@ class GenerateRequest(BaseModel):
     access_token: str = ""  # optional — resolved from sites table when empty
     product_id: int
     fields: list[str] | None = None  # None = four-layer template decides
+    skip_fields: list[str] = []      # fields already on the page (scan) — don't regenerate
 
 
 class PublishRequest(BaseModel):
     shop: str
     access_token: str = ""
     product_id: int
-    fields: list[str] = ["description", "faq", "pros", "cons", "comparison",
+    fields: list[str] = ["description", "faq", "pros", "comparison",
                          "use_cases", "buying_guide", "specification", "ai_summary"]
     overwrite_description: bool = False  # ⑥ publish rule: description overwrite is OPT-IN only
 
