@@ -25,7 +25,7 @@ function CompetitorsContent() {
     if (!user) return;
     (async () => {
       try {
-        const { data } = await supabase.from("sites").select("domain,platform").eq("user_id", user.id).limit(50);
+        const { data } = await supabase.from("sites").select("id,domain,platform").eq("user_id", user.id).limit(50);
         if (data) { setSites(data); if (!shop && data[0]) setShop(data[0].domain); }
       } catch {}
     })();
