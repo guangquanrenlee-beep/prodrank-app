@@ -231,6 +231,37 @@ class DB:
         data = self.client.table("subscriptions").select("*").eq("user_id", user_id).execute().data
         return data[0] if data else None
 
+    # ── Daily Health Check + Alerts ──
+
+    def save_health_snapshot(self, shop: str, snapshot_date: str, score: int,
+                             product_count: int, details: dict) -> None:
+        """Upsert one day's health snapshot for a shop (regression diffs)."""
+        self.client.table("health_snapshots").upsert({
+            "shop": shop, "snapshot_date": snapshot_date,
+            "score": score, "product_count": product_count,
+            "details": details or {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }, on_conflict="shop,snapshot_date").execute()
+
+    def get_health_snapshots(self, shop: str, limit: int = 30) -> list[dict]:
+        data = (self.client.table("health_snapshots")
+                .select("*").eq("shop", shop).order("snapshot_date", desc=True).limit(limit).execute().data or [])
+        return sorted(data, key=lambda r: r.get("snapshot_date", ""))
+
+    def save_alert(self, shop: str, alert_type: str, message: str,
+                   severity: str = "info", product_id: str = "",
+                   details: dict | None = None) -> None:
+        self.client.table("alerts").insert({
+            "shop": shop, "type": alert_type, "message": message,
+            "severity": severity, "product_id": product_id,
+            "details": details or {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+
+    def get_alerts(self, shop: str, limit: int = 20) -> list[dict]:
+        return (self.client.table("alerts")
+                .select("*").eq("shop", shop).order("created_at", desc=True).limit(limit).execute().data or [])
+
     # ── GDPR — data deletion (shop/redact webhook) ──
 
     def delete_shop_data(self, shop: str) -> None:

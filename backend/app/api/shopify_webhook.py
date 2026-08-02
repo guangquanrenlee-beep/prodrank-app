@@ -57,6 +57,71 @@ async def _lookup_token(shop: str) -> str:
     return ""
 
 
+async def _alert_on_product_change(shop: str, token: str, product_id) -> None:
+    """Event alert — product edited. Compare description length against the
+    latest health snapshot: a big shrink → "Description Too Short" alert."""
+    try:
+        from app.services.health_check import product_metrics_shopify
+        from app.services.db import DB
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{admin_api_base(shop)}/admin/api/{SHOPIFY_API_VERSION}/products/{product_id}.json",
+                headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                return
+            product = resp.json().get("product", {})
+        from app.services.shopify_service import ShopifyService
+        metrics = product_metrics_shopify(ShopifyService().extract_product_sync_data(product, shop))
+
+        db = DB()
+        snapshots = db.get_health_snapshots(shop, limit=1)
+        if not snapshots:
+            return  # no baseline yet — nothing to compare
+        prev = (snapshots[0].get("details") or {}).get(str(product_id))
+        if not prev:
+            return
+        prev_len = prev.get("desc_len", 0)
+        curr_len = metrics["desc_len"]
+        if prev_len >= 100 and curr_len < 100:
+            db.save_alert(shop, "description_shortened", "critical",
+                          f"Description dropped {prev_len}→{curr_len} chars", product_id=str(product_id))
+        elif prev_len and abs(curr_len - prev_len) > 0.5 * prev_len:
+            db.save_alert(shop, "description_changed", "warning",
+                          f"Description changed {prev_len}→{curr_len} chars", product_id=str(product_id))
+    except Exception:
+        pass  # alerts are best-effort; never fail the webhook
+
+
+async def _alert_on_theme_change(shop: str) -> None:
+    """Event alert — theme published. Crawl a product page: if JSON-LD
+    disappeared, flag it (theme update likely removed the blocks)."""
+    try:
+        from app.services.health_check import detect_page_schema, _fetch_page
+        from app.services.db import DB
+
+        db = DB()
+        sites = db.client.table("sites").select("domain").eq("domain", shop).eq("platform", "shopify").limit(1).execute().data
+        if not sites:
+            return
+        # Probe the homepage + one product page if we can find one
+        for url in (f"https://{shop}", f"https://{shop}/products"):
+            html = await _fetch_page(url)
+            if html:
+                page = detect_page_schema(html)
+                if not page["jsonld_types"]:
+                    db.save_alert(shop, "theme_change", "warning",
+                                  "Theme update — no Schema detected on the page; verify your app blocks still render")
+                elif page["faq_count"] == 0:
+                    db.save_alert(shop, "theme_change", "info",
+                                  "Theme update — Schema OK but no FAQPage detected; verify FAQ block")
+                return
+    except Exception:
+        pass
+
+
 async def _sync_product(shop: str, token: str, product_id) -> None:
     """⑧ products/update|create — re-sync one product into Supabase (idempotent)."""
     async with httpx.AsyncClient() as client:
@@ -104,6 +169,7 @@ async def webhook_listener(topic: str, request: Request):
         token = await _lookup_token(shop)
         if product_id and token:
             await _sync_product(shop, token, product_id)
+            await _alert_on_product_change(shop, token, product_id)
         return Response(status_code=200, content="ok")
 
     if topic == "inventory_levels/update":
@@ -118,13 +184,15 @@ async def webhook_listener(topic: str, request: Request):
         return Response(status_code=200, content="ok")
 
     if topic == "themes/publish":
-        # Theme changed → blocks may have been removed; Health Check re-verifies.
+        # Theme changed → blocks may have been removed; alert immediately if
+        # the live product page lost its Schema/FAQ (regression detection).
         try:
             db.client.table("sites").update({
                 "last_theme_change_at": now, "updated_at": now,
             }).eq("domain", shop).eq("platform", "shopify").execute()
         except Exception:
             pass
+        await _alert_on_theme_change(shop)
         return Response(status_code=200, content="ok")
 
     if topic == "app/uninstalled":

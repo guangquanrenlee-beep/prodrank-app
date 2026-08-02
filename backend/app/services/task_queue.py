@@ -74,6 +74,9 @@ class TaskQueue:
                     except Exception as e:
                         results[cat] = {"error": str(e)[:200]}
                 return results
+            elif task["type"] == "daily_health_check":
+                from app.services.health_check import run_daily_health_check
+                return loop.run_until_complete(run_daily_health_check())
             return {"error": "unknown task type"}
         except Exception as e:
             return {"error": str(e)}

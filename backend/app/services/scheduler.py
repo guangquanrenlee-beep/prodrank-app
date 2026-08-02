@@ -28,6 +28,12 @@ def run_pending():
         from app.services.data_collector import CATEGORY_CONFIG
         queue.enqueue("collect_questions", {"categories": list(CATEGORY_CONFIG.keys())})
 
+    # Daily AI Health Check (once per day, ~2am local)
+    if jobs.get("last_health") != today:
+        jobs["last_health"] = today
+        with open(daily_file, "w") as f: json.dump(jobs, f)
+        queue.enqueue("daily_health_check", {})
+
 def add_daily_keyword(brand: str, keyword: str):
     """Register a keyword for daily auto-tracking."""
     daily_file = os.path.join(os.path.dirname(__file__), "..", "..", "data", "daily_jobs.json")

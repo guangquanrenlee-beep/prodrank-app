@@ -61,6 +61,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [sites, setSites] = useState<any[]>([]);
+  const [healthTrend, setHealthTrend] = useState<any[]>([]);
+  const [healthDelta, setHealthDelta] = useState<number | null>(null);
+  const [healthSummary, setHealthSummary] = useState("");
+  const [healthAlerts, setHealthAlerts] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [scoreHistory, setScoreHistory] = useState<{date:string;score:number}[]>([]);
   const [scoreTrend, setScoreTrend] = useState<"up"|"down"|"flat">("flat");
@@ -132,7 +136,23 @@ export default function DashboardPage() {
       setCms({ domain: last.domain, platform: last.platform || "unknown", confidence: last.platform_confidence || 0, recommended_action: "Previously analyzed.", auth_method: last.auth_method || "plugin" });
       if (last.score_data) setScore(last.score_data as ScoreData);
       else if (last.ai_visibility_score) setScore({ ai_visibility_score: last.ai_visibility_score, label: last.ai_visibility_score >= 60 ? "Good" : "Poor", breakdown: {}, recommendation: "" });
+      loadHealth(last.domain);
     }
+  };
+
+  /** Health Check trend + alerts for the active store. */
+  const loadHealth = async (shop: string) => {
+    try {
+      const r = await fetch(`/api/health-check?domain=${encodeURIComponent(shop)}`);
+      if (r.ok) {
+        const d = await r.json();
+        setHealthTrend(d.trend || []);
+        setHealthDelta(d.delta ?? null);
+        setHealthSummary(d.summary || "");
+      }
+      const a = await fetch(`/api/alerts?domain=${encodeURIComponent(shop)}`);
+      if (a.ok) setHealthAlerts((await a.json()).alerts || []);
+    } catch { /* health feed is best-effort */ }
   };
 
   const saveScoreToDB = async (cleanDomain: string, sd: ScoreData) => {
@@ -353,6 +373,54 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* ── ROW 4.5: Health Check + Alerts ── */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-sm">🩺 Daily Health Check</h3>
+                    <Link href="/health" className="text-xs text-emerald-400 hover:text-emerald-300">Details →</Link>
+                  </div>
+                  {healthTrend.length > 0 ? (
+                    <>
+                      <div className="flex items-end gap-1.5 h-16 mb-3">
+                        {healthTrend.map((h: any) => (
+                          <div key={h.date} title={`${h.date}: ${h.score}`}
+                               className={`flex-1 rounded-t ${sc(h.score)} bg-current opacity-80`}
+                               style={{ height: `${Math.max(8, (h.score || 0))}%` }} />
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-zinc-400">Score <strong className={sc(healthTrend[healthTrend.length - 1]?.score || 0)}>{healthTrend[healthTrend.length - 1]?.score ?? "—"}</strong></span>
+                        <span className={`text-xs font-bold ${(healthDelta || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          {healthDelta === null ? "" : healthDelta >= 0 ? `▲ +${healthDelta}` : `▼ ${healthDelta}`}
+                        </span>
+                      </div>
+                      {healthSummary && <p className="text-xs text-zinc-500 mt-2">{healthSummary}</p>}
+                    </>
+                  ) : (
+                    <p className="text-sm text-zinc-600">No snapshots yet — the daily check runs at ~2am (or visit /health to run it now).</p>
+                  )}
+                </div>
+
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-sm">⚠️ Alerts</h3>
+                    <Link href="/health" className="text-xs text-emerald-400 hover:text-emerald-300">All →</Link>
+                  </div>
+                  {healthAlerts.length > 0 ? (
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {healthAlerts.slice(0, 6).map((a: any) => (
+                        <div key={a.id} className={`text-xs rounded-lg px-3 py-2 ${a.severity === "critical" ? "bg-red-900/20 border border-red-800/40 text-red-300" : a.severity === "warning" ? "bg-amber-900/20 border border-amber-800/40 text-amber-300" : "bg-zinc-800/50 text-zinc-400"}`}>
+                          {a.severity === "critical" ? "🔴" : a.severity === "warning" ? "🟡" : "🔵"} {a.message}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-600">No alerts. All quiet.</p>
+                  )}
+                </div>
+              </div>
 
               {/* ── ROW 5: Products Summary + Trend ── */}
               <div className="grid grid-cols-2 gap-4">
