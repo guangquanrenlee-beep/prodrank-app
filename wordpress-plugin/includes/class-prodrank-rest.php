@@ -106,6 +106,7 @@ class ProdRank_REST {
             $out[] = [
                 'id'    => $p->get_id(),
                 'title' => $p->get_name(),
+                'description' => wp_strip_all_tags($p->get_description()),
                 'price' => $p->get_price(),
                 'sku'   => $p->get_sku(),
                 'brand' => $p->get_attribute('brand') ?: '',

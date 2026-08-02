@@ -45,26 +45,32 @@ export default function PublishPage() {
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchResult, setBatchResult] = useState<any>(null);
 
+  // Keep the port! new URL(...).hostname strips it (localhost:8081 → localhost),
+  // which breaks local testing — .host preserves it (production domains have no port).
+  const shopHost = () => new URL(url.startsWith("http") ? url : "https://" + url).host;
+
   const handleBatchGroups = async () => {
     if (!url.trim()) { setError("Enter your store URL first (any product page works)."); return; }
     setBatchLoading(true); setError("");
-    const d = await apiPost("/api/batch/groups", { shop: new URL(url.startsWith("http") ? url : "https://" + url).hostname, platform });
+    const d = await apiPost("/api/batch/groups", { shop: shopHost(), platform });
     if (d) setBatchGroups(d);
     setBatchLoading(false);
   };
 
   const handleTemplate = async (category: string, sampleId: string) => {
     setBatchLoading(true); setError("");
-    const shop = new URL(url.startsWith("http") ? url : "https://" + url).hostname;
-    const d = await apiPost("/api/batch/generate-template", { shop, platform, category, sample_id: String(sampleId) });
+    const d = await apiPost("/api/batch/generate-template", { shop: shopHost(), platform, category, sample_id: String(sampleId) });
     if (d) setBatchResult(d);
     setBatchLoading(false);
   };
 
   const handleApply = async (category: string) => {
     setBatchLoading(true); setError("");
-    const shop = new URL(url.startsWith("http") ? url : "https://" + url).hostname;
-    const d = await apiPost("/api/batch/apply", { shop, platform, category });
+    // Pass the exact product ids from the grouping, so apply targets the same
+    // set (re-detection on apply would re-classify and skip products).
+    const group = batchGroups?.groups?.find((g: any) => g.category === category);
+    const ids = (group?.products || []).map((p: any) => p.id).filter(Boolean);
+    const d = await apiPost("/api/batch/apply", { shop: shopHost(), platform, category, product_ids: ids });
     if (d) setBatchResult(d);
     setBatchLoading(false);
   };

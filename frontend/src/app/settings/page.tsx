@@ -26,10 +26,20 @@ function SettingsContent() {
 
   // Show the user's actually-connected stores (so a fresh page load doesn't
   // look like the connection was lost — the inputs are just local state).
+  // The first connected WooCommerce/WordPress store pre-fills the domain
+  // input and shows a masked token — no need to re-type after connecting.
   useEffect(() => {
     if (!user) return;
     supabase.from("sites").select("domain,platform,access_token").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(10)
-      .then(({ data }) => setConnectedSites((data || []).filter((s: any) => s.access_token)));
+      .then(({ data }) => {
+        const connected = (data || []).filter((s: any) => s.access_token);
+        setConnectedSites(connected);
+        const wp = connected.find((s: any) => s.platform === "woocommerce" || s.platform === "wordpress");
+        if (wp && !wpDomain) {
+          setWpDomain(wp.domain);
+          setWpToken(wp.access_token); // pre-fill: re-connecting stays a one-click op
+        }
+      });
   }, [user]);
 
   // Strip the install markers from the URL after showing them once.

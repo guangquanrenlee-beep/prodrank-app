@@ -223,6 +223,7 @@ def _extract_woo_product(p: dict) -> dict:
     """Normalize a plugin product payload into the shared sync shape used by
     ShopifyAIService.generate_fields + build_schema."""
     return {
+        "id": str(p.get("id", "")),
         "title": p.get("title", ""),
         "description": (p.get("description") or "")[:3000],
         "price": str(p.get("price", "")),

@@ -132,6 +132,11 @@ async def generate_template(req: TemplateRequest):
         if "error" in generated:
             raise HTTPException(status_code=500, detail=generated["error"])
 
+        # Fallback: if the model ignored the placeholder rule and wrote the
+        # sample's concrete values, swap them back to placeholders so apply
+        # substitutes per product instead of copying the sample everywhere.
+        generated = _unsubstitute(generated, sample)
+
         # Store template in content_drafts under product_id "template:{category}"
         db = DB()
         versions: dict[str, int] = {}
@@ -174,6 +179,35 @@ def _substitute(content, product: dict) -> dict:
             return (value.replace("{{product_name}}", name)
                         .replace("{{price}}", price)
                         .replace("{{brand}}", brand))
+        if isinstance(value, dict):
+            return {k: repl(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [repl(v) for v in value]
+        return value
+
+    return repl(content)
+
+
+def _unsubstitute(content: dict, sample: dict) -> dict:
+    """Swap the sample's concrete values back to placeholders — safety net for
+    when the LLM ignores template_mode and writes the sample product's name /
+    price / brand into the template."""
+    name = sample.get("title", "")
+    price = str(sample.get("price", ""))
+    brand = sample.get("brand") or sample.get("vendor") or ""
+    if not name and not price and not brand:
+        return content
+
+    def repl(value):
+        if isinstance(value, str):
+            out = value
+            if name and len(name) >= 4:
+                out = out.replace(name, "{{product_name}}")
+            if price:
+                out = out.replace(price, "{{price}}")
+            if brand and len(brand) >= 2:
+                out = out.replace(brand, "{{brand}}")
+            return out
         if isinstance(value, dict):
             return {k: repl(v) for k, v in value.items()}
         if isinstance(value, list):

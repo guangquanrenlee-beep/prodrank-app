@@ -237,13 +237,16 @@ class ShopifyAIService:
         keyword_map: dict[str, list[str]] = {
             "fashion": ["cloth", "shirt", "t-shirt", "dress", "pant", "jean", "jacket", "coat", "shoe",
                         "sneaker", "hoodie", "sweater", "skirt", "top", "bottom", "apparel", "wear",
-                        "fashion", "hat", "cap", "scarf", "belt", "sock", "underwear", "swim"],
+                        "fashion", "hat", "cap", "scarf", "belt", "sock", "underwear", "swim",
+                        "bag", "backpack", "wallet", "purse", "handbag", "tote", "clutch"],
             "electronics": ["electronic", "gadget", "phone", "laptop", "tablet", "camera", "speaker",
                            "headphone", "charger", "cable", "adapter", "monitor", "keyboard", "mouse",
                            "watch", "tv", "television", "audio", "computer", "usb", "hdmi"],
             "beauty": ["cosmetic", "makeup", "skincare", "cream", "serum", "lotion", "shampoo",
                       "conditioner", "perfume", "fragrance", "nail", "lipstick", "mascara", "beauty",
-                      "hair", "face", "skin", "bath", "soap"],
+                      "hair", "face", "skin", "bath", "soap",
+                      "serum", "moisturizer", "cleanser", "mask", "sunscreen", "retinol",
+                      "lipstick", "lip", "eye", "patch", "wash"],
             "home": ["kitchen", "cook", "bake", "furniture", "decor", "bed", "pillow", "blanket",
                     "towel", "lamp", "light", "rug", "curtain", "storage", "organizer", "home",
                     "household", "dinner", "plate", "cup", "mug", "pan", "pot", "appliance",
@@ -371,20 +374,30 @@ FIELDS TO GENERATE ({len(fields)}):
 Return ONLY valid JSON (no markdown, no explanation), an object with one key per field:
 {{"{fields[0]}": {{...}}, ...}}"""
 
-        try:
-            resp = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.6,
-                max_tokens=6000,
-                timeout=45.0,
-            )
-            text = (resp.choices[0].message.content or "").strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1].split("```")[0].strip()
-            data = json.loads(text)
-        except Exception as e:
-            return {"error": f"AI generation failed: {str(e)[:200]}"}
+        data: dict = {}
+        last_error = ""
+        for attempt in range(2):  # LLM hiccups — retry once
+            try:
+                resp = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.6,
+                    max_tokens=6000,
+                    timeout=45.0,
+                )
+                text = (resp.choices[0].message.content or "").strip()
+                if text.startswith("```"):
+                    text = text.split("\n", 1)[1].split("```")[0].strip()
+                # Robust JSON extraction: first { … last }
+                start, end = text.find("{"), text.rfind("}")
+                if start != -1 and end > start:
+                    text = text[start:end + 1]
+                data = json.loads(text)
+                break
+            except Exception as e:
+                last_error = str(e)[:200]
+        else:
+            return {"error": f"AI generation failed: {last_error}"}
 
         out: dict = {}
         for f in fields:
