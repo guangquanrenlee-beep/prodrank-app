@@ -235,15 +235,21 @@ def _extract_woo_product(p: dict) -> dict:
     }
 
 
+# httpx does NOT follow redirects by default — merchants often connect via
+# www.myshop.com while the site 301s to myshop.com (or vice versa). Follow
+# redirects so the www/no-www variant always works.
+_HTTP = {"timeout": 25, "follow_redirects": True}
+
+
 async def _plugin_get(domain: str, path: str, **params):
-    async with httpx.AsyncClient(timeout=25) as client:
+    async with httpx.AsyncClient(**_HTTP) as client:
         resp = await client.get(f"{_plugin_base(domain)}{path}", headers=await _plugin_headers(domain), params=params)
         resp.raise_for_status()
         return resp.json()
 
 
 async def _plugin_post(domain: str, path: str, body: dict):
-    async with httpx.AsyncClient(timeout=25) as client:
+    async with httpx.AsyncClient(**_HTTP) as client:
         resp = await client.post(f"{_plugin_base(domain)}{path}", headers=await _plugin_headers(domain), json=body)
         resp.raise_for_status()
         return resp.json()
@@ -266,7 +272,7 @@ async def connect(req: WooConnectRequest):
     """Save the plugin API token and verify it works by calling plugin /status."""
     domain = req.domain.strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = await client.get(
                 f"{_plugin_base(domain)}/status",
                 headers={"X-ProdRank-Token": req.api_token},
