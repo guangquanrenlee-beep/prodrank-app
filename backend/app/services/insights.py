@@ -44,7 +44,7 @@ def _collect_signals(shop: str) -> dict:
     return signals
 
 
-def _summarize(signals: dict, shop: str) -> str:
+async def _summarize(signals: dict, shop: str) -> str:
     """One DeepSeek call → 2-3 actionable sentences."""
     from app.services.ai_query import AIQueryService
     ai = AIQueryService()
@@ -54,7 +54,7 @@ def _summarize(signals: dict, shop: str) -> str:
         "Write 2-3 short, concrete sentences (plain text, no markdown): what looks good, "
         "what regressed, and ONE specific action for this week. Be specific with numbers."
     )
-    raw = ai.query_cheap(prompt, max_tokens=300)
+    raw = await ai.query_cheap(prompt, max_tokens=300)
     return raw or "No signals yet — data collects automatically."
 
 
@@ -63,7 +63,7 @@ async def generate_insight(shop: str) -> dict:
     db = DB()
     today = date.today().isoformat()
     signals = _collect_signals(shop)
-    content = _summarize(signals, shop)
+    content = await _summarize(signals, shop)
     db.client.table("ai_insights").upsert({
         "shop": shop, "insight_date": today, "content": content,
         "created_at": datetime.now(timezone.utc).isoformat(),
