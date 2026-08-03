@@ -19,7 +19,7 @@ async def _background_worker():
     from app.services.scheduler import run_pending
     while True:
         try:
-            run_pending()
+            await run_pending()
         except Exception as e:
             print(f"[worker] {e}")
         await asyncio.sleep(1800)

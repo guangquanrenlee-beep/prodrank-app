@@ -2,10 +2,10 @@
 import json, time, os
 from app.services.task_queue import TaskQueue
 
-def run_pending():
+async def run_pending():
     """Called periodically by the in-app worker. Processes task queue and daily jobs."""
     queue = TaskQueue()
-    queue.process_pending()
+    await queue.process_pending()
 
     # Check if daily jobs need to run (once per day per keyword)
     daily_file = os.path.join(os.path.dirname(__file__), "..", "..", "data", "daily_jobs.json")
