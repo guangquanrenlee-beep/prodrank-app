@@ -2,6 +2,13 @@
 
 AI Agent Commerce SEO — 监控和优化产品在 ChatGPT/Gemini/Claude/Grok 中的可见性。商家通过 Shopify App / WordPress 插件接入，SaaS 侧生成 GEO 内容并追踪 AI 推荐。
 
+## 编码基本规则（改代码前必读）
+
+- 弹窗：点击内容区绝不关（只有点遮罩本身+未拖动）；请求必须有超时；loading 必须能复位；输入/连接状态持久化不丢
+- 域名解析保留端口（URL.hostname 是坑）；服务器间请求 follow_redirects；uuid 列传 NULL 不传空串；async 上下文绝不 new_event_loop
+- 数据不编造（API 拿不到标未检测到，AI 缺字段返回 missing）；花钱端点必须鉴权+限速；密钥只进 .env；LLM 调用兜底+重试
+- 内容边界见 `docs/product-content-boundaries.md`；导航放模块不放功能（自动任务不进菜单）；dashboard 内容只增不减；Cons 永不生成；生成前先扫描
+
 ## 怎么跑起来
 
 ```bash
