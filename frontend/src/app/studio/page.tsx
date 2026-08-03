@@ -239,7 +239,7 @@ function PublishContent() {
       <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
         <div>
           <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 text-sm">← Dashboard</Link>
-          <h1 className="text-3xl font-bold mt-1">AI Content Studio</h1>
+          <h1 className="text-3xl font-bold mt-1">AI Optimization</h1>
           <p className="text-zinc-500 text-sm mt-1">Paste a product URL → AI generates → you review & publish. <span className="text-zinc-600">Max {MAX} generations per product. Connect your store in Settings first.</span></p>
         </div>
 

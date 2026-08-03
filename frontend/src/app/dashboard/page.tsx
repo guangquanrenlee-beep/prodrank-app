@@ -12,21 +12,18 @@ interface ScoreData {
   recommendation: string; analyzed_at?: string; title?: string;
 }
 
+// Modules, not features: auto-running jobs (health check, alerts, weekly
+// report, competitor/citation watch) live inside these modules — never as
+// their own menu items. Pages removed from the nav still exist at their URLs.
 const NAV = [
+  { label: "Dashboard", href: "/dashboard", icon: "📊" },
   { label: "Products", href: "/products", icon: "📦" },
-  { label: "Knowledge Graph", href: "/knowledge-graph", icon: "🧠" },
-  { label: "Knowledge Base", href: "/knowledge-base", icon: "📚" },
+  { label: "AI Optimization", href: "/studio", icon: "🎯" },
+  { label: "Monitoring", href: "/monitoring", icon: "📈" },
+  { label: "Competitors", href: "/competitors", icon: "⚔️" },
   { label: "Citation Intelligence", href: "/cite", icon: "📰" },
-  { label: "Competitors", href: "/compare", icon: "⚔️" },
-  { label: "Social Listening", href: "/social-listening", icon: "👂" },
-  { label: "Source Marketplace", href: "/marketplace", icon: "🏪" },
-  { label: "Action Center", href: "/actions", icon: "⚡" },
-  { label: "Optimization Center", href: "/optimize", icon: "🔧" },
-  { label: "Install Store", href: "/install", icon: "🔌" },
-  { label: "AI Studio", href: "/studio", icon: "✍️" },
-  { label: "Verification", href: "/verify", icon: "📈" },
-  { label: "Monitoring", href: "/monitoring", icon: "📡" },
-  { label: "Reports", href: "/reports", icon: "📊" },
+  { label: "Verification", href: "/verify", icon: "✅" },
+  { label: "Reports", href: "/reports", icon: "📄" },
   { label: "Integrations", href: "/integrations", icon: "🔌" },
   { label: "Settings", href: "/settings", icon: "⚙️" },
 ];
@@ -266,6 +263,9 @@ export default function DashboardPage() {
               <span>{item.icon}</span>{sidebarOpen && <span>{item.label}</span>}
             </Link>
           ))}
+          <Link href="/install" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300 transition">
+            <span>🔌</span>{sidebarOpen && <span>Install Store</span>}
+          </Link>
         </nav>
         <div className="p-4 border-t border-zinc-800">
           <div className="flex items-center gap-2 text-sm text-zinc-400"><span className="w-2 h-2 rounded-full bg-emerald-500" />{user.email?.split("@")[0]}</div>
