@@ -22,7 +22,27 @@ function SettingsContent() {
   const [wpToken, setWpToken] = useState("");
   const [wpConnecting, setWpConnecting] = useState(false);
   const [wpStatus, setWpStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [customDomain, setCustomDomain] = useState("");
+  const [customToken, setCustomToken] = useState("");
+  const [customConnecting, setCustomConnecting] = useState(false);
+  const [customStatus, setCustomStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [connectedSites, setConnectedSites] = useState<any[]>([]);
+
+  const handleCustomConnect = async () => {
+    if (!customDomain.trim() || !customToken.trim()) return;
+    setCustomConnecting(true); setCustomStatus(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch("/api/custom/connect", {
+        method: "POST", headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ domain: customDomain.trim(), api_token: customToken.trim() }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) setCustomStatus({ ok: true, msg: `Connected to ${d.store_name || d.domain} — ${d.product_count || 0} products synced` });
+      else setCustomStatus({ ok: false, msg: d.detail || d.message || `Connection failed (${r.status})` });
+    } catch { setCustomStatus({ ok: false, msg: "Network error — is the store running?" }); }
+    finally { setCustomConnecting(false); }
+  };
 
   // Show the user's actually-connected stores (so a fresh page load doesn't
   // look like the connection was lost — the inputs are just local state).
@@ -147,6 +167,19 @@ function SettingsContent() {
           <div className="flex items-center justify-between">
             <div><div className="text-sm text-zinc-200">Shopify</div><div className="text-xs text-zinc-500">Connect your store via OAuth</div></div>
             <ShopifyConnect shop={installedShop || "yourstore.myshopify.com"} className="text-sm text-emerald-400 hover:text-emerald-300">Connect →</ShopifyConnect>
+          </div>
+
+          {/* Custom API — standalone store connect */}
+          <div className="border-t border-zinc-800 pt-3 space-y-3">
+            <div><div className="text-sm text-zinc-200">Custom API Store</div><div className="text-xs text-zinc-500">Connect any standalone store that exposes the ProdRank API protocol (BaiHuoZhan, custom Next.js stores, etc.)</div></div>
+            <div className="grid grid-cols-2 gap-2">
+              <input value={customDomain} onChange={e => setCustomDomain(e.target.value)} placeholder="localhost:3000" className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              <input value={customToken} onChange={e => setCustomToken(e.target.value)} placeholder="API token" className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+            <button onClick={handleCustomConnect} disabled={customConnecting} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
+              {customConnecting ? "Connecting…" : "Connect"}
+            </button>
+            {customStatus && <div className={`text-xs ${customStatus.ok ? "text-emerald-400" : "text-red-400"}`}>{customStatus.msg}</div>}
           </div>
 
           {/* WordPress / WooCommerce — token-based connect */}

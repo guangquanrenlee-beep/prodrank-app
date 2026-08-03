@@ -7,7 +7,7 @@ import Link from "next/link";
 const MAX = 3;
 const DEFAULT_FIELDS = ["description", "faq", "pros", "comparison", "use_cases", "specification", "ai_summary"];
 
-type Step = "idle" | "resolving" | "generating" | "preview" | "history" | "publishing" | "published" | "verified";
+type Step = "idle" | "resolving" | "generating" | "preview" | "history" | "publishing" | "published" | "verified" | "testing";
 
 export default function PublishPage() {
   return <Suspense fallback={<main className="min-h-screen flex items-center justify-center bg-zinc-950"><p className="text-zinc-400">Loading…</p></main>}><PublishContent /></Suspense>;
@@ -35,6 +35,11 @@ function PublishContent() {
   const [scanResult, setScanResult] = useState<any>(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [forceFields, setForceFields] = useState<Set<string>>(new Set()); // "found" fields the merchant wants regenerated anyway
+
+  // ── AI Recommendation Test ──
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testCategory, setTestCategory] = useState(""); // detected from product
 
   const apiPost = async (path: string, body: any, timeoutMs = 120000) => {
     setLoading(true); setError("");
@@ -96,7 +101,7 @@ function PublishContent() {
   };
 
   // ── Resolve URL ──
-  const platform = url.includes("myshopify.com") ? "shopify" : "woocommerce";
+  const platform = url.includes("myshopify.com") ? "shopify" : url.includes("localhost") || resolved?._platform === "custom" ? "custom" : "woocommerce";
 
   const handleResolve = async () => {
     const apiPath = platform === "shopify"
@@ -148,7 +153,7 @@ function PublishContent() {
   };
 
   // ── Generate ──
-  const apiBase = () => resolved?._platform === "shopify" ? "/api/shopify" : "/api/woocommerce";
+  const apiBase = () => resolved?._platform === "shopify" ? "/api/shopify" : resolved?._platform === "custom" ? "/api/custom" : "/api/woocommerce";
   const apiBody = () => resolved?._platform === "shopify"
     ? { shop: resolved.domain, product_id: resolved.product.id }
     : { domain: resolved.domain, product_id: resolved.product.id };
@@ -216,6 +221,29 @@ function PublishContent() {
     const d = await apiPost(apiBase() + "/verify",
       apiBody());
     if (d) { setResult(d); setStep("verified"); }
+  };
+
+  const handleAITest = async () => {
+    if (!resolved) return;
+    setTestLoading(true); setError("");
+    setStep("testing");
+    const brand = resolved.product?.vendor || resolved.product?.brand || resolved.domain?.split(".")[0] || "Test Brand";
+    const r = await fetch("/api/test/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        domain: resolved.domain,
+        brand_name: brand,
+        category: testCategory || "",
+        product_id: resolved.product?.id || null,
+        query_count: 30,
+        models: ["deepseek"],
+      }),
+    });
+    const d = await r.json();
+    if (r.ok) setTestResult(d);
+    else setError(d.detail || d.message || "Test failed");
+    setTestLoading(false);
   };
 
   const handleHistory = async () => {
@@ -334,6 +362,9 @@ function PublishContent() {
                 </button>
                 <button onClick={handleVerify} className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition">
                   3 · Verify
+                </button>
+                <button onClick={handleAITest} disabled={testLoading} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
+                  {testLoading ? "Testing…" : "4 · AI Test"}
                 </button>
               </>
             ) : (
@@ -467,6 +498,114 @@ function PublishContent() {
           <div className="bg-zinc-900 border border-emerald-800 rounded-xl p-5">
             <h2 className="font-semibold text-emerald-400 mb-3">{step === "verified" ? "✅ Verified" : "📦 Published"}</h2>
             <pre className="text-xs text-zinc-300 whitespace-pre-wrap max-h-80 overflow-y-auto">{JSON.stringify(result, null, 2)}</pre>
+          </div>
+        )}
+
+        {/* AI Recommendation Test Results */}
+        {(step === "testing" || testResult) && (
+          <div className="bg-zinc-900 border border-purple-800 rounded-xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-purple-400 text-lg">🧠 AI Recommendation Test</h2>
+              {testResult && (
+                <button onClick={handleAITest} disabled={testLoading} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white text-xs rounded-lg">
+                  {testLoading ? "…" : "Re-test"}
+                </button>
+              )}
+            </div>
+
+            {testLoading && (
+              <div className="text-center py-8">
+                <div className="animate-spin w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full mx-auto mb-3" />
+                <p className="text-zinc-400 text-sm">Testing AI recommendations across {30} shopping queries…</p>
+                <p className="text-zinc-600 text-xs mt-1">Asking DeepSeek to recommend products for each query</p>
+              </div>
+            )}
+
+            {testResult && !testLoading && (
+              <>
+                {/* Recommendation Rate */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-purple-400">{testResult.recommendation_rate}%</div>
+                    <div className="text-xs text-zinc-500 mt-1">Recommendation Rate</div>
+                  </div>
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-zinc-300">{testResult.total_queries}</div>
+                    <div className="text-xs text-zinc-500 mt-1">Queries Tested</div>
+                  </div>
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-emerald-400">{testResult.by_model?.deepseek?.recommended || 0}</div>
+                    <div className="text-xs text-zinc-500 mt-1">Times Recommended</div>
+                  </div>
+                </div>
+
+                {/* Per-model breakdown */}
+                {testResult.by_model && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-zinc-500 font-medium">By Model</p>
+                    {Object.entries(testResult.by_model).map(([model, data]: [string, any]) => (
+                      <div key={model} className="flex items-center gap-3 bg-zinc-950 rounded-lg px-3 py-2">
+                        <span className="text-sm text-zinc-300 capitalize w-20">{model}</span>
+                        <div className="flex-1 bg-zinc-800 rounded-full h-3 overflow-hidden">
+                          <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${data.rate || 0}%` }} />
+                        </div>
+                        <span className="text-sm text-zinc-400 w-16 text-right">{data.rate || 0}%</span>
+                        <span className="text-xs text-zinc-600">{data.recommended}/{data.total}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Top mentioned competitors */}
+                {testResult.results && testResult.results.length > 0 && (
+                  <div>
+                    <p className="text-xs text-zinc-500 font-medium mb-2">Top Brands AI Recommended</p>
+                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                      {(() => {
+                        const brandCounts: Record<string, number> = {};
+                        testResult.results.forEach((r: any) => {
+                          (r.mentioned_brands || []).forEach((b: string) => {
+                            const name = b.split(" ").slice(0, 2).join(" "); // first 2 words
+                            brandCounts[name] = (brandCounts[name] || 0) + 1;
+                          });
+                        });
+                        return Object.entries(brandCounts)
+                          .sort(([, a], [, b]) => (b as number) - (a as number))
+                          .slice(0, 15)
+                          .map(([brand, count]) => (
+                            <span key={brand} className="text-[10px] bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-400">
+                              {brand} <span className="text-purple-400">×{count as number}</span>
+                            </span>
+                          ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sample responses */}
+                <details className="text-xs">
+                  <summary className="text-zinc-500 cursor-pointer hover:text-zinc-400">View sample AI responses</summary>
+                  <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
+                    {testResult.results?.slice(0, 10).map((r: any, i: number) => (
+                      <div key={i} className="bg-zinc-950 border border-zinc-800 rounded p-2">
+                        <p className="text-zinc-400 font-medium">Q: {r.query}</p>
+                        <p className="text-zinc-600 mt-0.5">{r.answer?.slice(0, 150) || "(no response)"}</p>
+                        {r.mentioned_brands?.length > 0 && (
+                          <p className="text-purple-400 mt-1">Brands: {r.mentioned_brands.slice(0, 5).join(", ")}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </>
+            )}
+
+            {!testResult && !testLoading && (
+              <div className="text-center py-6">
+                <p className="text-zinc-500 text-sm">Run an AI recommendation test to see how often your brand appears in AI shopping recommendations.</p>
+                <p className="text-zinc-600 text-xs mt-1">Tests {30} real shopping queries against DeepSeek — costs &lt;$0.01</p>
+              </div>
+            )}
           </div>
         )}
 

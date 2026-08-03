@@ -54,6 +54,7 @@ services:
       - wp_data:/var/www/html
       - ../../wordpress-plugin:/var/www/html/wp-content/plugins/prodrank-ai-seo
       - ./setup.sh:/setup.sh
+      - ./add-products.sh:/add-products.sh
     entrypoint: ["sh", "/setup.sh"]
     restart: "no"
 
