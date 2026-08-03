@@ -8,15 +8,22 @@ Plan quotas (subscriptions table by user — unbound stores default to free):
   free: 3 / month   pro: 50   growth: 200   agency: 500
 """
 
+import os
 from datetime import datetime, timezone
 
 from app.services.db import DB
+
+# Owner account(s) — plan 'unlimited' bypasses monthly quotas, store limits
+# and per-product caps. The default covers the product owner; extend via the
+# OWNER_USER_IDS env var (comma-separated Supabase user ids) if needed.
+OWNER_USER_IDS = {u for u in os.getenv("OWNER_USER_IDS", "d51447f9-0f8d-4bc0-95aa-a9b47f671201").split(",") if u}
 
 PLAN_QUOTAS: dict[str, int] = {
     "free": 3,
     "pro": 50,
     "growth": 200,
     "agency": 500,
+    "unlimited": 999999,  # owner account — effectively unlimited
 }
 
 # Max stores a user may connect per plan (multi-store is a paid feature).
@@ -25,6 +32,7 @@ SITE_LIMITS: dict[str, int] = {
     "pro": 1,
     "growth": 3,
     "agency": 10,
+    "unlimited": 999,
 }
 
 DEFAULT_PLAN = "free"
@@ -44,6 +52,8 @@ def _plan_for_shop(shop: str) -> str:
         user_id = sites[0].get("user_id") if sites else None
         if not user_id:
             return DEFAULT_PLAN
+        if user_id in OWNER_USER_IDS:
+            return "unlimited"
         subs = db.client.table("subscriptions").select("plan").eq("user_id", user_id).limit(1).execute().data
         if subs and subs[0].get("plan"):
             return subs[0]["plan"]
@@ -60,6 +70,8 @@ def quota_for_shop(shop: str) -> tuple[str, int]:
 
 def plan_for_user(user_id: str) -> str:
     """Resolve a user's plan from their subscription (defaults to free)."""
+    if user_id in OWNER_USER_IDS:
+        return "unlimited"
     try:
         db = DB()
         subs = db.client.table("subscriptions").select("plan").eq("user_id", user_id).limit(1).execute().data

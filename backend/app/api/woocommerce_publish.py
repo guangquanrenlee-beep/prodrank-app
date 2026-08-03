@@ -377,6 +377,11 @@ async def sync(req: WooSyncRequest):
 
 MAX_GENERATIONS = 3
 
+def _is_unlimited(shop: str) -> bool:
+    """Owner account bypass — plan 'unlimited' skips per-product caps."""
+    from app.services.usage import plan_for_user, _plan_for_shop
+    return _plan_for_shop(shop) == "unlimited"
+
 
 def _layer_of(field: str, knowledge: list[str], decision: list[str], trust: list[str]) -> str:
     if field in knowledge:
@@ -394,7 +399,7 @@ async def generate_content(req: WooGenerateRequest):
     try:
         db = DB()
         count = db.count_generations(req.domain, str(req.product_id))
-        if count >= MAX_GENERATIONS:
+        if not _is_unlimited(req.domain) and count >= MAX_GENERATIONS:
             raise HTTPException(status_code=429, detail=f"Limit reached: {MAX_GENERATIONS} AI generations per product. Please edit your existing draft manually.")
 
         # Account-level monthly quota (anti-abuse)
@@ -435,7 +440,7 @@ async def generate_content(req: WooGenerateRequest):
                 shop=req.domain, shopify_product_id=str(req.product_id), field=field,
                 content=content, status="draft", provenance=_provenance(),
             )
-        remaining = MAX_GENERATIONS - db.count_generations(req.domain, str(req.product_id))
+        remaining = 9999 if _is_unlimited(req.domain) else MAX_GENERATIONS - db.count_generations(req.domain, str(req.product_id))
         monthly_used = consume_generation(req.domain)
         return {
             "status": "drafted",
@@ -589,6 +594,7 @@ async def generation_count(domain: str, product_id: int):
     try:
         db = DB()
         count = db.count_generations(domain, str(product_id))
-        return {"product_id": product_id, "generations_used": count, "generations_remaining": max(0, MAX_GENERATIONS - count)}
+        cap = 9999 if _is_unlimited(domain) else MAX_GENERATIONS
+        return {"product_id": product_id, "generations_used": count, "generations_remaining": max(0, cap - count)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
