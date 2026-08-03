@@ -38,13 +38,18 @@ function PublishContent() {
 
   const apiPost = async (path: string, body: any) => {
     setLoading(true); setError("");
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 120000); // generation can take ~1-2 min
     try {
-      const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || d.message || `HTTP ${r.status}`);
       return d;
-    } catch (e: any) { setError(e.message); return null; }
-    finally { setLoading(false); }
+    } catch (e: any) {
+      setError(e.name === "AbortError" ? "Request timed out — is the backend running?" : e.message);
+      return null;
+    }
+    finally { clearTimeout(timer); setLoading(false); }
   };
 
   // ── Batch ──
