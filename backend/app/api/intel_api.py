@@ -57,3 +57,31 @@ async def run_regression(authorization: str = Header(default="")):
         return await run_regression_monitor()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)[:150])
+
+
+# ── AI Insights (daily one-call summary) ──
+
+@router.get("/insights")
+async def get_insight(shop: str = Query(...)):
+    """Latest AI insight for a store."""
+    try:
+        rows = (DB().client.table("ai_insights").select("*").eq("shop", shop)
+                .order("insight_date", desc=True).limit(1).execute().data or [])
+        if not rows:
+            return {"shop": shop, "insight": None}
+        r = rows[0]
+        return {"shop": shop, "insight": {"date": r["insight_date"], "content": r.get("content", "")}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:150])
+
+
+@router.post("/insights/generate")
+async def generate_insight_now(shop: str = Query(...), authorization: str = Header(default="")):
+    """Generate today's insight now (signed-in users only — 1 cheap call)."""
+    if not user_id_from_auth(authorization):
+        raise HTTPException(status_code=401, detail="Sign in required")
+    from app.services.insights import generate_insight
+    try:
+        return await generate_insight(shop)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:150])

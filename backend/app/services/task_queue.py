@@ -106,6 +106,9 @@ class TaskQueue:
             elif task["type"] == "regression_monitor":
                 from app.services.regression_monitor import run_regression_monitor
                 return await run_regression_monitor()
+            elif task["type"] == "daily_insights":
+                from app.services.insights import run_daily_insights
+                return await run_daily_insights()
             return {"error": "unknown task type"}
         except Exception as e:
             return {"error": str(e)}

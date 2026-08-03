@@ -52,6 +52,12 @@ async def run_pending():
         with open(daily_file, "w") as f: json.dump(jobs, f)
         queue.enqueue("regression_monitor", {})
 
+    # Daily AI Insights (one cheap summary per store)
+    if jobs.get("last_insights") != today:
+        jobs["last_insights"] = today
+        with open(daily_file, "w") as f: json.dump(jobs, f)
+        queue.enqueue("daily_insights", {})
+
     # Weekly Opportunity Report (Monday only)
     weekday = time.strftime("%A")
     if weekday == "Monday" and jobs.get("last_weekly") != today:

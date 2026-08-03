@@ -69,6 +69,7 @@ export default function DashboardPage() {
   const [weeklySending, setWeeklySending] = useState(false);
   const [weeklyStatus, setWeeklyStatus] = useState("");
   const [citationDist, setCitationDist] = useState<any[]>([]);
+  const [insight, setInsight] = useState<any>(null);
 
   const handleAddCompetitor = async () => {
     if (!domain || !compDomain.trim()) return;
@@ -90,6 +91,13 @@ export default function DashboardPage() {
     try {
       const r = await fetch(`/api/citations/trend?days=30`);
       if (r.ok) setCitationDist((await r.json()).distribution || []);
+    } catch {}
+  };
+
+  const loadInsight = async (shop: string) => {
+    try {
+      const r = await fetch(`/api/insights?shop=${encodeURIComponent(shop)}`);
+      if (r.ok) setInsight((await r.json()).insight || null);
     } catch {}
   };
 
@@ -177,6 +185,7 @@ export default function DashboardPage() {
       loadHealth(last.domain);
       loadCompetitors(last.domain);
       loadCitations();
+      loadInsight(last.domain);
     }
   };
 
@@ -470,6 +479,17 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
+
+              {/* ── ROW 4.6: AI Insights — daily one-call briefing ── */}
+              {insight && (
+                <div className="bg-gradient-to-r from-emerald-900/20 to-zinc-900 border border-emerald-800/40 rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-sm text-emerald-300">🤖 AI Insights <span className="text-[10px] text-zinc-600 font-normal">· {insight.date}</span></h3>
+                    <span className="text-[10px] text-zinc-600">daily briefing</span>
+                  </div>
+                  <p className="text-sm text-zinc-300 leading-relaxed">{insight.content}</p>
+                </div>
+              )}
 
               {/* ── ROW 4.7: Competitor Watch + Weekly Report ── */}
               <div className="grid grid-cols-2 gap-4">
