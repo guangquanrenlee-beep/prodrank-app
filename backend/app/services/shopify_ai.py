@@ -357,6 +357,27 @@ class ShopifyAIService:
                 "Write the content so it works for any product in this category — no invented specifics."
             )
 
+        # Data flywheel: inject REAL shopper questions from the library into
+        # FAQ generation — the FAQ hits actual search intent instead of the
+        # model guessing what customers ask.
+        real_questions = []
+        if "faq" in fields:
+            try:
+                from app.services.db import DB
+                rows = DB().client.table("questions").select("question_text") \
+                    .ilike("category", f"{category}%").limit(12).execute().data or []
+                real_questions = [r["question_text"] for r in rows if r.get("question_text")]
+            except Exception:
+                real_questions = []
+        real_q_rule = ""
+        if real_questions:
+            real_q_rule = (
+                "\n\nREAL SHOPPER QUESTIONS — these are verified questions people "
+                "actually ask for this category. Use them as the FAQ questions "
+                "(reword slightly per product); write answers from the product data:\n"
+                + "\n".join(f"- {q}" for q in real_questions[:10])
+            )
+
         prompt = f"""You are a GEO (Generative Engine Optimization) content writer for e-commerce.
 
 PRODUCT CATEGORY: {cat_label}
