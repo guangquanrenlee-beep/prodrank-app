@@ -248,10 +248,17 @@ async def run_daily_health_check() -> dict:
             changes = diff_snapshots(prev_details or {}, metrics)
             db.save_health_snapshot(shop, today, score, len(metrics), metrics)
 
-            # Push critical changes as alerts (dashboard feed)
+            # Push critical changes as alerts (dashboard feed) — each alert
+            # carries an action link so the merchant can jump straight to
+            # the fix (AI Studio, pre-filled with the product URL).
             for c in changes:
                 if c["severity"] in ("critical", "warning"):
-                    db.save_alert(shop, c["type"], c["message"], c["severity"], product_id=c["product_id"])
+                    product_url = (metrics.get(c["product_id"]) or {}).get("url", "")
+                    action = None
+                    if product_url:
+                        action = {"label": "Fix in AI Studio", "studio_url": f"/studio?url={product_url}"}
+                    db.save_alert(shop, c["type"], c["message"], c["severity"],
+                                  product_id=c["product_id"], details={"action": action})
 
             results["checked"] += 1
             results["shops"].append({

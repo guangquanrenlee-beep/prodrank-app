@@ -116,7 +116,10 @@ function HealthContent() {
                 <div key={a.id} className={`text-sm rounded-lg px-4 py-3 ${a.severity === "critical" ? "bg-red-900/20 border border-red-800/40 text-red-300" : a.severity === "warning" ? "bg-amber-900/20 border border-amber-800/40 text-amber-300" : "bg-zinc-800/50 text-zinc-400"}`}>
                   <div className="flex items-center justify-between gap-3">
                     <span>{a.severity === "critical" ? "🔴" : a.severity === "warning" ? "🟡" : "🔵"} {a.message}</span>
-                    <span className="text-[10px] text-zinc-600 whitespace-nowrap">{(a.created_at || "").slice(0, 16).replace("T", " ")}</span>
+                    <span className="flex items-center gap-2">
+                      {a.details?.action?.studio_url && <Link href={a.details.action.studio_url} className="text-emerald-400 hover:text-emerald-300">Fix →</Link>}
+                      <span className="text-[10px] text-zinc-600 whitespace-nowrap">{(a.created_at || "").slice(0, 16).replace("T", " ")}</span>
+                    </span>
                   </div>
                 </div>
               ))}

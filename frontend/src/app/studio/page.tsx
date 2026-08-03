@@ -1,15 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 const MAX = 3;
-const DEFAULT_FIELDS = ["description", "faq", "pros", "cons", "comparison", "use_cases", "specification", "ai_summary"];
+const DEFAULT_FIELDS = ["description", "faq", "pros", "comparison", "use_cases", "specification", "ai_summary"];
 
 type Step = "idle" | "resolving" | "generating" | "preview" | "history" | "publishing" | "published" | "verified";
 
 export default function PublishPage() {
-  const [url, setUrl] = useState("");
+  return <Suspense fallback={<main className="min-h-screen flex items-center justify-center bg-zinc-950"><p className="text-zinc-400">Loading…</p></main>}><PublishContent /></Suspense>;
+}
+
+function PublishContent() {
+  const searchParams = useSearchParams();
+  // Pre-fill from ?url= — alert "Fix in AI Studio" links land here ready to go.
+  const [url, setUrl] = useState(searchParams.get("url") || "");
   const [overwrite, setOverwrite] = useState(false);
   const [step, setStep] = useState<Step>("idle");
   const [loading, setLoading] = useState(false);

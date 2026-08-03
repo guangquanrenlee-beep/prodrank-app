@@ -452,11 +452,17 @@ export default function DashboardPage() {
                   </div>
                   {healthAlerts.length > 0 ? (
                     <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {healthAlerts.slice(0, 6).map((a: any) => (
-                        <div key={a.id} className={`text-xs rounded-lg px-3 py-2 ${a.severity === "critical" ? "bg-red-900/20 border border-red-800/40 text-red-300" : a.severity === "warning" ? "bg-amber-900/20 border border-amber-800/40 text-amber-300" : "bg-zinc-800/50 text-zinc-400"}`}>
-                          {a.severity === "critical" ? "🔴" : a.severity === "warning" ? "🟡" : "🔵"} {a.message}
-                        </div>
-                      ))}
+                      {healthAlerts.slice(0, 6).map((a: any) => {
+                        const act = a.details?.action;
+                        return (
+                          <div key={a.id} className={`text-xs rounded-lg px-3 py-2 ${a.severity === "critical" ? "bg-red-900/20 border border-red-800/40 text-red-300" : a.severity === "warning" ? "bg-amber-900/20 border border-amber-800/40 text-amber-300" : "bg-zinc-800/50 text-zinc-400"}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span>{a.severity === "critical" ? "🔴" : a.severity === "warning" ? "🟡" : "🔵"} {a.message}</span>
+                              {act?.studio_url && <Link href={act.studio_url} className="text-emerald-400 hover:text-emerald-300 whitespace-nowrap shrink-0">Fix →</Link>}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-sm text-zinc-600">No alerts. All quiet.</p>

@@ -367,6 +367,7 @@ Generate ONLY the content fields listed below. This is a {cat_label} product —
 
 CONCISENESS (hard rule): Write tight, scannable copy. Description <= 120 words. FAQ answers <= 50 words. Pros items <= 12 words each, 4-6 items. Buying guide steps <= 25 words. Comparison cells <= 15 words. No filler, no repeated marketing fluff, no preamble sentences.
 {template_rule}
+{real_q_rule}
 
 FIELDS TO GENERATE ({len(fields)}):
 {shape_guide}

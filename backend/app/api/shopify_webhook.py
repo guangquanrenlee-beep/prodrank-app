@@ -85,12 +85,17 @@ async def _alert_on_product_change(shop: str, token: str, product_id) -> None:
             return
         prev_len = prev.get("desc_len", 0)
         curr_len = metrics["desc_len"]
+        action = None
+        if metrics.get("url"):
+            action = {"label": "Fix in AI Studio", "studio_url": f"/studio?url={metrics['url']}"}
         if prev_len >= 100 and curr_len < 100:
             db.save_alert(shop, "description_shortened", "critical",
-                          f"Description dropped {prev_len}→{curr_len} chars", product_id=str(product_id))
+                          f"Description dropped {prev_len}→{curr_len} chars", product_id=str(product_id),
+                          details={"action": action})
         elif prev_len and abs(curr_len - prev_len) > 0.5 * prev_len:
             db.save_alert(shop, "description_changed", "warning",
-                          f"Description changed {prev_len}→{curr_len} chars", product_id=str(product_id))
+                          f"Description changed {prev_len}→{curr_len} chars", product_id=str(product_id),
+                          details={"action": action})
     except Exception:
         pass  # alerts are best-effort; never fail the webhook
 
