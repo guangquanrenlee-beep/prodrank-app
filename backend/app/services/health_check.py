@@ -51,6 +51,31 @@ def detect_page_schema(html: str) -> dict:
     }
 
 
+# ── Product Schema field counter (12-field standard used by the Products page) ──
+
+PRODUCT_SCHEMA_FIELDS = ["name", "description", "image", "offers", "brand",
+                         "aggregateRating", "review", "sku", "gtin",
+                         "itemCondition", "availability", "shippingDetails"]
+
+
+def count_product_schema_fields(html: str) -> int:
+    """How many of the 12 standard Product-schema fields exist on the page."""
+    soup = BeautifulSoup(html, "lxml")
+    best = 0
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(script.string or "")
+        except Exception:
+            continue
+        blocks = data if isinstance(data, list) else [data]
+        for b in blocks:
+            if not isinstance(b, dict):
+                continue
+            if b.get("@type") == "Product":
+                best = max(best, sum(1 for f in PRODUCT_SCHEMA_FIELDS if f in b))
+    return best
+
+
 # ── Per-product metrics ──
 
 async def _fetch_page(url: str) -> str | None:
