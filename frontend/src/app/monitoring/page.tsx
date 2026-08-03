@@ -1,15 +1,35 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 
 interface RankSnap { ai_agent: string; rank: number | null; description: string; sentiment: string; checked_at?: string; }
 
 export default function MonitoringPage() {
+  const { user } = useAuth();
   const [keyword, setKeyword] = useState(""); const [brand, setBrand] = useState("");
   const [snapshot, setSnapshot] = useState<any>(null); const [history, setHistory] = useState<Record<string, RankSnap[]>>({});
   const [mentions, setMentions] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMentions, setLoadingMentions] = useState(false);
+  const [health, setHealth] = useState<any>(null);
+  const [healthAlerts, setHealthAlerts] = useState<any[]>([]);
+
+  // Auto-monitoring: daily health, alerts, regression — all on one page.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("sites").select("domain").eq("user_id", user?.id || "").limit(1);
+        const shop = data?.[0]?.domain;
+        if (!shop) return;
+        const r = await fetch(`/api/health-check?domain=${encodeURIComponent(shop)}`);
+        if (r.ok) setHealth(await r.json());
+        const a = await fetch(`/api/alerts?domain=${encodeURIComponent(shop)}`);
+        if (a.ok) setHealthAlerts((await a.json()).alerts || []);
+      } catch {}
+    })();
+  }, [user]);
 
   const runTrack = async () => {
     setLoading(true);
@@ -59,7 +79,47 @@ export default function MonitoringPage() {
     <main className="min-h-screen max-w-5xl mx-auto px-4 py-10 space-y-6">
       <Link href="/dashboard" className="text-zinc-500 text-sm">← Dashboard</Link>
       <div>
-        <h1 className="text-2xl font-bold">AI Ranking Monitor</h1>
+        <h1 className="text-2xl font-bold">📈 Monitoring</h1>
+        <p className="text-sm text-zinc-500">AI ranking, daily health, alerts and recommendation regressions — one place.</p>
+
+        {/* Auto-monitoring blocks: health + alerts + regression */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-semibold text-sm">🩺 Daily Health Check</h2>
+              <Link href="/health" className="text-xs text-emerald-400 hover:text-emerald-300">Details →</Link>
+            </div>
+            {health?.trend?.length > 0 ? (
+              <>
+                <div className="flex items-end gap-1 h-12 mb-2">
+                  {health.trend.slice(-7).map((h: any) => (
+                    <div key={h.date} title={`${h.date}: ${h.score}`}
+                         className={`flex-1 rounded-t ${h.score >= 70 ? "bg-emerald-500" : h.score >= 40 ? "bg-amber-500" : "bg-red-500"} opacity-80`}
+                         style={{ height: `${Math.max(8, h.score)}%` }} />
+                  ))}
+                </div>
+                <div className="text-xs text-zinc-400">Latest <strong>{health.trend[health.trend.length - 1]?.score}</strong>
+                  {health.delta !== null && <span className={health.delta >= 0 ? "text-emerald-400" : "text-red-400"}> {health.delta >= 0 ? `▲ +${health.delta}` : `▼ ${health.delta}`}</span>}
+                </div>
+              </>
+            ) : <p className="text-xs text-zinc-600">No snapshots yet — runs daily at ~2am.</p>}
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-semibold text-sm">⚠️ Alerts & Regressions</h2>
+              <Link href="/health" className="text-xs text-emerald-400 hover:text-emerald-300">All →</Link>
+            </div>
+            {healthAlerts.length > 0 ? (
+              <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                {healthAlerts.slice(0, 6).map((a: any) => (
+                  <div key={a.id} className={`text-xs rounded-lg px-2.5 py-1.5 ${a.severity === "critical" ? "bg-red-900/20 text-red-300" : a.severity === "warning" ? "bg-amber-900/20 text-amber-300" : "bg-zinc-800/50 text-zinc-400"}`}>
+                    {a.severity === "critical" ? "🔴" : a.severity === "warning" ? "🟡" : "🔵"} {a.message}
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-xs text-zinc-600">No alerts. All quiet.</p>}
+          </div>
+        </div>
         <p className="text-zinc-400 text-sm mt-1">Track your brand across 4 AI agents — automatically archived for trend analysis.</p>
       </div>
 

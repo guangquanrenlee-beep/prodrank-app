@@ -15,6 +15,11 @@ export default function CitePage() {
   const { user, loading: authLoading } = useAuth();
   const [domain, setDomain] = useState("");
   const [category, setCategory] = useState("");
+  const [citeDist, setCiteDist] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/citations/trend?days=30`).then(r => r.json()).then(d => setCiteDist(d.distribution || [])).catch(() => {});
+  }, []);
   const [keywords, setKeywords] = useState("");
   const [data, setData] = useState<any>(null);
   const [influence, setInfluence] = useState<any>(null);
@@ -75,6 +80,29 @@ export default function CitePage() {
         <p className="text-zinc-400 text-sm mt-1">
           Track which sources AI agents cite, who they trust, and how influence flows in your category.
         </p>
+      </div>
+
+      {/* Citation Watch — 30-day source distribution (auto-collected daily) */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-sm">📰 Citation Watch — what AI agents cite (30 days)</h2>
+          <span className="text-[10px] text-zinc-600">auto-collected daily</span>
+        </div>
+        {citeDist.length > 0 ? (
+          <div className="space-y-1.5">
+            {citeDist.map((c: any) => (
+              <div key={c.domain} className="flex items-center gap-2 text-xs">
+                <span className="w-40 truncate text-zinc-400">{c.domain}</span>
+                <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${Math.min(100, c.pct * 3)}%` }} />
+                </div>
+                <span className="text-zinc-500 w-12 text-right">{c.count} · {c.pct}%</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-600">Collecting… daily real-model queries build the distribution.</p>
+        )}
       </div>
 
       {/* Search */}
