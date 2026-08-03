@@ -352,9 +352,12 @@ function PublishContent() {
           <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 pb-10 overflow-auto bg-black/70"
             onMouseDown={e => { (e.currentTarget as HTMLElement).dataset.down = `${e.clientX},${e.clientY}`; }}
             onMouseUp={e => {
+              // close only when the click STARTED and ENDED on the overlay
+              // itself (target === currentTarget) without dragging — clicks
+              // inside the modal (buttons, field editors) must never close it
+              if (e.target !== e.currentTarget) return;
               const down = (e.currentTarget as HTMLElement).dataset.down || "";
               const [x, y] = down.split(",").map(Number);
-              // close only on a stationary click — dragging to select text must not close
               if (x === e.clientX && y === e.clientY) setStep("idle");
             }}>
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-3xl max-h-full overflow-y-auto p-6 space-y-4" onClick={e => e.stopPropagation()}>
