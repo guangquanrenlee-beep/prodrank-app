@@ -36,10 +36,10 @@ function PublishContent() {
   const [scanLoading, setScanLoading] = useState(false);
   const [forceFields, setForceFields] = useState<Set<string>>(new Set()); // "found" fields the merchant wants regenerated anyway
 
-  const apiPost = async (path: string, body: any) => {
+  const apiPost = async (path: string, body: any, timeoutMs = 120000) => {
     setLoading(true); setError("");
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 120000); // generation can take ~1-2 min
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
       const d = await r.json();
@@ -77,12 +77,20 @@ function PublishContent() {
   };
 
   const handleApply = async (category: string) => {
+    // A template must exist for this category first — apply substitutes
+    // placeholders, it doesn't generate anything.
+    if (batchResult?.status !== "template_drafted" || batchResult?.category !== category) {
+      setError(`Generate the ${category} template first — Apply only fills in placeholders per product.`);
+      return;
+    }
     setBatchLoading(true); setError("");
     // Pass the exact product ids from the grouping, so apply targets the same
     // set (re-detection on apply would re-classify and skip products).
     const group = batchGroups?.groups?.find((g: any) => g.category === category);
     const ids = (group?.products || []).map((p: any) => p.id).filter(Boolean);
-    const d = await apiPost("/api/batch/apply", { shop: shopHost(), platform, category, product_ids: ids });
+    // Batch apply writes to every product sequentially (~3-7s each on a cold
+    // local WP) — give it a generous timeout instead of the 120s default.
+    const d = await apiPost("/api/batch/apply", { shop: shopHost(), platform, category, product_ids: ids }, 300000);
     if (d) setBatchResult(d);
     setBatchLoading(false);
   };
