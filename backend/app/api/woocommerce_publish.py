@@ -374,22 +374,24 @@ async def sync(req: WooSyncRequest):
     rows = [_extract_woo_product(p) for p in all_products]
     db.save_products_batch(site_id, rows)
 
-    # Live schema check: fetch product pages (parallel, capped) and count the
-    # 12 standard Product-schema fields — the Products page shows this number.
+    # Live schema check: fetch product pages (parallel, capped), store the
+    # actual present field list — the Products page shows count + real missing.
     import asyncio
-    from app.services.health_check import count_product_schema_fields, _fetch_page
+    from app.services.health_check import product_schema_fields, _fetch_page
     urls = [(r.get("url"), r.get("id")) for r in rows if r.get("url")][:200]
     sem = asyncio.Semaphore(10)
     async def check(item):
         url, _pid = item
         async with sem:
             html = await _fetch_page(url)
-            return url, count_product_schema_fields(html) if html else 0
+            return url, product_schema_fields(html) if html else []
     checked = await asyncio.gather(*[check(u) for u in urls])
     for url, fields in checked:
         if url:
             try:
-                db.client.table("products").update({"schema_fields": fields}).eq("site_id", site_id).eq("url", url).execute()
+                db.client.table("products").update({
+                    "schema_fields": len(fields), "schema_present": fields,
+                }).eq("site_id", site_id).eq("url", url).execute()
             except Exception as e:
                 print(f"[sync] schema update failed for {url}: {str(e)[:150]}")
     return {"status": "synced", "domain": domain, "total": len(all_products),

@@ -58,10 +58,10 @@ PRODUCT_SCHEMA_FIELDS = ["name", "description", "image", "offers", "brand",
                          "itemCondition", "availability", "shippingDetails"]
 
 
-def count_product_schema_fields(html: str) -> int:
-    """How many of the 12 standard Product-schema fields exist on the page."""
+def product_schema_fields(html: str) -> list[str]:
+    """Which of the 12 standard Product-schema fields exist on the page."""
     soup = BeautifulSoup(html, "lxml")
-    best = 0
+    best: list[str] = []
     for script in soup.find_all("script", type="application/ld+json"):
         try:
             data = json.loads(script.string or "")
@@ -72,8 +72,15 @@ def count_product_schema_fields(html: str) -> int:
             if not isinstance(b, dict):
                 continue
             if b.get("@type") == "Product":
-                best = max(best, sum(1 for f in PRODUCT_SCHEMA_FIELDS if f in b))
+                present = [f for f in PRODUCT_SCHEMA_FIELDS if f in b]
+                if len(present) > len(best):
+                    best = present
     return best
+
+
+def count_product_schema_fields(html: str) -> int:
+    """How many of the 12 standard Product-schema fields exist on the page."""
+    return len(product_schema_fields(html))
 
 
 # ── Per-product metrics ──

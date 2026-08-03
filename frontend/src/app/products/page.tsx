@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 
 interface ProductItem {
   id: string; title: string; url: string; description: string;
-  schema_fields: number; content_quality_score: number; ai_visibility_score: number;
+  schema_fields: number; schema_present?: string[]; content_quality_score: number; ai_visibility_score: number;
   price?: string; brand?: string; sku?: string;
 }
 
@@ -98,7 +98,12 @@ export default function ProductsPage() {
               const score = p.ai_visibility_score || 0;
               const fields = p.schema_fields || 0;
               const isExpanded = expanded.has(p.id);
-              const missingFields = ["name","description","image","offers","brand","aggregateRating","review","sku","gtin","itemCondition","availability","shippingDetails"].slice(fields);
+              // Real missing detection: what the page actually lacks (sync
+              // stores the present list per product). Falls back to the old
+              // slice when the list isn't available yet.
+              const ALL_FIELDS = ["name","description","image","offers","brand","aggregateRating","review","sku","gtin","itemCondition","availability","shippingDetails"];
+              const present = Array.isArray(p.schema_present) ? p.schema_present : [];
+              const missingFields = present.length > 0 ? ALL_FIELDS.filter(f => !present.includes(f)) : ALL_FIELDS.slice(fields);
               return (
                 <div key={p.id} className={`bg-zinc-900 border rounded-xl p-5 transition ${score < 40 ? "border-red-800/30 hover:border-red-700/50" : score < 70 ? "border-amber-800/20 hover:border-amber-700/40" : "border-emerald-800/20 hover:border-emerald-700/40"}`}>
                   <div className="flex items-start gap-4">
