@@ -64,7 +64,7 @@ function HealthContent() {
           <div>
             <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-300 text-sm">← Dashboard</Link>
             <h1 className="text-3xl font-bold mt-1">🩺 Daily Health Check</h1>
-            <p className="text-zinc-500 text-sm mt-1">Daily regression detection — theme updates, gutted descriptions, lost Schema/FAQ. No AI, ~zero cost.</p>
+            <p className="text-zinc-500 text-sm mt-1">Daily regression detection — theme updates, gutted descriptions, lost Schema/FAQ.</p>
           </div>
           <button onClick={runNow} disabled={running} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-medium rounded-lg transition">
             {running ? "Running…" : "▶ Run now"}
