@@ -47,7 +47,17 @@ class TaskQueue:
         return None
 
     async def process_pending(self):
-        """Pick up pending tasks and run them (async — called from the worker)."""
+        """Pick up pending tasks and run them (async — called from the worker).
+
+        Recovery: a task stuck in 'running' for > 30 min means the process died
+        mid-execution (deploy restart, crash). It is reset to 'pending' and
+        retried, up to 3 times, so scheduled jobs (question collection, health
+        check, ...) can never silently stall forever.
+        """
+        STALE_AFTER = 30 * 60  # 30 min
+        MAX_RETRIES = 3
+        now = time.time()
+
         for fn in os.listdir(TASK_DIR):
             if not fn.endswith(".json"):
                 continue
@@ -57,16 +67,52 @@ class TaskQueue:
                     task = json.load(f)
             except Exception:
                 continue
+
+            status = task.get("status")
+            created = task.get("created_at", now)
+
+            # Stale 'running' task → reset to pending for retry
+            if status == "running" and now - created > STALE_AFTER:
+                retries = task.get("retries", 0) + 1
+                if retries > MAX_RETRIES:
+                    task["status"] = "failed"
+                    task["result"] = {"error": f"stale after {MAX_RETRIES} retries"}
+                    print(f"[task_queue] {task.get('type')} ({fn}) failed after {MAX_RETRIES} retries — marking failed")
+                    with open(path, "w") as f:
+                        json.dump(task, f)
+                    continue
+                task["status"] = "pending"
+                task["retries"] = retries
+                print(f"[task_queue] {task.get('type')} ({fn}) stuck in running {int((now - created) // 60)}min — retry {retries}/{MAX_RETRIES}")
+                with open(path, "w") as f:
+                    json.dump(task, f)
+
             if task.get("status") != "pending":
                 continue
             task["status"] = "running"
+            task["started_at"] = time.time()
             with open(path, "w") as f:
                 json.dump(task, f)
             result = await self._execute(task)
             task["status"] = "done"
             task["result"] = result
+            task["retries"] = task.get("retries", 0)
             with open(path, "w") as f:
                 json.dump(task, f)
+
+        # Housekeeping: drop done/failed tasks older than 7 days
+        cutoff = now - 7 * 24 * 3600
+        for fn in os.listdir(TASK_DIR):
+            if not fn.endswith(".json"):
+                continue
+            path = f"{TASK_DIR}/{fn}"
+            try:
+                with open(path) as f:
+                    task = json.load(f)
+                if task.get("status") in ("done", "failed") and task.get("created_at", now) < cutoff:
+                    os.remove(path)
+            except Exception:
+                continue
 
     async def _execute(self, task: dict) -> dict:
         try:
