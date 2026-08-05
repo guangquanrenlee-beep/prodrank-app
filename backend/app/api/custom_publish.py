@@ -75,7 +75,7 @@ async def connect_custom_store(req: CustomConnectRequest):
     # Call the store's /api/prodrank/connect endpoint to verify
     store_url = f"http://{domain}" if not domain.startswith("http") else domain
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = await client.post(
                 f"{store_url}/api/prodrank/connect",
                 headers={"X-API-Token": token},
@@ -88,7 +88,7 @@ async def connect_custom_store(req: CustomConnectRequest):
         if not store_url.startswith("https"):
             try:
                 store_url_https = store_url.replace("http://", "https://")
-                async with httpx.AsyncClient(timeout=15) as client:
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
                     resp = await client.post(
                         f"{store_url_https}/api/prodrank/connect",
                         headers={"X-API-Token": token},
@@ -129,7 +129,7 @@ async def connect_custom_store(req: CustomConnectRequest):
 
     # Sync products
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             prod_resp = await client.get(
                 f"{store_url}/api/prodrank/products",
                 headers={"X-API-Token": token},
@@ -195,7 +195,7 @@ async def resolve_custom_product(req: CustomResolveUrlRequest):
     product = {"url": url, "title": "", "description": "", "price": "", "sku": "", "brand": "", "images": [], "id": slug}
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             resp = await client.get(
                 f"{base_url}/api/prodrank/products/{slug}",
                 headers={"X-API-Token": token},
@@ -232,7 +232,7 @@ async def generate_content(req: CustomGenerateRequest):
     token, base_url = _get_token_and_url(req.shop)
 
     # Fetch full product data
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
         resp = await client.get(
             f"{base_url}/api/prodrank/products/{req.product_id}",
             headers={"X-API-Token": token},
@@ -293,7 +293,7 @@ async def publish_content(req: CustomPublishRequest):
     for field, draft in drafts.items():
         body[field] = draft.get("content")
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         resp = await client.put(
             f"{base_url}/api/prodrank/products/{req.product_id}/content",
             headers={"X-API-Token": token, "Content-Type": "application/json"},
@@ -321,7 +321,7 @@ async def verify_content(req: CustomVerifyRequest):
     """Verify content was published to the custom store."""
     token, base_url = _get_token_and_url(req.shop)
 
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
         resp = await client.get(
             f"{base_url}/api/prodrank/products/{req.product_id}/verify",
             headers={"X-API-Token": token},
