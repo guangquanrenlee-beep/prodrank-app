@@ -288,7 +288,10 @@ async def resolve_custom_product(req: CustomResolveUrlRequest, request: Request)
                     "brand": p.get("brand", ""),
                     "images": p.get("images", []),
                     "id": p.get("id", slug),
+                    "category": p.get("category", ""),
                     "product_type": p.get("product_type", ""),
+                    "variants": p.get("variants", []),
+                    "in_stock": p.get("in_stock", True),
                     "tags": p.get("tags", []),
                 }
     except Exception:
