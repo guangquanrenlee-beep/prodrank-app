@@ -264,7 +264,7 @@ export default function DashboardPage() {
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? "w-56" : "w-14"} bg-zinc-900 border-r border-zinc-800 shrink-0 transition-all duration-200 flex flex-col`}>
         <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-          {sidebarOpen && <Link href="/dashboard" className="font-bold text-emerald-400 text-lg">ProdRank</Link>}
+          {sidebarOpen && <Link href="/" className="font-bold text-emerald-400 text-lg">ProdRank</Link>}
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-zinc-500 hover:text-zinc-300 text-xs">{sidebarOpen ? "◀" : "▶"}</button>
         </div>
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
