@@ -13,7 +13,7 @@ Auth: X-API-Token header (same as WordPress plugin pattern).
 import json
 import httpx
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 
 from app.services.db import DB
@@ -56,21 +56,91 @@ class CustomVerifyRequest(BaseModel):
     fields: list[str] | None = None
 
 
-def _get_token_and_url(domain: str) -> tuple[str, str]:
-    """Get the API token and base URL for a connected custom store."""
-    site = db.client.table("sites").select("access_token,shopify_shop").eq("domain", domain).eq("platform", "custom").limit(1).execute().data
+# ── Auth helpers (same pattern as woocommerce_publish) ──
+
+def _user_id_from_auth(authorization: str) -> str | None:
+    """Resolve Supabase user id from an Authorization: Bearer <jwt> header."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        return None
+    try:
+        user = db.client.auth.get_user(token)
+        return user.user.id if user and user.user else None
+    except Exception:
+        return None
+
+
+def _user_id_from_email(email: str) -> str | None:
+    """Resolve Supabase user id from email (X-User-Email header — the frontend
+    fetch interceptor sends it on every /api/* call when logged in)."""
+    if not email:
+        return None
+    try:
+        users = db.client.auth.admin.list_users()
+        for u in (users.users if hasattr(users, "users") else users):
+            if (u.email or "").lower() == email.lower():
+                return u.id
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_user_id(request: Request) -> str | None:
+    """User id from either Authorization Bearer or X-User-Email."""
+    uid = _user_id_from_auth(request.headers.get("Authorization", ""))
+    if uid:
+        return uid
+    return _user_id_from_email(request.headers.get("X-User-Email", ""))
+
+
+def _require_owner(site: dict, user_id: str | None) -> None:
+    """Claim-or-verify store ownership.
+
+    Unbound stores (user_id NULL — legacy direct-API connects) are claimed by
+    the first authenticated user touching them. A store bound to another
+    account is rejected. Unauthenticated callers are rejected outright.
+    """
+    if not user_id:
+        raise HTTPException(401, "Login required — connect your store from Settings or pass Authorization")
+    if site.get("user_id") and site["user_id"] != user_id:
+        raise HTTPException(403, "This store belongs to another account")
+    if not site.get("user_id"):
+        try:
+            db.client.table("sites").update({"user_id": user_id}).eq("id", site["id"]).execute()
+        except Exception:
+            pass  # best-effort claim; the operation itself still proceeds
+
+
+def _get_site(domain: str) -> dict:
+    """Full site row for a connected custom store."""
+    site = db.client.table("sites").select("id,user_id,access_token,shopify_shop").eq("domain", domain).eq("platform", "custom").limit(1).execute().data
     if not site or not site[0].get("access_token"):
         raise HTTPException(404, f"No connected custom store for {domain}")
-    token = site[0]["access_token"]
-    base_url = site[0].get("shopify_shop", f"http://{domain}")
+    return site[0]
+
+
+def _get_token_and_url(domain: str) -> tuple[str, str]:
+    """Get the API token and base URL for a connected custom store."""
+    site = _get_site(domain)
+    token = site["access_token"]
+    base_url = site.get("shopify_shop", f"http://{domain}")
     return token, base_url
 
 
 @router.post("/connect")
-async def connect_custom_store(req: CustomConnectRequest):
-    """Verify a custom store's API and save the connection."""
+async def connect_custom_store(req: CustomConnectRequest, authorization: str = Header(default="")):
+    """Verify a custom store's API and save the connection.
+
+    Binds the store to the authenticated account (Authorization: Bearer
+    Supabase JWT) so plan quotas + store limits apply. Without a token the
+    store is stored unbound — later operations claim it for the first
+    authenticated user (see _require_owner).
+    """
     domain = req.domain.strip().lower()
     token = req.api_token.strip()
+    user_id = _user_id_from_auth(authorization)
 
     # Call the store's /api/prodrank/connect endpoint to verify
     store_url = f"http://{domain}" if not domain.startswith("http") else domain
@@ -104,25 +174,30 @@ async def connect_custom_store(req: CustomConnectRequest):
     except Exception as e:
         raise HTTPException(400, f"Connection failed: {e}")
 
-    # Save site (user_id stays NULL until bound from Settings page)
-    existing = db.client.table("sites").select("id").eq("domain", domain).eq("platform", "custom").limit(1).execute().data
-    if not existing:
-        db.client.table("sites").insert({
-            "domain": domain,
-            "platform": "custom",
-            "platform_confidence": 100,
-            "auth_method": "api_token",
-            "access_token": token,
-            "shopify_shop": store_url,  # reuse for base URL
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }).execute()
+    # Save site — bound to the authenticated account when present.
+    fields = {
+        "platform": "custom",
+        "platform_confidence": 100,
+        "auth_method": "api_token",
+        "access_token": token,
+        "shopify_shop": store_url,  # reuse for base URL
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if user_id:
+        from app.services.usage import check_site_limit
+        allowed, detail, _current, _limit = check_site_limit(user_id)
+        if not allowed:
+            raise HTTPException(status_code=403, detail=detail)
+        fields["user_id"] = user_id
+        # upsert on (user_id, domain); clean up any leftover unbound rows
+        db.client.table("sites").upsert({"domain": domain, **fields}, on_conflict="user_id,domain").execute()
+        db.client.table("sites").delete().eq("domain", domain).is_("user_id", None).execute()
     else:
-        db.client.table("sites").update({
-            "access_token": token,
-            "shopify_shop": store_url,
-            "platform_confidence": 100,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", existing[0]["id"]).execute()
+        existing = db.client.table("sites").select("id").eq("domain", domain).eq("platform", "custom").limit(1).execute().data
+        if existing:
+            db.client.table("sites").update(fields).eq("id", existing[0]["id"]).execute()
+        else:
+            db.client.table("sites").insert({"domain": domain, **fields}).execute()
 
     # Get the site id for product sync
     site_data = existing or db.client.table("sites").select("id").eq("domain", domain).eq("platform", "custom").limit(1).execute().data
@@ -169,8 +244,9 @@ async def connect_custom_store(req: CustomConnectRequest):
 
 
 @router.post("/resolve-url")
-async def resolve_custom_product(req: CustomResolveUrlRequest):
-    """Resolve a product URL from a custom store."""
+async def resolve_custom_product(req: CustomResolveUrlRequest, request: Request):
+    """Resolve a product URL from a custom store.
+    Requires login + store ownership (prevents probing other stores)."""
     from urllib.parse import urlparse
 
     url = req.url.strip()
@@ -181,9 +257,10 @@ async def resolve_custom_product(req: CustomResolveUrlRequest):
     domain = domain.replace("www.", "").lower()
 
     # Find the site
-    site_data = db.client.table("sites").select("id,access_token,shopify_shop").eq("domain", domain).eq("platform", "custom").limit(1).execute().data
+    site_data = db.client.table("sites").select("id,user_id,access_token,shopify_shop").eq("domain", domain).eq("platform", "custom").limit(1).execute().data
     if not site_data:
         raise HTTPException(404, f"No custom store connected for {domain}")
+    _require_owner(site_data[0], _resolve_user_id(request))
 
     site = site_data[0]
     token = site.get("access_token", "")
@@ -227,8 +304,10 @@ async def resolve_custom_product(req: CustomResolveUrlRequest):
 
 
 @router.post("/publish/generate")
-async def generate_content(req: CustomGenerateRequest):
-    """Generate AI content for a custom store product."""
+async def generate_content(req: CustomGenerateRequest, request: Request):
+    """Generate AI content for a custom store product.
+    Requires login + store ownership (spend endpoint)."""
+    _require_owner(_get_site(req.shop), _resolve_user_id(request))
     token, base_url = _get_token_and_url(req.shop)
 
     # Fetch full product data
@@ -279,8 +358,10 @@ async def generate_content(req: CustomGenerateRequest):
 
 
 @router.post("/publish")
-async def publish_content(req: CustomPublishRequest):
-    """Push generated content to the custom store."""
+async def publish_content(req: CustomPublishRequest, request: Request):
+    """Push generated content to the custom store.
+    Requires login + store ownership."""
+    _require_owner(_get_site(req.shop), _resolve_user_id(request))
     token, base_url = _get_token_and_url(req.shop)
 
     # Get latest drafts
@@ -317,8 +398,10 @@ async def publish_content(req: CustomPublishRequest):
 
 
 @router.post("/verify")
-async def verify_content(req: CustomVerifyRequest):
-    """Verify content was published to the custom store."""
+async def verify_content(req: CustomVerifyRequest, request: Request):
+    """Verify content was published to the custom store.
+    Requires login + store ownership."""
+    _require_owner(_get_site(req.shop), _resolve_user_id(request))
     token, base_url = _get_token_and_url(req.shop)
 
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
@@ -343,8 +426,9 @@ async def verify_content(req: CustomVerifyRequest):
 
 
 @router.get("/drafts")
-async def get_drafts(shop: str, product_id: str):
-    """Get version history for a product."""
+async def get_drafts(shop: str, product_id: str, request: Request):
+    """Get version history for a product. Requires login + store ownership."""
+    _require_owner(_get_site(shop), _resolve_user_id(request))
     drafts = db.get_latest_drafts(shop, product_id)
     return {
         "history": {
