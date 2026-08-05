@@ -104,10 +104,27 @@ function PublishContent() {
   const platform = url.includes("myshopify.com") ? "shopify" : url.includes("localhost") || resolved?._platform === "custom" ? "custom" : "woocommerce";
 
   const handleResolve = async () => {
-    const apiPath = platform === "shopify"
+    const isShopify = url.includes("myshopify.com");
+    let d: any = null;
+    if (!isShopify) {
+      // Try the custom-store resolver first — connected standalone stores
+      // (BaiHuoZhan etc.) resolve via /api/custom. Falls back to WooCommerce
+      // when the domain isn't a connected custom store (404 → null).
+      d = await apiPost("/api/custom/resolve-url", { url: url.trim() });
+      if (d && d._platform === "custom") {
+        setResolved({ ...d, _platform: "custom" });
+        setStep("idle"); setPreview(null); setResult(null);
+        setGenUsed(0); setGenRemaining(MAX);
+        if (d.product?.id) loadExisting(d.domain, d.product.id, "custom");
+        setError(d.has_token ? "" : "⚠ Store not connected — connect in Settings first.");
+        return;
+      }
+      // Not a custom store — fall through to the platform resolvers
+    }
+    const apiPath = isShopify
       ? "/api/shopify/resolve-url"
       : "/api/woocommerce/resolve-url";
-    const d = await apiPost(apiPath, { url: url.trim() });
+    d = await apiPost(apiPath, { url: url.trim() });
     if (!d) return;
     setResolved({ ...d, _platform: platform });
     setStep("idle"); setPreview(null); setResult(null);
@@ -156,7 +173,9 @@ function PublishContent() {
   const apiBase = () => resolved?._platform === "shopify" ? "/api/shopify" : resolved?._platform === "custom" ? "/api/custom" : "/api/woocommerce";
   const apiBody = () => resolved?._platform === "shopify"
     ? { shop: resolved.domain, product_id: resolved.product.id }
-    : { domain: resolved.domain, product_id: resolved.product.id };
+    : resolved?._platform === "custom"
+      ? { shop: resolved.domain, product_id: resolved.product.id }
+      : { domain: resolved.domain, product_id: resolved.product.id };
 
   /** Scan the live product page first: what info already exists (found),
    *  what's vague (fuzzy) and what's absent (missing). Only missing + fuzzy
@@ -207,7 +226,9 @@ function PublishContent() {
 
   const handlePublish = async () => {
     if (!resolved) return;
-    if (Object.keys(edited).length > 0) {
+    if (Object.keys(edited).length > 0 && resolved._platform !== "custom") {
+      // Custom stores have no drafts/edit endpoint yet — edited content is
+      // part of the preview only; publish uses the stored draft version.
       const editPath = resolved._platform === "shopify" ? "/api/shopify/drafts/edit" : "/api/woocommerce/drafts/edit";
       await apiPost(editPath, { shop: resolved.domain, product_id: resolved.product.id, fields: edited });
     }
