@@ -70,6 +70,13 @@ async def run_pending():
         with open(daily_file, "w") as f: json.dump(jobs, f)
         queue.enqueue("regression_monitor", {})
 
+    # Daily AI Shopping Trend snapshot (attribute frequencies accumulate
+    # into 30-day trend series)
+    if jobs.get("last_trend") != today:
+        jobs["last_trend"] = today
+        with open(daily_file, "w") as f: json.dump(jobs, f)
+        queue.enqueue("trend_snapshot", {})
+
     # Daily AI Insights (one cheap summary per store)
     if jobs.get("last_insights") != today:
         jobs["last_insights"] = today

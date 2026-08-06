@@ -102,6 +102,7 @@ class AITestEngine:
         "chatgpt": "anthropic/claude-haiku-4.5",
         "gemini": "google/gemini-3.6-flash",
         "claude": "anthropic/claude-sonnet-5",
+        "grok": "x-ai/grok-4.3",
         "deepseek": None,  # resolved from get_content_client()
     }
 

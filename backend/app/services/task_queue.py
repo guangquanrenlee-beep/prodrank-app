@@ -155,6 +155,9 @@ class TaskQueue:
             elif task["type"] == "daily_insights":
                 from app.services.insights import run_daily_insights
                 return await run_daily_insights()
+            elif task["type"] == "trend_snapshot":
+                from app.services.trend_engine import TrendEngine
+                return await TrendEngine().snapshot()
             return {"error": "unknown task type"}
         except Exception as e:
             return {"error": str(e)}

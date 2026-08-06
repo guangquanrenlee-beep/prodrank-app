@@ -24,7 +24,7 @@ async def _background_worker():
             print(f"[worker] {e}")
         await asyncio.sleep(1800)
 
-from app.api import audit, rank, shopify, shopify_publish, shopify_webhook, woocommerce_publish, batch, data_api, optimize, intelligence, recommendation, citation, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api, scan, health_api, competitors_api, intel_api, coverage_api, test_engine, custom_publish, match_api, insights_api, action_api
+from app.api import audit, rank, shopify, shopify_publish, shopify_webhook, woocommerce_publish, batch, data_api, optimize, intelligence, recommendation, citation, detect, score, integrations, guidance, monitor, tasks, email_api, admin_api, social, marketplace, knowledge_api, reports_api, dashboard_api, scan, health_api, competitors_api, intel_api, coverage_api, test_engine, custom_publish, match_api, insights_api, action_api, trend_api
 
 
 @asynccontextmanager
@@ -90,6 +90,7 @@ app.include_router(custom_publish.router, prefix="/api/custom", tags=["Custom St
 app.include_router(match_api.router, prefix="/api/match", tags=["Match Engine"])
 app.include_router(insights_api.router, prefix="/api/insights", tags=["Insights"])
 app.include_router(action_api.router, prefix="/api/action", tags=["Action Engine"])
+app.include_router(trend_api.router, prefix="/api/trends", tags=["Trends"])
 
 
 @app.get("/api/health")

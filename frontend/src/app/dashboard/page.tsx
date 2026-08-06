@@ -129,6 +129,9 @@ export default function DashboardPage() {
   const [applying, setApplying] = useState(false);
   const [retestResult, setRetestResult] = useState<any>(null);
   const [retesting, setRetesting] = useState(false);
+  const [testModels, setTestModels] = useState<string[]>(["deepseek"]);
+  const [trends, setTrends] = useState<any>(null);
+  const [trendGaps, setTrendGaps] = useState<any[]>([]);
 
   const siteIdForDomain = () => sites.find((s: any) => s.domain === domain)?.id || "";
 
@@ -151,7 +154,7 @@ export default function DashboardPage() {
       const brand = domain.split(".")[0] || "Store";
       const r = await fetch("/api/test/run", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ site_id: sid, brand_name: brand, category: "", query_count: queryCount, models: ["deepseek"] }),
+        body: JSON.stringify({ site_id: sid, brand_name: brand, category: "", query_count: queryCount, models: testModels }),
       });
       if (r.ok) {
         setAiTest(await r.json());
@@ -198,9 +201,24 @@ export default function DashboardPage() {
     setRetesting(false);
   };
 
-  // Auto-load the insight analysis once a site is selected
+  const loadTrends = async () => {
+    try {
+      const sid = siteIdForDomain();
+      const [hotR, gapsR] = await Promise.all([
+        fetch("/api/trends/hot?top_n=12"),
+        sid ? fetch(`/api/trends/gaps?site_id=${encodeURIComponent(sid)}`) : Promise.resolve(null),
+      ]);
+      if (hotR.ok) setTrends(await hotR.json());
+      if (gapsR && gapsR.ok) setTrendGaps((await gapsR.json()).gaps || []);
+    } catch {}
+  };
+
+  // Auto-load the insight analysis + trends once a site is selected
   useEffect(() => {
-    if (sites.length > 0 && domain) loadAiInsight();
+    if (sites.length > 0 && domain) {
+      loadAiInsight();
+      loadTrends();
+    }
   }, [sites, domain]);
 
   useEffect(() => {
@@ -430,7 +448,15 @@ export default function DashboardPage() {
                     <h2 className="font-semibold text-white">🧠 AI Recommendation Test</h2>
                     <p className="text-xs text-zinc-500 mt-0.5">Ask an AI shopping assistant real shopper questions — measure your recommendation rate & find evidence-backed gaps</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={testModels[0]}
+                      onChange={e => setTestModels(e.target.value === "deepseek" ? ["deepseek"] : ["chatgpt", "gemini", "claude", "grok"])}
+                      className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-xs focus:outline-none"
+                    >
+                      <option value="deepseek">DeepSeek (fast & cheap)</option>
+                      <option value="all4">All 4 models (real AI)</option>
+                    </select>
                     <button onClick={() => runAiTest(30)} disabled={aiTestLoading} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white text-xs rounded-lg transition">
                       {aiTestLoading ? "Testing…" : "Run 30 queries"}
                     </button>
@@ -511,6 +537,51 @@ export default function DashboardPage() {
                     <p className="text-xs text-zinc-600">{aiInsightLoading ? "Analyzing…" : "Auto-analyzes when a site is connected"}</p>
                   )}
                 </div>
+              </div>
+
+              {/* ── AI SHOPPING TRENDS ── */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="font-semibold text-white">📈 AI Shopping Trends</h2>
+                    <p className="text-xs text-zinc-500 mt-0.5">What shoppers ask about most — and what your products are missing</p>
+                  </div>
+                  <button onClick={loadTrends} className="text-xs text-purple-400 hover:text-purple-300">Refresh</button>
+                </div>
+
+                {trends?.attributes?.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-xs font-semibold text-zinc-400 mb-2">Hot attributes shoppers ask about</h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      {trends.attributes.map((a: any) => (
+                        <span key={a.attribute} className="text-[10px] bg-zinc-800 px-2 py-1 rounded-full text-zinc-300">
+                          {a.attribute} <span className="text-purple-400">{a.count}×</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {trendGaps.length > 0 && (
+                  <div className="border-t border-zinc-800 pt-4">
+                    <h3 className="text-xs font-semibold text-zinc-400 mb-2">⚠ Your products don&apos;t mention these</h3>
+                    <div className="space-y-2">
+                      {trendGaps.slice(0, 6).map((g: any) => (
+                        <div key={g.attribute} className="flex items-start gap-2 text-xs">
+                          <span className="text-amber-400 mt-0.5">⚠</span>
+                          <div>
+                            <span className="text-zinc-300 font-medium">{g.attribute}</span>
+                            <span className="text-zinc-500"> — {g.advice}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(!trends?.attributes?.length && trendGaps.length === 0) && (
+                  <p className="text-xs text-zinc-600">No trend data yet — it builds up as the question library grows.</p>
+                )}
               </div>
 
               {/* WHY MODAL */}
