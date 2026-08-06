@@ -103,6 +103,45 @@ async def get_results(site_id: str = "", domain: str = ""):
         raise HTTPException(500, str(e))
 
 
+@router.get("/trend")
+async def get_test_trend(site_id: str = "", domain: str = "", days: int = 30):
+    """Daily recommendation-rate series (for trend lines — single test rounds
+    are noisy; the 30-day moving view shows the real direction)."""
+    site_id = _resolve_site_id(site_id, domain)
+    try:
+        from datetime import datetime, timedelta, timezone
+        from collections import defaultdict
+
+        db = DB()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=min(days, 90))).isoformat()
+        rows = (db.client.table("ai_query_results")
+                .select("recommended,created_at")
+                .eq("site_id", site_id)
+                .gte("created_at", cutoff)
+                .limit(5000).execute().data or [])
+
+        daily: dict[str, dict] = defaultdict(lambda: {"total": 0, "recommended": 0})
+        for r in rows:
+            day = (r.get("created_at") or "")[:10]
+            if not day:
+                continue
+            daily[day]["total"] += 1
+            if r.get("recommended"):
+                daily[day]["recommended"] += 1
+
+        series = []
+        for day in sorted(daily.keys()):
+            d = daily[day]
+            series.append({
+                "date": day,
+                "queries": d["total"],
+                "rate_pct": round(d["recommended"] / d["total"] * 100, 1) if d["total"] else 0,
+            })
+        return {"site_id": site_id, "days": len(series), "series": series}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @router.post("/verify")
 async def verify_optimization(req: TestVerifyRequest):
     """Run a fresh test and compare with previous results.

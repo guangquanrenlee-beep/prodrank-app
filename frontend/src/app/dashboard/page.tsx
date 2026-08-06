@@ -132,6 +132,7 @@ export default function DashboardPage() {
   const [testModels, setTestModels] = useState<string[]>(["deepseek"]);
   const [trends, setTrends] = useState<any>(null);
   const [trendGaps, setTrendGaps] = useState<any[]>([]);
+  const [rateTrend, setRateTrend] = useState<any[]>([]);
 
   const siteIdForDomain = () => sites.find((s: any) => s.domain === domain)?.id || "";
 
@@ -210,6 +211,10 @@ export default function DashboardPage() {
       ]);
       if (hotR.ok) setTrends(await hotR.json());
       if (gapsR && gapsR.ok) setTrendGaps((await gapsR.json()).gaps || []);
+      if (sid) {
+        const tr = await fetch(`/api/test/trend?site_id=${encodeURIComponent(sid)}&days=30`);
+        if (tr.ok) setRateTrend((await tr.json()).series || []);
+      }
     } catch {}
   };
 
@@ -447,6 +452,7 @@ export default function DashboardPage() {
                   <div>
                     <h2 className="font-semibold text-white">🧠 AI Recommendation Test</h2>
                     <p className="text-xs text-zinc-500 mt-0.5">Ask an AI shopping assistant real shopper questions — measure your recommendation rate & find evidence-backed gaps</p>
+                    <p className="text-[10px] text-zinc-600 mt-1">AI awareness updates over 4–12 weeks as search indexes and model knowledge refresh — short-term swings are normal. Track the trend, not single rounds.</p>
                   </div>
                   <div className="flex gap-2 items-center">
                     <select
@@ -486,6 +492,20 @@ export default function DashboardPage() {
                   <p className="text-xs text-zinc-600 mb-4">No test run yet — hit Run to start (30 queries ≈ {"<$0.01"})</p>
                 )}
 
+                {rateTrend.length > 1 && (
+                  <div className="mb-4">
+                    <h3 className="text-xs font-semibold text-zinc-400 mb-1.5">Recommendation rate trend (daily)</h3>
+                    <div className="flex items-end gap-1 h-16">
+                      {rateTrend.map((p: any) => (
+                        <div key={p.date} className="flex-1 flex flex-col items-center justify-end" title={`${p.date}: ${p.rate_pct}% (${p.queries} queries)`}>
+                          <div className="w-full bg-purple-600/70 rounded-t" style={{ height: `${Math.max(4, p.rate_pct)}%`, minHeight: "2px" }} />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-zinc-600 mt-1">Last {rateTrend.length} day(s) with test data — each bar is that day&apos;s recommendation rate.</p>
+                  </div>
+                )}
+
                 {/* Insight factors */}
                 <div className="border-t border-zinc-800 pt-4">
                   <div className="flex items-center justify-between mb-3">
@@ -518,13 +538,18 @@ export default function DashboardPage() {
                           {f.action && <p className="text-xs text-emerald-400/80 mt-1.5">→ {f.action}</p>}
                         </div>
                       ))}
-                      {applyStatus && <p className="text-xs text-emerald-400 mt-2">{applyStatus}</p>}
+                      {applyStatus && (
+                        <p className="text-xs text-emerald-400 mt-2">
+                          {applyStatus} — content changes are verifiable on the page now; the AI recommendation impact builds over weeks.
+                        </p>
+                      )}
 
                       {/* Retest (before/after) */}
                       <div className="mt-4 flex items-center gap-3 flex-wrap">
                         <button onClick={retest} disabled={retesting} className="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white rounded-lg transition">
                           {retesting ? "Retesting…" : "🔄 Retest after fixes"}
                         </button>
+                        <span className="text-[10px] text-zinc-600">Fixes take weeks to show up in AI knowledge — retest in ~2 weeks for a meaningful comparison.</span>
                         {retestResult && (
                           <div className={`text-xs font-medium ${retestResult.delta > 0 ? "text-emerald-400" : retestResult.delta < 0 ? "text-red-400" : "text-zinc-400"}`}>
                             {retestResult.before_rate}% → {retestResult.after_rate}%
