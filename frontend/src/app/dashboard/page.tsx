@@ -120,6 +120,48 @@ export default function DashboardPage() {
   const [showWhy, setShowWhy] = useState(false);
   const [whyLoading, setWhyLoading] = useState(false);
 
+  // ── AI Recommendation Test (Test Engine + Insight Engine) ──
+  const [aiTest, setAiTest] = useState<any>(null);
+  const [aiInsight, setAiInsight] = useState<any>(null);
+  const [aiTestLoading, setAiTestLoading] = useState(false);
+  const [aiInsightLoading, setAiInsightLoading] = useState(false);
+
+  const siteIdForDomain = () => sites.find((s: any) => s.domain === domain)?.id || "";
+
+  const loadAiInsight = async () => {
+    const sid = siteIdForDomain();
+    if (!sid) return;
+    setAiInsightLoading(true);
+    try {
+      const r = await fetch(`/api/insights/why?site_id=${encodeURIComponent(sid)}&domain=${encodeURIComponent(domain || "")}`);
+      if (r.ok) setAiInsight(await r.json());
+    } catch {}
+    setAiInsightLoading(false);
+  };
+
+  const runAiTest = async (queryCount: number) => {
+    const sid = siteIdForDomain();
+    if (!sid || !domain) return;
+    setAiTestLoading(true);
+    try {
+      const brand = domain.split(".")[0] || "Store";
+      const r = await fetch("/api/test/run", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site_id: sid, brand_name: brand, category: "", query_count: queryCount, models: ["deepseek"] }),
+      });
+      if (r.ok) {
+        setAiTest(await r.json());
+        loadAiInsight();  // refresh the evidence after a test round
+      }
+    } catch {}
+    setAiTestLoading(false);
+  };
+
+  // Auto-load the insight analysis once a site is selected
+  useEffect(() => {
+    if (sites.length > 0 && domain) loadAiInsight();
+  }, [sites, domain]);
+
   useEffect(() => {
     if (user) {
       loadSites(user.id);
@@ -338,6 +380,73 @@ export default function DashboardPage() {
                 <button onClick={fetchWhyAnalysis} disabled={whyLoading} className="mt-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition">
                   {whyLoading ? "Analyzing…" : "🤔 Why?"}
                 </button>
+              </div>
+
+              {/* ── AI RECOMMENDATION TEST (Test Engine + Insight Engine) ── */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                  <div>
+                    <h2 className="font-semibold text-white">🧠 AI Recommendation Test</h2>
+                    <p className="text-xs text-zinc-500 mt-0.5">问 AI 购物助手真实购物问题，测你的商品被推荐的概率 & 找出证据差距</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => runAiTest(30)} disabled={aiTestLoading} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white text-xs rounded-lg transition">
+                      {aiTestLoading ? "Testing…" : "Run 30 queries"}
+                    </button>
+                    <button onClick={() => runAiTest(100)} disabled={aiTestLoading} className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 disabled:bg-zinc-700 text-white text-xs rounded-lg transition">
+                      Run 100
+                    </button>
+                  </div>
+                </div>
+
+                {/* Recommendation rate cards */}
+                {aiTest ? (
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-center">
+                      <div className={`text-3xl font-bold ${aiTest.recommendation_rate >= 25 ? "text-emerald-400" : aiTest.recommendation_rate > 0 ? "text-amber-400" : "text-red-400"}`}>{aiTest.recommendation_rate}%</div>
+                      <div className="text-xs text-zinc-500 mt-1">Recommendation Rate</div>
+                    </div>
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-center">
+                      <div className="text-3xl font-bold text-zinc-300">{aiTest.total_queries}</div>
+                      <div className="text-xs text-zinc-500 mt-1">Queries Tested</div>
+                    </div>
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-center">
+                      <div className="text-3xl font-bold text-zinc-300">{aiTest.by_model?.deepseek?.recommended || 0}</div>
+                      <div className="text-xs text-zinc-500 mt-1">Times Recommended</div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-600 mb-4">还没跑过测试 — 点击 Run 开始（30 条 ≈ 成本 {"<$0.01"}）</p>
+                )}
+
+                {/* Insight factors */}
+                <div className="border-t border-zinc-800 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-zinc-300">为什么没被推荐（证据）</h3>
+                    <button onClick={loadAiInsight} disabled={aiInsightLoading} className="text-xs text-purple-400 hover:text-purple-300">
+                      {aiInsightLoading ? "…" : "刷新分析"}
+                    </button>
+                  </div>
+                  {aiInsight?.factors?.length > 0 ? (
+                    <div className="space-y-2">
+                      {aiInsight.summary && <p className="text-xs text-zinc-400 mb-2">{aiInsight.summary}</p>}
+                      {aiInsight.factors.map((f: any) => (
+                        <div key={f.factor} className={`border rounded-lg p-3 ${f.severity === "high" ? "border-red-900/60 bg-red-950/20" : f.severity === "medium" ? "border-amber-900/60 bg-amber-950/20" : "border-zinc-800 bg-zinc-950/50"}`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${f.severity === "high" ? "bg-red-900/40 text-red-300" : f.severity === "medium" ? "bg-amber-900/40 text-amber-300" : "bg-zinc-800 text-zinc-400"}`}>
+                              {f.severity.toUpperCase()}
+                            </span>
+                            <span className="text-sm font-medium text-zinc-200">{f.label}</span>
+                          </div>
+                          <p className="text-xs text-zinc-400 mt-1.5">{f.evidence}</p>
+                          {f.action && <p className="text-xs text-emerald-400/80 mt-1.5">→ {f.action}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-600">{aiInsightLoading ? "分析中…" : "连接站点后自动分析"}</p>
+                  )}
+                </div>
               </div>
 
               {/* WHY MODAL */}
