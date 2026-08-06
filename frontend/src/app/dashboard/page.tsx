@@ -125,6 +125,10 @@ export default function DashboardPage() {
   const [aiInsight, setAiInsight] = useState<any>(null);
   const [aiTestLoading, setAiTestLoading] = useState(false);
   const [aiInsightLoading, setAiInsightLoading] = useState(false);
+  const [applyStatus, setApplyStatus] = useState<string>("");
+  const [applying, setApplying] = useState(false);
+  const [retestResult, setRetestResult] = useState<any>(null);
+  const [retesting, setRetesting] = useState(false);
 
   const siteIdForDomain = () => sites.find((s: any) => s.domain === domain)?.id || "";
 
@@ -155,6 +159,43 @@ export default function DashboardPage() {
       }
     } catch {}
     setAiTestLoading(false);
+  };
+
+  const applyFix = async (factor: string) => {
+    const sid = siteIdForDomain();
+    if (!sid) return;
+    setApplying(true); setApplyStatus("");
+    try {
+      const r = await fetch("/api/action/apply", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site_id: sid, domain: domain || "", factors: [factor] }),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setApplyStatus(`已生成发布 ${d.applied || 0} 个产品${d.failed ? `，${d.failed} 个失败` : ""}`);
+        loadAiInsight();
+      } else {
+        setApplyStatus(d.detail || "修复失败");
+      }
+    } catch { setApplyStatus("网络错误"); }
+    setApplying(false);
+  };
+
+  const retest = async () => {
+    const sid = siteIdForDomain();
+    if (!sid) return;
+    setRetesting(true); setRetestResult(null);
+    try {
+      const r = await fetch("/api/action/retest", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site_id: sid, domain: domain || "", query_count: 50 }),
+      });
+      if (r.ok) {
+        setRetestResult(await r.json());
+        loadAiInsight();
+      }
+    } catch {}
+    setRetesting(false);
   };
 
   // Auto-load the insight analysis once a site is selected
@@ -432,16 +473,39 @@ export default function DashboardPage() {
                       {aiInsight.summary && <p className="text-xs text-zinc-400 mb-2">{aiInsight.summary}</p>}
                       {aiInsight.factors.map((f: any) => (
                         <div key={f.factor} className={`border rounded-lg p-3 ${f.severity === "high" ? "border-red-900/60 bg-red-950/20" : f.severity === "medium" ? "border-amber-900/60 bg-amber-950/20" : "border-zinc-800 bg-zinc-950/50"}`}>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${f.severity === "high" ? "bg-red-900/40 text-red-300" : f.severity === "medium" ? "bg-amber-900/40 text-amber-300" : "bg-zinc-800 text-zinc-400"}`}>
                               {f.severity.toUpperCase()}
                             </span>
                             <span className="text-sm font-medium text-zinc-200">{f.label}</span>
+                            {(f.factor === "faq" || f.factor === "knowledge") && (
+                              <button
+                                onClick={() => applyFix(f.factor)}
+                                disabled={applying}
+                                className="ml-auto text-[10px] px-2 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-md transition"
+                              >
+                                {applying ? "…" : "⚡ Fix →"}
+                              </button>
+                            )}
                           </div>
                           <p className="text-xs text-zinc-400 mt-1.5">{f.evidence}</p>
                           {f.action && <p className="text-xs text-emerald-400/80 mt-1.5">→ {f.action}</p>}
                         </div>
                       ))}
+                      {applyStatus && <p className="text-xs text-emerald-400 mt-2">{applyStatus}</p>}
+
+                      {/* Retest (before/after) */}
+                      <div className="mt-4 flex items-center gap-3 flex-wrap">
+                        <button onClick={retest} disabled={retesting} className="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white rounded-lg transition">
+                          {retesting ? "Retesting…" : "🔄 优化后重测（before/after）"}
+                        </button>
+                        {retestResult && (
+                          <div className={`text-xs font-medium ${retestResult.delta > 0 ? "text-emerald-400" : retestResult.delta < 0 ? "text-red-400" : "text-zinc-400"}`}>
+                            {retestResult.before_rate}% → {retestResult.after_rate}%
+                            {retestResult.delta !== 0 && ` (${retestResult.delta > 0 ? "+" : ""}${retestResult.delta}%)`}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <p className="text-xs text-zinc-600">{aiInsightLoading ? "分析中…" : "连接站点后自动分析"}</p>
