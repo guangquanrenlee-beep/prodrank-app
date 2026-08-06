@@ -42,7 +42,7 @@ export const INDUSTRIES = [
 ];
 
 export const SOLUTIONS = [
-  { slug: "shopify", title: "Shopify Stores", desc: "180万+ Shopify stores need AI visibility. Install our App — one click, all products optimized." },
+  { slug: "shopify", title: "Shopify Stores", desc: "1.8M+ Shopify stores need AI visibility. Install our App — one click, all products optimized." },
   { slug: "woocommerce", title: "WooCommerce Shops", desc: "WooCommerce REST API sync. Upload our Plugin — all products get Schema." },
   { slug: "amazon-sellers", title: "Amazon Sellers", desc: "Optimize your Amazon listings for AI agent recommendations." },
   { slug: "dtc-brands", title: "DTC Brands", desc: "Direct-to-consumer brands need AI visibility more than anyone. No marketplace to fall back on." },
