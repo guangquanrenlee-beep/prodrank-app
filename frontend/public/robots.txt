@@ -1,0 +1,47 @@
+# ProdRank — AI agent crawlers explicitly allowed (this is a GEO-first site)
+# Block only training-only crawlers; every AI shopping assistant is welcome.
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Training-only crawlers — blocked
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: omgili
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: otherbot
+Disallow: /
+
+Sitemap: https://prodrank.app/sitemap.xml

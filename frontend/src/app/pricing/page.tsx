@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import Link from "next/link";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 
 const PADDLE_PRICE_IDS = { pro: "pri_pro_placeholder", growth: "pri_growth_placeholder" };
@@ -12,6 +13,7 @@ export default function PricingPage() {
 
   return (<>
     <main className="min-h-screen max-w-6xl mx-auto px-4 py-12 space-y-8">
+      <Breadcrumbs items={[{ label: "Pricing" }]} />
       <div className="text-center space-y-4">
         <Link href="/" className="text-zinc-500 hover:text-zinc-300 text-sm">← Back</Link>
         <h1 className="text-4xl font-bold">Simple, transparent pricing</h1>

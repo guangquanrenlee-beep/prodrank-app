@@ -1,6 +1,7 @@
 import { SOLUTIONS } from "@/lib/content";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 export function generateStaticParams() { return SOLUTIONS.map(s => ({ slug: s.slug })); }
 
@@ -10,7 +11,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
   if (!s) notFound();
 
   return (<main className="min-h-screen max-w-3xl mx-auto px-4 py-16 space-y-8">
-    <Link href="/" className="text-zinc-500 text-sm">← Home</Link>
+    <Breadcrumbs items={[{ label: "Solutions", href: "/solutions" }, { label: s.title }]} />
     <div className="space-y-4"><h1 className="text-4xl font-bold">AI Visibility for {s.title}</h1><p className="text-lg text-zinc-400">{s.desc}</p></div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5"><h3 className="font-semibold mb-2">Auto Schema Injection</h3><p className="text-sm text-zinc-400">One-click install. All products get complete JSON-LD Schema automatically.</p></div>

@@ -1,0 +1,30 @@
+# ProdRank
+
+> AI Agent Commerce SEO (GEO) — help ecommerce stores get their products recommended by ChatGPT, Gemini, Claude, and Grok when shoppers ask for product advice. ProdRank audits a store's AI visibility, generates GEO-optimized content (Schema, FAQ, descriptions), tracks AI recommendations weekly, and shows what to fix with evidence.
+
+Key facts:
+- ProdRank optimizes for AI shopping assistants, not just Google.
+- Core loop: scan your store → find why AI doesn't recommend you → generate fixes (Schema/FAQ/content) → publish → re-test recommendation rate.
+- Works with Shopify (App), WooCommerce (plugin), and any custom store via API.
+- Honest timeline: AI awareness updates over 4–12 weeks as indexes and model knowledge refresh.
+
+## Core pages
+
+- [Home](https://prodrank.app/): AI visibility diagnostic + product overview
+- [Pricing](https://prodrank.app/pricing): Free / Pro $79 / Growth $199 / Agency $499
+- [AI Optimization Studio](https://prodrank.app/studio): generate Schema, FAQ, descriptions, comparisons
+- [AI Shopping Score](https://prodrank.app/verify): how AI visibility is measured (Discover/Understand/Trust/Recommend)
+- [Free tools](https://prodrank.app/tools): Schema Validator, AI Score Checker, FAQ Generator, JSON-LD Generator, Description Analyzer, Citation Checker
+- [Integrations](https://prodrank.app/integrations): Shopify App, WordPress plugin, custom API
+- [Docs](https://prodrank.app/docs): getting started
+
+## Platform guides
+
+- [Shopify](https://prodrank.app/solutions/shopify): install the App, one click
+- [WooCommerce](https://prodrank.app/solutions/woocommerce): plugin + REST sync
+- [Amazon Sellers](https://prodrank.app/solutions/amazon-sellers)
+- [DTC Brands](https://prodrank.app/solutions/dtc-brands)
+
+## Contact
+
+- Email: support@prodrank.app
