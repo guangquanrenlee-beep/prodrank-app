@@ -133,6 +133,10 @@ export default function DashboardPage() {
   const [trends, setTrends] = useState<any>(null);
   const [trendGaps, setTrendGaps] = useState<any[]>([]);
   const [rateTrend, setRateTrend] = useState<any[]>([]);
+  const [compareInput, setCompareInput] = useState("");
+  const [compareResult, setCompareResult] = useState<any>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [trendGrowth, setTrendGrowth] = useState<any>(null);
 
   const siteIdForDomain = () => sites.find((s: any) => s.domain === domain)?.id || "";
 
@@ -202,6 +206,21 @@ export default function DashboardPage() {
     setRetesting(false);
   };
 
+  const runCompare = async () => {
+    const sid = siteIdForDomain();
+    if (!sid || !compareInput.trim()) return;
+    setCompareLoading(true); setCompareResult(null);
+    try {
+      const competitors = compareInput.split(",").map(s => s.trim()).filter(Boolean);
+      const r = await fetch("/api/test/compare", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site_id: sid, domain: domain || "", brand_name: (domain || "").split(".")[0] || "Store", competitors, query_count: 30, models: ["deepseek"] }),
+      });
+      if (r.ok) setCompareResult(await r.json());
+    } catch {}
+    setCompareLoading(false);
+  };
+
   const loadTrends = async () => {
     try {
       const sid = siteIdForDomain();
@@ -215,6 +234,8 @@ export default function DashboardPage() {
         const tr = await fetch(`/api/test/trend?site_id=${encodeURIComponent(sid)}&days=30`);
         if (tr.ok) setRateTrend((await tr.json()).series || []);
       }
+      const tg = await fetch("/api/trends/trend?days=30&top_n=8");
+      if (tg.ok) setTrendGrowth(await tg.json());
     } catch {}
   };
 
@@ -506,6 +527,39 @@ export default function DashboardPage() {
                   </div>
                 )}
 
+                {/* Competitor comparison */}
+                <div className="border-t border-zinc-800 pt-4 mt-4">
+                  <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    <h3 className="text-sm font-semibold text-zinc-300">⚔️ vs Competitors</h3>
+                    <input
+                      value={compareInput}
+                      onChange={e => setCompareInput(e.target.value)}
+                      placeholder="Nike, Uniqlo, Adidas"
+                      className="flex-1 min-w-40 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-xs placeholder:text-zinc-600 focus:outline-none"
+                    />
+                    <button onClick={runCompare} disabled={compareLoading || !compareInput.trim()}
+                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white text-xs rounded-lg transition">
+                      {compareLoading ? "Comparing…" : "Compare →"}
+                    </button>
+                  </div>
+                  {compareResult?.comparison?.length > 0 && (
+                    <div className="space-y-1.5">
+                      {compareResult.comparison.map((row: any) => (
+                        <div key={row.brand} className="flex items-center gap-2 text-xs">
+                          <span className="w-24 truncate text-zinc-300">{row.brand}</span>
+                          <div className="flex-1 bg-zinc-800 rounded-full h-3 overflow-hidden">
+                            <div className={`h-full rounded-full ${row.brand === compareResult.comparison[0].brand ? "bg-purple-500" : "bg-zinc-600"}`}
+                                 style={{ width: `${Math.max(2, row.rate_pct)}%` }} />
+                          </div>
+                          <span className="w-14 text-right text-zinc-400">{row.rate_pct}%</span>
+                          <span className="text-[10px] text-zinc-600">{row.mentioned_queries}/{compareResult.total_queries}</span>
+                        </div>
+                      ))}
+                      <p className="text-[10px] text-zinc-600">Same {compareResult.total_queries} questions asked once — mentions counted per brand. Your brand highlighted purple.</p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Insight factors */}
                 <div className="border-t border-zinc-800 pt-4">
                   <div className="flex items-center justify-between mb-3">
@@ -584,6 +638,26 @@ export default function DashboardPage() {
                         </span>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {trendGrowth?.has_data && trendGrowth.trends?.length > 0 && (
+                  <div className="mb-4 border-t border-zinc-800 pt-4">
+                    <h3 className="text-xs font-semibold text-zinc-400 mb-2">30-day growth (what&apos;s rising)</h3>
+                    <div className="space-y-1.5">
+                      {trendGrowth.trends.filter((t: any) => t.growth_pct !== null).slice(0, 6).map((t: any) => (
+                        <div key={t.attribute} className="flex items-center gap-2 text-xs">
+                          <span className="w-28 truncate text-zinc-300">{t.attribute}</span>
+                          <div className="flex-1 bg-zinc-800 rounded-full h-2.5 overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, Math.max(2, (t.growth_pct || 0) / 2))}%` }} />
+                          </div>
+                          <span className={`w-14 text-right font-medium ${(t.growth_pct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {t.growth_pct > 0 ? "+" : ""}{t.growth_pct}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-zinc-600 mt-1">Growth vs the previous {trendGrowth.series?.length || 30} day(s) of snapshot data.</p>
                   </div>
                 )}
 
