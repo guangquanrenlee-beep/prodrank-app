@@ -172,12 +172,12 @@ export default function DashboardPage() {
       });
       const d = await r.json();
       if (r.ok) {
-        setApplyStatus(`已生成发布 ${d.applied || 0} 个产品${d.failed ? `，${d.failed} 个失败` : ""}`);
+        setApplyStatus(`Generated & published on ${d.applied || 0} products${d.failed ? `, ${d.failed} failed` : ""}`);
         loadAiInsight();
       } else {
-        setApplyStatus(d.detail || "修复失败");
+        setApplyStatus(d.detail || "Fix failed");
       }
-    } catch { setApplyStatus("网络错误"); }
+    } catch { setApplyStatus("Network error"); }
     setApplying(false);
   };
 
@@ -428,7 +428,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
                   <div>
                     <h2 className="font-semibold text-white">🧠 AI Recommendation Test</h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">问 AI 购物助手真实购物问题，测你的商品被推荐的概率 & 找出证据差距</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">Ask an AI shopping assistant real shopper questions — measure your recommendation rate & find evidence-backed gaps</p>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => runAiTest(30)} disabled={aiTestLoading} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white text-xs rounded-lg transition">
@@ -457,15 +457,15 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-600 mb-4">还没跑过测试 — 点击 Run 开始（30 条 ≈ 成本 {"<$0.01"}）</p>
+                  <p className="text-xs text-zinc-600 mb-4">No test run yet — hit Run to start (30 queries ≈ {"<$0.01"})</p>
                 )}
 
                 {/* Insight factors */}
                 <div className="border-t border-zinc-800 pt-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-zinc-300">为什么没被推荐（证据）</h3>
+                    <h3 className="text-sm font-semibold text-zinc-300">Why not recommended (evidence)</h3>
                     <button onClick={loadAiInsight} disabled={aiInsightLoading} className="text-xs text-purple-400 hover:text-purple-300">
-                      {aiInsightLoading ? "…" : "刷新分析"}
+                      {aiInsightLoading ? "…" : "Refresh analysis"}
                     </button>
                   </div>
                   {aiInsight?.factors?.length > 0 ? (
@@ -497,7 +497,7 @@ export default function DashboardPage() {
                       {/* Retest (before/after) */}
                       <div className="mt-4 flex items-center gap-3 flex-wrap">
                         <button onClick={retest} disabled={retesting} className="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-zinc-700 text-white rounded-lg transition">
-                          {retesting ? "Retesting…" : "🔄 优化后重测（before/after）"}
+                          {retesting ? "Retesting…" : "🔄 Retest after fixes"}
                         </button>
                         {retestResult && (
                           <div className={`text-xs font-medium ${retestResult.delta > 0 ? "text-emerald-400" : retestResult.delta < 0 ? "text-red-400" : "text-zinc-400"}`}>
@@ -508,7 +508,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-zinc-600">{aiInsightLoading ? "分析中…" : "连接站点后自动分析"}</p>
+                    <p className="text-xs text-zinc-600">{aiInsightLoading ? "Analyzing…" : "Auto-analyzes when a site is connected"}</p>
                   )}
                 </div>
               </div>
