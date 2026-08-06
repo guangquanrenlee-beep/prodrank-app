@@ -14,6 +14,7 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
     volumes:
       - question_data:/app/data
+      - question_tasks:/app/tasks
 
   nginx:
     image: nginx:alpine
@@ -31,3 +32,4 @@ services:
 
 volumes:
   question_data:
+  question_tasks:

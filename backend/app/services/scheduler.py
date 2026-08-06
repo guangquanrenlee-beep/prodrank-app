@@ -22,9 +22,27 @@ async def run_pending():
         with open(daily_file, "w") as f: json.dump(jobs, f)
 
     # Daily real-question collection (once per day, all categories)
-    if jobs.get("last_collect") != today:
+    # last_collect is marked ONLY when the collect task completes successfully
+    # (see below) — a task killed by a deploy/rebuild is re-enqueued on the
+    # next worker tick instead of being silently skipped for the day.
+    from app.services.task_queue import TASK_DIR
+    collect_done = False
+    for fn in os.listdir(TASK_DIR):
+        if not fn.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(TASK_DIR, fn)) as f:
+                t = json.load(f)
+        except Exception:
+            continue
+        if t.get("type") == "collect_questions" and t.get("status") == "done" and t.get("result"):
+            collect_done = True
+            break
+    if collect_done:
         jobs["last_collect"] = today
         with open(daily_file, "w") as f: json.dump(jobs, f)
+    elif jobs.get("last_collect") != today:
+        # Not collected today and no completed task — (re)enqueue.
         from app.services.data_collector import CATEGORY_CONFIG
         queue.enqueue("collect_questions", {"categories": list(CATEGORY_CONFIG.keys())})
 
