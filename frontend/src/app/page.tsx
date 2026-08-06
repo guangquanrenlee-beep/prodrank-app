@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { TOOLS } from "@/lib/content";
+import DiagnosticHero from "@/components/DiagnosticHero";
 
 const FEATURES = [
   { icon: "🔍", title: "Schema Audit", desc: "12-field JSON-LD check across every product page. See exactly what AI crawlers see." },
@@ -120,6 +121,11 @@ export default function HomePage() {
           <button type="submit" disabled={loading} className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-medium rounded-lg transition text-lg">{loading ? "..." : "Analyze Free →"}</button>
         </form>
         <p className="text-xs text-zinc-600">No credit card. Works with Shopify, WooCommerce, and any custom site.</p>
+
+        {/* Live diagnostic (three-tier AI-readiness scan) */}
+        <div className="pt-10">
+          <DiagnosticHero />
+        </div>
       </section>
 
       {/* ===== Social Proof ===== */}
