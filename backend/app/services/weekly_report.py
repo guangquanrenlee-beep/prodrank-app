@@ -7,6 +7,7 @@ sends the email. Runs Monday morning via the scheduler.
 """
 
 import json
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
 from app.services.db import DB
@@ -60,6 +61,42 @@ def collect_weekly_stats(shop: str) -> dict:
     if len(stats["health_scores"]) >= 2:
         stats["health_delta"] = stats["health_scores"][-1][1] - stats["health_scores"][-2][1]
 
+    # AI Recommendation rate this week (ai_query_results — Test Engine rounds)
+    site = db.client.table("sites").select("id").eq("domain", shop).limit(1).execute().data
+    if site:
+        tests = (db.client.table("ai_query_results").select("recommended")
+                 .eq("site_id", site[0]["id"])
+                 .gte("created_at", f"{start}T00:00:00").execute().data or [])
+        stats["recommendation_tests"] = len(tests)
+        stats["recommendation_rate"] = None
+        if tests:
+            rec = sum(1 for t in tests if t.get("recommended"))
+            stats["recommendation_rate"] = round(rec / len(tests) * 100, 1)
+    else:
+        stats["recommendation_tests"] = 0
+        stats["recommendation_rate"] = None
+
+    # AI Shopping Trend: hot attributes this week (from trend snapshots)
+    snaps = (db.client.table("trend_snapshots").select("snapshot_date,attributes")
+             .gte("snapshot_date", f"{start}").order("snapshot_date").limit(30).execute().data or [])
+    stats["trend_attributes"] = None
+    if snaps:
+        attrs: Counter = Counter()
+        for s in snaps:
+            attrs.update(s.get("attributes") or {})
+        top = [{"attribute": a, "count": c} for a, c in attrs.most_common(8)]
+        stats["trend_attributes"] = top
+
+    # Fixes published this week (drafts moved to published)
+    pubs = (db.client.table("content_drafts").select("field").eq("shop", shop)
+            .eq("status", "published")
+            .gte("created_at", f"{start}T00:00:00").execute().data or [])
+    stats["fixes_published"] = len(pubs)
+    stats["fixes_by_field"] = {}
+    for d in pubs:
+        f = d.get("field", "other")
+        stats["fixes_by_field"][f] = stats["fixes_by_field"].get(f, 0) + 1
+
     return stats
 
 
@@ -95,7 +132,11 @@ Here is your ProdRank weekly AI-visibility report for {shop}.
 {summary}
 
 ---
-This week: {stats['content_generated']} AI content pieces generated · {stats['alerts']} alerts · {stats['citations']} new citations · {stats['rank_checks']} ranking checks.
+This week: {stats['content_generated']} AI content pieces generated · {stats['alerts']} alerts · {stats['citations']} new citations · {stats['rank_checks']} ranking checks · {stats['fixes_published']} fixes published.
+
+AI Recommendation rate: {stats['recommendation_rate'] if stats['recommendation_rate'] is not None else 'no tests run'} ({stats['recommendation_tests']} queries tested).
+
+Hot attributes shoppers asked about: {', '.join(f"{a['attribute']} ({a['count']}×)" for a in (stats['trend_attributes'] or [])) or 'collecting data…'}.
 
 Health score trend: {stats['health_scores']} ({(stats['health_delta'] if stats['health_delta'] is not None else 0):+d} vs last week).
 

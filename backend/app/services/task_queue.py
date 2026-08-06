@@ -158,6 +158,9 @@ class TaskQueue:
             elif task["type"] == "trend_snapshot":
                 from app.services.trend_engine import TrendEngine
                 return await TrendEngine().snapshot()
+            elif task["type"] == "trend_alerts":
+                from app.services.trend_engine import TrendEngine
+                return await TrendEngine().check_trend_alerts()
             return {"error": "unknown task type"}
         except Exception as e:
             return {"error": str(e)}

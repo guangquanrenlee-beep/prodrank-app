@@ -83,6 +83,13 @@ async def run_pending():
         with open(daily_file, "w") as f: json.dump(jobs, f)
         queue.enqueue("daily_insights", {})
 
+    # Weekly Trend Alerts (Monday only — what shoppers newly care about)
+    weekday = time.strftime("%A")
+    if weekday == "Monday" and jobs.get("last_trend_alerts") != today:
+        jobs["last_trend_alerts"] = today
+        with open(daily_file, "w") as f: json.dump(jobs, f)
+        queue.enqueue("trend_alerts", {})
+
     # Weekly Opportunity Report (Monday only)
     weekday = time.strftime("%A")
     if weekday == "Monday" and jobs.get("last_weekly") != today:

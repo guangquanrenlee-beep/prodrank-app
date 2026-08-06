@@ -136,3 +136,59 @@ async def verify_optimization(req: TestVerifyRequest):
         }
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+class TestCompareRequest(BaseModel):
+    site_id: str = ""
+    domain: str = ""
+    brand_name: str
+    competitors: list[str]  # brand names to compare against, e.g. ["Nike", "Uniqlo"]
+    category: str = ""
+    query_count: int = 50
+    models: list[str] | None = None
+
+
+@router.post("/compare")
+async def compare_with_competitors(req: TestCompareRequest):
+    """Same batch of shopping queries, ask once, count how often each brand
+    gets mentioned. Your recommendation rate vs each competitor's — a
+    head-to-head visibility comparison on identical questions.
+    """
+    site_id = _resolve_site_id(req.site_id, req.domain)
+    brand = req.brand_name or _guess_brand(req.domain or "")
+
+    run = await engine.run_test(
+        site_id=site_id,
+        brand_name=brand,
+        category=req.category,
+        query_count=min(req.query_count, 200),
+        models=req.models,
+    )
+
+    # Count mentions of every brand across the same answers
+    from collections import Counter
+    mentions: Counter = Counter()
+    for r in run.results:
+        for b in r.mentioned_brands:
+            mentions[b.lower()] += 1
+
+    def brand_stats(name: str) -> dict:
+        name_l = name.lower()
+        # exact or fuzzy: brand is mentioned if any mentioned brand contains it
+        hits = sum(1 for r in run.results if any(name_l in m.lower() for m in r.mentioned_brands))
+        return {
+            "brand": name,
+            "mentioned_queries": hits,
+            "rate_pct": round(hits / run.total_queries * 100, 1) if run.total_queries else 0,
+        }
+
+    comparison = [brand_stats(brand)] + [brand_stats(c) for c in req.competitors]
+    comparison.sort(key=lambda x: -x["rate_pct"])
+
+    return {
+        "site_id": site_id,
+        "total_queries": run.total_queries,
+        "models": req.models or ["deepseek"],
+        "comparison": comparison,
+        "top_mentioned_brands": [{"brand": b, "count": c} for b, c in mentions.most_common(10)],
+    }

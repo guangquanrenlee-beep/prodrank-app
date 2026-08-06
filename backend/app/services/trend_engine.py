@@ -128,3 +128,69 @@ class TrendEngine:
             out.append({"attribute": a, "growth_pct": growth, "points": points})
         out.sort(key=lambda x: -(x["growth_pct"] or 0))
         return {"has_data": True, "series": series, "trends": out}
+
+    # ── Trend-driven auto alerts ──
+
+    async def check_trend_alerts(self, window_days: int = 7, min_growth: float = 30.0) -> dict:
+        """Weekly task: compare the last N days of attribute frequencies against
+        the N days before them. Attributes growing fastest are checked against
+        every site's product content — missing ones raise an alert.
+
+        This is the 'AI Shopping Trend' flywheel: what shoppers ask about is
+        shifting, and merchants learn which content to add BEFORE their
+        competitors do.
+        """
+        rows = (self.db.client.table("trend_snapshots")
+                .select("snapshot_date,attributes")
+                .order("snapshot_date", desc=True)
+                .limit(window_days * 3).execute().data or [])
+        if len(rows) < window_days:
+            return {"checked": False, "message": f"Not enough snapshots yet ({len(rows)}/{window_days}) — trends need time to accumulate.", "alerts": []}
+
+        series = sorted(rows, key=lambda r: r["snapshot_date"])
+        recent = series[-window_days:]
+        prev = series[:-window_days][-window_days:] if len(series) > window_days else []
+
+        def aggregate(chunk: list[dict]) -> Counter:
+            c: Counter = Counter()
+            for r in chunk:
+                c.update(r.get("attributes") or {})
+            return c
+
+        rec_counts = aggregate(recent)
+        prev_counts = aggregate(prev)
+        if not prev_counts:
+            return {"checked": False, "message": "No previous window to compare", "alerts": []}
+
+        # Growing attributes (prev > 0 so growth is meaningful)
+        growing = []
+        for attr, prev_c in prev_counts.items():
+            rec_c = rec_counts.get(attr, 0)
+            if prev_c >= 3 and rec_c >= prev_c:  # avoid noise from rare attrs
+                growth = round((rec_c - prev_c) / prev_c * 100, 1)
+                if growth >= min_growth:
+                    growing.append({"attribute": attr, "recent": rec_c, "previous": prev_c, "growth_pct": growth})
+        growing.sort(key=lambda x: -x["growth_pct"])
+
+        if not growing:
+            return {"checked": True, "growing": [], "alerts": []}
+
+        # For each site, alert when its products don't cover a growing attribute
+        sites = self.db.client.table("sites").select("id,domain").not_.is_("user_id", None).limit(100).execute().data or []
+        alerts = []
+        for s in sites:
+            products = self.db.client.table("products").select("*").eq("site_id", s["id"]).limit(300).execute().data or []
+            texts = [self._product_text(p) for p in products]
+            for g in growing:
+                if any(g["attribute"] in t for t in texts):
+                    continue
+                msg = (f"AI Shopping Trend: '{g['attribute']}' questions grew {g['growth_pct']}% in the last "
+                       f"{window_days} days ({g['previous']}→{g['recent']} mentions). Your products don't mention it — "
+                       f"adding it to descriptions/FAQ could boost AI recommendations.")
+                self.db.save_alert(
+                    shop=s["domain"], alert_type="trend_opportunity",
+                    message=msg, severity="medium",
+                )
+                alerts.append({"shop": s["domain"], "attribute": g["attribute"], "growth_pct": g["growth_pct"], "message": msg})
+
+        return {"checked": True, "growing": growing, "alerts": alerts}
