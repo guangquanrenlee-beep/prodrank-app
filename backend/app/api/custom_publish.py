@@ -138,7 +138,8 @@ async def connect_custom_store(req: CustomConnectRequest, authorization: str = H
     store is stored unbound — later operations claim it for the first
     authenticated user (see _require_owner).
     """
-    domain = req.domain.strip().lower()
+    from app.services.usage import normalize_domain
+    domain = normalize_domain(req.domain)
     token = req.api_token.strip()
     user_id = _user_id_from_auth(authorization)
 
@@ -184,13 +185,24 @@ async def connect_custom_store(req: CustomConnectRequest, authorization: str = H
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     if user_id:
-        from app.services.usage import check_site_limit
+        from app.services.usage import check_site_limit, normalize_domain
         allowed, detail, _current, _limit = check_site_limit(user_id)
         if not allowed:
             raise HTTPException(status_code=403, detail=detail)
         fields["user_id"] = user_id
-        # upsert on (user_id, domain); clean up any leftover unbound rows
-        db.client.table("sites").upsert({"domain": domain, **fields}, on_conflict="user_id,domain").execute()
+        # Idempotent write: reuse any prior row for this user with the same
+        # normalized domain (scheme/www/trailing-slash variants included),
+        # drop the duplicate rows, and clean up leftover unbound rows.
+        existing = db.client.table("sites").select("id,domain,created_at").eq("user_id", user_id).execute().data
+        dups = [s for s in existing if normalize_domain(s["domain"]) == domain]
+        if dups:
+            dups.sort(key=lambda s: s["created_at"] or "")
+            keep, rest = dups[0]["id"], [s["id"] for s in dups[1:]]
+            db.client.table("sites").update(fields).eq("id", keep).execute()
+            if rest:
+                db.client.table("sites").delete().in_("id", rest).execute()
+        else:
+            db.client.table("sites").insert({"domain": domain, **fields}).execute()
         db.client.table("sites").delete().eq("domain", domain).is_("user_id", None).execute()
     else:
         existing = db.client.table("sites").select("id").eq("domain", domain).eq("platform", "custom").limit(1).execute().data

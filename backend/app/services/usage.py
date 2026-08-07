@@ -38,6 +38,30 @@ SITE_LIMITS: dict[str, int] = {
 DEFAULT_PLAN = "free"
 
 
+def normalize_domain(domain: str) -> str:
+    """Canonical store domain: strip scheme, www., path, port-less, lowercase.
+
+    'https://BaiHuoZhan.vercel.app/shop/' → 'baihuozhan.vercel.app'.
+    Used for site dedup — a store re-added with or without scheme/trailing
+    slash must count as the same store.
+    """
+    d = domain.strip().lower()
+    # strip scheme
+    if "://" in d:
+        d = d.split("://", 1)[1]
+    # strip www. (www.example.com and example.com are the same store)
+    if d.startswith("www."):
+        d = d[4:]
+    # strip path/query/fragment
+    for sep in ("/", "?", "#"):
+        if sep in d:
+            d = d.split(sep, 1)[0]
+    # strip port (localhost:3000 → localhost is still distinct from
+    # localhost:8081 — keep ports, they identify different local stores)
+    d = d.rstrip(".")
+    return d if d else domain.strip().lower()
+
+
 def current_month() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m")
 
@@ -83,10 +107,15 @@ def plan_for_user(user_id: str) -> str:
 
 
 def count_user_sites(user_id: str) -> int:
-    """How many stores this user has already bound to their account."""
+    """How many distinct stores this user has already bound to their account.
+
+    Dedupes on the normalized domain — re-adding the same store (with or
+    without scheme/www/trailing slash) must never inflate the count, and
+    leftover rows from failed connection attempts don't count twice.
+    """
     try:
-        data = DB().client.table("sites").select("id").eq("user_id", user_id).execute().data
-        return len(data)
+        data = DB().client.table("sites").select("domain").eq("user_id", user_id).execute().data
+        return len({normalize_domain(s["domain"]) for s in data})
     except Exception:
         return 0
 

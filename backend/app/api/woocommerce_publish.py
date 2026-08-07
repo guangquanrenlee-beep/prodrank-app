@@ -299,7 +299,8 @@ async def connect(req: WooConnectRequest, authorization: str = Header(default=""
     Binds the store to the authenticated account (Authorization: Bearer
     Supabase JWT) so plan quotas + store limits apply. Without a token the
     store is stored unbound (free plan)."""
-    domain = req.domain.strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
+    from app.services.usage import normalize_domain
+    domain = normalize_domain(req.domain)
     user_id = _user_id_from_auth(authorization)
 
     try:
@@ -314,15 +315,14 @@ async def connect(req: WooConnectRequest, authorization: str = Header(default=""
         raise HTTPException(status_code=400, detail=f"Plugin unreachable or token invalid: {str(e)[:150]}")
 
     db = DB()
-    # The same domain may exist both as an unbound row (previous connect
-    # without auth) and as the user's row (added from the dashboard) — the
-    # (user_id, domain) unique constraint would collide on update. Resolve by
-    # upserting on (user_id, domain) and cleaning up leftover unbound rows.
+    # Store limits: a genuinely new store (not a re-connect of a store this
+    # user already has, compared by normalized domain) counts against the
+    # plan's store allowance.
+    user_sites = []
     if user_id:
-        existing = db.client.table("sites").select("id").eq("domain", domain).eq("user_id", user_id).limit(1).execute().data
-        # Store limits: a genuinely new store (not a re-connect) counts
-        # against the plan's store allowance.
-        if not existing:
+        user_sites = db.client.table("sites").select("id,domain,created_at").eq("user_id", user_id).execute().data
+        known = any(normalize_domain(s["domain"]) == domain for s in user_sites)
+        if not known:
             from app.services.usage import check_site_limit
             allowed, detail, _current, _limit = check_site_limit(user_id)
             if not allowed:
@@ -337,12 +337,26 @@ async def connect(req: WooConnectRequest, authorization: str = Header(default=""
     if user_id:
         fields["user_id"] = user_id
     try:
-        db.client.table("sites").upsert(
-            {"domain": domain, **fields}, on_conflict="user_id,domain"
-        ).execute()
         if user_id:
+            # Idempotent write: reuse the earliest matching row (scheme/www/
+            # slash variants included), drop duplicates, remove unbound rows.
+            dups = [s for s in user_sites if normalize_domain(s["domain"]) == domain]
+            if dups:
+                dups.sort(key=lambda s: s["created_at"] or "")
+                keep, rest = dups[0]["id"], [s["id"] for s in dups[1:]]
+                db.client.table("sites").update(fields).eq("id", keep).execute()
+                if rest:
+                    db.client.table("sites").delete().in_("id", rest).execute()
+            else:
+                db.client.table("sites").insert({"domain": domain, **fields}).execute()
             # Remove leftover unbound rows for this domain (NULL user_id)
             db.client.table("sites").delete().eq("domain", domain).is_("user_id", None).execute()
+        else:
+            existing = db.client.table("sites").select("id").eq("domain", domain).eq("user_id", None).limit(1).execute().data
+            if existing:
+                db.client.table("sites").update(fields).eq("id", existing[0]["id"]).execute()
+            else:
+                db.client.table("sites").insert({"domain": domain, **fields}).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save connection: {str(e)[:150]}")
 

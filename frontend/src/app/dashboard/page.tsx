@@ -316,6 +316,20 @@ export default function DashboardPage() {
     }
   };
 
+  /** Switch the active store — reloads everything for the picked site. */
+  const switchSite = (store: any) => {
+    setDomain(store.domain);
+    setCms({ domain: store.domain, platform: store.platform || "unknown", confidence: store.platform_confidence || 0, recommended_action: "Previously analyzed.", auth_method: store.auth_method || "plugin" });
+    if (store.score_data) setScore(store.score_data as ScoreData);
+    else if (store.ai_visibility_score) setScore({ ai_visibility_score: store.ai_visibility_score, label: store.ai_visibility_score >= 60 ? "Good" : "Poor", breakdown: {}, recommendation: "" });
+    else setScore(null);
+    localStorage.setItem(`prodrank_last_domain_${user!.id}`, store.domain);
+    loadHealth(store.domain);
+    loadCompetitors(store.domain);
+    loadCitations();
+    loadInsight(store.domain);
+  };
+
   /** Health Check trend + alerts for the active store. */
   const loadHealth = async (shop: string) => {
     try {
@@ -347,15 +361,19 @@ export default function DashboardPage() {
       const cmsData = await cmsRes.json();
       setCms(cmsData);
 
-      // Store limit check — only counts when adding a NEW store
-      const alreadyBound = sites.some((s: any) => s.domain === cleanDomain);
+      // Store limit check — dedupe by normalized domain (re-adding a store
+      // with/without scheme or trailing slash must never inflate the count,
+      // and failed-connection leftovers must not count either).
+      const norm = (d: string) => d.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      const alreadyBound = sites.some((s: any) => norm(s.domain) === norm(cleanDomain));
       if (!alreadyBound) {
-        const { data: siteRows } = await supabase.from("sites").select("id").eq("user_id", user.id);
+        const { data: siteRows } = await supabase.from("sites").select("domain").eq("user_id", user.id);
+        const distinct = new Set((siteRows || []).map((r: any) => norm(r.domain)));
         const { data: subs } = await supabase.from("subscriptions").select("plan").eq("user_id", user.id).limit(1);
         const plan = (subs?.[0]?.plan as string) || "free";
-        const LIMITS: Record<string, number> = { free: 1, pro: 1, growth: 3, agency: 10 };
-        if ((siteRows?.length ?? 0) >= (LIMITS[plan] ?? 1)) {
-          setError(`Store limit reached (${siteRows?.length}/${LIMITS[plan]}) on your ${plan} plan. Upgrade to Growth to add more stores.`);
+        const LIMITS: Record<string, number> = { free: 1, pro: 1, growth: 3, agency: 10, unlimited: 999 };
+        if (distinct.size >= (LIMITS[plan] ?? 1)) {
+          setError(`Store limit reached (${distinct.size}/${LIMITS[plan]}) on your ${plan} plan. Upgrade to Growth to add more stores.`);
           setLoading(false);
           return;
         }
@@ -896,6 +914,37 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* ── ROW 4.5: Connected Stores ── */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-sm">🏬 Connected Stores</h3>
+                  <span className="text-xs text-zinc-500">{sites.length} store{sites.length !== 1 ? "s" : ""} · click to switch</span>
+                </div>
+                {sites.length === 0 ? (
+                  <div className="text-xs text-zinc-600 py-3">No stores connected yet — analyze a domain above to add your first store.</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {sites.map((s: any) => (
+                      <button
+                        key={s.id}
+                        onClick={() => switchSite(s)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition ${s.domain === domain ? "border-emerald-600 bg-emerald-500/10" : "border-zinc-800 bg-zinc-950 hover:border-zinc-700"}`}
+                      >
+                        <span className="text-lg">{s.platform === "shopify" ? "🛒" : s.platform === "woocommerce" || s.platform === "wordpress" ? "📝" : "🌐"}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm text-zinc-200 truncate">{s.domain}</span>
+                          <span className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-zinc-600">{s.platform || "unknown"}</span>
+                            {s.access_token ? <span className="text-[10px] text-emerald-400">● connected</span> : <span className="text-[10px] text-zinc-600">○ unbound</span>}
+                          </span>
+                        </span>
+                        <span className={`text-sm font-bold ${sc(s.ai_visibility_score || 0)}`}>{s.ai_visibility_score ?? "—"}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* ── ROW 5: Products Summary + Trend ── */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Products summary */}
@@ -939,21 +988,6 @@ export default function DashboardPage() {
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                   <h3 className="font-semibold text-sm mb-4">⚔️ Competitor Watch</h3>
                   <CompetitorMini domain={domain} />
-                  {sites.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-zinc-800">
-                      <div className="text-xs text-zinc-500 mb-2">Your Sites</div>
-                      {sites.slice(0, 2).map((s: any) => (
-                        <div key={s.id} className="flex items-center justify-between py-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs">{s.platform === "shopify" ? "🛒" : s.platform === "woocommerce" || s.platform === "wordpress" ? "📝" : "🌐"}</span>
-                            <span className="text-xs text-zinc-300">{s.domain}</span>
-                            {s.access_token ? <span className="text-[10px] text-emerald-400">● connected</span> : <span className="text-[10px] text-zinc-600">○ unbound</span>}
-                          </div>
-                          <span className={`text-xs font-bold ${sc(s.ai_visibility_score || 0)}`}>{s.ai_visibility_score ?? "—"}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
 
