@@ -7,7 +7,7 @@
  * Author:       ProdRank
  * Author URI:   https://prodrank.app
  * License:      GPL-2.0+
- * Text Domain:  prodrank-ai-seo
+ * Text Domain:  prodrank-ai-geo
  * Requires PHP: 7.4
  * Requires at least: 6.0
  *

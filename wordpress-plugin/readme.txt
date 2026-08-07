@@ -29,7 +29,7 @@ ProdRank helps your WooCommerce store get recommended by AI engines. When custom
 
 == Installation ==
 
-1. Upload the `prodrank-ai-seo` folder to `/wp-content/plugins/`, or install through the WordPress plugins screen.
+1. Upload the `prodrank-ai-geo` folder to `/wp-content/plugins/`, or install through the WordPress plugins screen.
 2. Activate the plugin (requires WooCommerce).
 3. Go to **WooCommerce → ProdRank SEO** to copy your API token and configure Rendering Rules.
 4. Connect the store in your ProdRank dashboard to start generating AI content.

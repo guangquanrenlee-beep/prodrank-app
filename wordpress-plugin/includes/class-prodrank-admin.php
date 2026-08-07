@@ -1,6 +1,6 @@
 <?php
 /**
- * ProdRank Admin — settings page under WooCommerce → ProdRank SEO.
+ * ProdRank Admin — settings page under WooCommerce → ProdRank GEO.
  *
  * Shows:
  *   - API token (SaaS→plugin REST communication, prodrank/v1)
@@ -34,8 +34,8 @@ class ProdRank_Admin {
     public function admin_menu(): void {
         add_submenu_page(
             'woocommerce',
-            'ProdRank SEO — AI Agent Commerce',
-            'ProdRank SEO',
+            'ProdRank GEO — AI Agent Commerce',
+            'ProdRank GEO',
             'manage_woocommerce',
             'prodrank-seo',
             [$this, 'admin_page']

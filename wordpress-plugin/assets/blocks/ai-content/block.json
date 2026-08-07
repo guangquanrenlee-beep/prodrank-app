@@ -16,6 +16,6 @@
     "html": false,
     "align": true
   },
-  "textdomain": "prodrank-ai-seo",
+  "textdomain": "prodrank-ai-geo",
   "editorScript": "file:./index.js"
 }

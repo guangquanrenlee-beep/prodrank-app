@@ -170,7 +170,7 @@ class ProdRank_Content {
     private function render_description($c): string {
         $html = isset($c['html']) ? $c['html'] : '';
         if (!$html) return '';
-        $title = esc_html($c['title'] ?? __('Product Overview', 'prodrank-ai-seo'));
+        $title = esc_html($c['title'] ?? __('Product Overview', 'prodrank-ai-geo'));
         return '<div class="prodrank-section" data-prodrank="description">'
             . '<h2>' . $title . '</h2>' . wp_kses_post($html) . '</div>';
     }
@@ -182,7 +182,7 @@ class ProdRank_Content {
     private function render_pros($c): string {
         $items = $c['items'] ?? [];
         if (!$items) return '';
-        $title = esc_html($c['title'] ?? __('Pros', 'prodrank-ai-seo'));
+        $title = esc_html($c['title'] ?? __('Pros', 'prodrank-ai-geo'));
         $lis = '';
         foreach ($items as $item) {
             $lis .= '<li>' . esc_html($item) . '</li>';
@@ -193,7 +193,7 @@ class ProdRank_Content {
     private function render_faq($c): string {
         $questions = $c['questions'] ?? [];
         if (!$questions) return '';
-        $title = esc_html($c['title'] ?? __('FAQ', 'prodrank-ai-seo'));
+        $title = esc_html($c['title'] ?? __('FAQ', 'prodrank-ai-geo'));
         $out = '<div class="prodrank-section" data-prodrank="faq"><h2>' . $title . '</h2>';
         foreach ($questions as $qa) {
             $q = esc_html($qa['question'] ?? '');
@@ -209,9 +209,9 @@ class ProdRank_Content {
         $rows = $c['rows'] ?? [];
         if (!$rows) return '';
         global $post;
-        $title = esc_html($c['title'] ?? __('How it compares', 'prodrank-ai-seo'));
-        $competitor = esc_html($c['competitor'] ?? __('Typical competitor', 'prodrank-ai-seo'));
-        $product_name = $post ? esc_html(get_the_title($post)) : __('This product', 'prodrank-ai-seo');
+        $title = esc_html($c['title'] ?? __('How it compares', 'prodrank-ai-geo'));
+        $competitor = esc_html($c['competitor'] ?? __('Typical competitor', 'prodrank-ai-geo'));
+        $product_name = $post ? esc_html(get_the_title($post)) : __('This product', 'prodrank-ai-geo');
         $out = '<div class="prodrank-section" data-prodrank="comparison"><h2>' . $title . '</h2>'
             . '<table class="prodrank-comparison"><thead><tr><th>' . $product_name . '</th><th>' . $competitor . '</th></tr></thead><tbody>';
         foreach ($rows as $row) {
@@ -223,7 +223,7 @@ class ProdRank_Content {
     private function render_use_cases($c): string {
         $items = $c['items'] ?? [];
         if (!$items) return '';
-        $title = esc_html($c['title'] ?? __('Use cases', 'prodrank-ai-seo'));
+        $title = esc_html($c['title'] ?? __('Use cases', 'prodrank-ai-geo'));
         $out = '<div class="prodrank-section" data-prodrank="use_cases"><h2>' . $title . '</h2>';
         foreach ($items as $uc) {
             $out .= '<div class="prodrank-use-case"><h3>' . esc_html($uc['title'] ?? '') . '</h3><p>' . wp_kses_post($uc['description'] ?? '') . '</p></div>';
@@ -234,7 +234,7 @@ class ProdRank_Content {
     private function render_buying_guide($c): string {
         $steps = $c['steps'] ?? [];
         if (!$steps) return '';
-        $title = esc_html($c['title'] ?? __('Buying guide', 'prodrank-ai-seo'));
+        $title = esc_html($c['title'] ?? __('Buying guide', 'prodrank-ai-geo'));
         $out = '<div class="prodrank-section" data-prodrank="buying_guide"><h2>' . $title . '</h2><ol>';
         foreach ($steps as $step) {
             $out .= '<li><strong>' . esc_html($step['title'] ?? '') . '</strong> — ' . wp_kses_post($step['detail'] ?? '') . '</li>';
@@ -245,7 +245,7 @@ class ProdRank_Content {
     private function render_specification($c): string {
         $items = $c['items'] ?? [];
         if (!$items) return '';
-        $title = esc_html($c['title'] ?? __('Specifications', 'prodrank-ai-seo'));
+        $title = esc_html($c['title'] ?? __('Specifications', 'prodrank-ai-geo'));
         $out = '<div class="prodrank-section" data-prodrank="specification"><h2>' . $title . '</h2><table class="prodrank-specs">';
         foreach ($items as $spec) {
             $out .= '<tr><th>' . esc_html($spec['name'] ?? '') . '</th><td>' . wp_kses_post($spec['value'] ?? '') . '</td></tr>';
