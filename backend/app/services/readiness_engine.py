@@ -24,15 +24,24 @@ AI_BOTS = ["GPTBot", "ClaudeBot", "Google-Extended", "PerplexityBot", "Bingbot"]
 
 
 def _is_cloudflare(resp: httpx.Response, html: str) -> bool:
-    server = (resp.headers.get("server") or "").lower()
-    if "cloudflare" in server:
-        return True
-    if resp.headers.get("cf-ray"):
-        return True
-    # challenge page markers
-    markers = ["challenge-platform", "cf-chl", "cf-browser-verification", "__cf_chl"]
+    """True only if Cloudflare is actually intercepting the request.
+
+    Merely being proxied by Cloudflare (server: cloudflare / cf-ray headers,
+    incl. every cloudflared tunnel) is NOT an interception — a tunneled site
+    with no bot protection serves 200 + normal content. Real interception
+    shows up as: cf-mitigated header, challenge-page markers, or a block
+    status code (403/429/503) coming from the Cloudflare edge.
+    """
+    if resp.headers.get("cf-mitigated"):
+        return True  # challenge / block / bypass — visitor was challenged
+    # challenge page markers (interactive/managed challenge pages)
+    markers = ["challenge-platform", "cf-chl-", "cf-browser-verification", "__cf_chl",
+               "Attention Required! | Cloudflare"]
     if any(m in html for m in markers):
         return True
+    if resp.status_code in (403, 429, 503):
+        server = (resp.headers.get("server") or "").lower()
+        return "cloudflare" in server or bool(resp.headers.get("cf-ray"))
     return False
 
 
@@ -180,8 +189,22 @@ async def readiness_scan(url: str) -> dict:
 
         html = resp.text if resp.status_code == 200 else ""
 
-        # Cloudflare check first — this IS the diagnosis
-        if resp.status_code in (403, 429, 503) or _is_cloudflare(resp, html):
+        # Blocked check first — this IS the diagnosis
+        if _is_cloudflare(resp, html):
+            kind, message = "cloudflare", (
+                "Your store is behind Cloudflare bot protection. "
+                "AI crawlers (GPTBot, ClaudeBot, PerplexityBot) are likely blocked the same way — "
+                "this is one of the most common reasons products never appear in AI recommendations."
+            )
+        elif resp.status_code in (403, 429, 503):
+            kind, message = "http", (
+                f"The site returned HTTP {resp.status_code} to an automated visitor. "
+                "AI crawlers (GPTBot, ClaudeBot, PerplexityBot) are likely blocked the same way — "
+                "this is one of the most common reasons products never appear in AI recommendations."
+            )
+        else:
+            kind = None
+        if kind:
             robots_text = None
             try:
                 r = await client.get(f"{resp.url.scheme}://{resp.url.netloc}/robots.txt", timeout=10)
@@ -192,12 +215,8 @@ async def readiness_scan(url: str) -> dict:
             bots_blocked = [b for b, blocked in bot_verdicts.items() if blocked]
             return {
                 "status": "blocked",
-                "kind": "cloudflare",
-                "message": (
-                    "Your store is behind Cloudflare bot protection. "
-                    "AI crawlers (GPTBot, ClaudeBot, PerplexityBot) are likely blocked the same way — "
-                    "this is one of the most common reasons products never appear in AI recommendations."
-                ),
+                "kind": kind,
+                "message": message,
                 "robots_readable": robots_text is not None,
                 "ai_bots_blocked": bots_blocked,
                 "fix_hint": "Connect your store for a deep audit: we verify AI crawler access and configure the allow-list.",
