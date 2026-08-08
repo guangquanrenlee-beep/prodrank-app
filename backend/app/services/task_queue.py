@@ -77,6 +77,7 @@ class TaskQueue:
                 if retries > MAX_RETRIES:
                     task["status"] = "failed"
                     task["result"] = {"error": f"stale after {MAX_RETRIES} retries"}
+                    task["completed_at"] = time.time()
                     print(f"[task_queue] {task.get('type')} ({fn}) failed after {MAX_RETRIES} retries — marking failed")
                     with open(path, "w") as f:
                         json.dump(task, f)
@@ -97,6 +98,7 @@ class TaskQueue:
             task["status"] = "done"
             task["result"] = result
             task["retries"] = task.get("retries", 0)
+            task["completed_at"] = time.time()
             with open(path, "w") as f:
                 json.dump(task, f)
 

@@ -22,27 +22,38 @@ async def run_pending():
         with open(daily_file, "w") as f: json.dump(jobs, f)
 
     # Daily real-question collection (once per day, all categories)
-    # last_collect is marked ONLY when the collect task completes successfully
-    # (see below) — a task killed by a deploy/rebuild is re-enqueued on the
-    # next worker tick instead of being silently skipped for the day.
+    # The collect task is considered "done for today" ONLY if it completed
+    # today (completed_at, falling back to file mtime for legacy tasks).
+    # Previously any historical done task in TASK_DIR suppressed collection
+    # forever — tasks linger up to 7 days, so the first successful run
+    # blocked every later day. Tasks pending/running are left alone
+    # (inflight guard) so a slow collect is never double-enqueued.
     from app.services.task_queue import TASK_DIR
-    collect_done = False
+    collect_done_today = False
+    collect_inflight = False
     for fn in os.listdir(TASK_DIR):
         if not fn.endswith(".json"):
             continue
+        path = os.path.join(TASK_DIR, fn)
         try:
-            with open(os.path.join(TASK_DIR, fn)) as f:
+            with open(path) as f:
                 t = json.load(f)
         except Exception:
             continue
-        if t.get("type") == "collect_questions" and t.get("status") == "done" and t.get("result"):
-            collect_done = True
-            break
-    if collect_done:
+        if t.get("type") != "collect_questions":
+            continue
+        if t.get("status") in ("pending", "running"):
+            collect_inflight = True
+        elif t.get("status") == "done" and t.get("result"):
+            completed = t.get("completed_at") or os.path.getmtime(path)
+            if time.strftime("%Y-%m-%d", time.localtime(completed)) == today:
+                collect_done_today = True
+    if collect_done_today:
         jobs["last_collect"] = today
-        with open(daily_file, "w") as f: json.dump(jobs, f)
-    elif jobs.get("last_collect") != today:
-        # Not collected today and no completed task — (re)enqueue.
+    elif not collect_inflight:
+        # Not collected today and no task in flight — (re)enqueue. This also
+        # recovers the case where last_collect was wrongly marked by a
+        # historical task: it now just gets re-run.
         from app.services.data_collector import CATEGORY_CONFIG
         queue.enqueue("collect_questions", {"categories": list(CATEGORY_CONFIG.keys())})
 
