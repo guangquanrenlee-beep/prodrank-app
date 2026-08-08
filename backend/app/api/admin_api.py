@@ -109,9 +109,24 @@ async def data_summary(request: Request):
     from app.services.db import DB
     db = DB()
 
-    # Pull category + added_at for aggregation (library is small, thousands of rows)
-    rows = db.client.table("questions").select("category,added_at").limit(50000).execute().data or []
-    total = len(rows)
+    # Pull category + added_at for aggregation. A single .limit(50000) call
+    # is silently truncated by PostgREST's db-max-rows (1000 on Supabase) —
+    # the summary would always read "1000" no matter the real size. Fetch
+    # paginated and use an exact count instead.
+    def fetch_all(select: str, page_size: int = 1000):
+        first = db.client.table("questions").select(select, count="exact").range(0, page_size - 1).execute()
+        total = first.count or 0
+        rows = list(first.data or [])
+        start = page_size
+        while start < total:
+            chunk = db.client.table("questions").select(select).range(start, start + page_size - 1).execute()
+            rows += (chunk.data or [])
+            start += page_size
+            if not chunk.data:
+                break
+        return rows, total
+
+    rows, total = fetch_all("category,added_at")
 
     # Per category dimension distribution: category = "fashion:Size"
     by_category: dict[str, dict] = {}
