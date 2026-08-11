@@ -100,6 +100,27 @@ async def setup_env(req: SetupEnvRequest, request: Request):
         return {"status": "error", "message": str(e)}
 
 
+def _fetch_all_rows(db, table: str, select: str, page_size: int = 1000) -> tuple[list[dict], int]:
+    """Fetch every row of a table, returning (rows, exact_total).
+
+    A single .limit(50000) call is silently truncated by PostgREST's
+    db-max-rows (1000 on Supabase) — the summary used to always read "1000"
+    no matter the real size. Fetch paginated via Range headers and use an
+    exact count (Prefer: count=exact via supabase-py's count param).
+    """
+    first = db.client.table(table).select(select, count="exact").range(0, page_size - 1).execute()
+    total = first.count or 0
+    rows = list(first.data or [])
+    start = page_size
+    while start < total:
+        chunk = db.client.table(table).select(select).range(start, start + page_size - 1).execute()
+        rows += (chunk.data or [])
+        start += page_size
+        if not chunk.data:
+            break
+    return rows, total
+
+
 @router.get("/data/summary")
 async def data_summary(request: Request):
     """Internal data asset panel — question library stats.
@@ -109,24 +130,7 @@ async def data_summary(request: Request):
     from app.services.db import DB
     db = DB()
 
-    # Pull category + added_at for aggregation. A single .limit(50000) call
-    # is silently truncated by PostgREST's db-max-rows (1000 on Supabase) —
-    # the summary would always read "1000" no matter the real size. Fetch
-    # paginated and use an exact count instead.
-    def fetch_all(select: str, page_size: int = 1000):
-        first = db.client.table("questions").select(select, count="exact").range(0, page_size - 1).execute()
-        total = first.count or 0
-        rows = list(first.data or [])
-        start = page_size
-        while start < total:
-            chunk = db.client.table("questions").select(select).range(start, start + page_size - 1).execute()
-            rows += (chunk.data or [])
-            start += page_size
-            if not chunk.data:
-                break
-        return rows, total
-
-    rows, total = fetch_all("category,added_at")
+    rows, total = _fetch_all_rows(db, "questions", "category,added_at")
 
     # Per category dimension distribution: category = "fashion:Size"
     by_category: dict[str, dict] = {}

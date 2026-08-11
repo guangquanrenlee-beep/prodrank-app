@@ -2,13 +2,16 @@
 import json, time, os
 from app.services.task_queue import TaskQueue
 
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
+DAILY_FILE = os.path.join(DATA_DIR, "daily_jobs.json")
+
 async def run_pending():
     """Called periodically by the in-app worker. Processes task queue and daily jobs."""
     queue = TaskQueue()
     await queue.process_pending()
 
     # Check if daily jobs need to run (once per day per keyword)
-    daily_file = os.path.join(os.path.dirname(__file__), "..", "..", "data", "daily_jobs.json")
+    daily_file = DAILY_FILE
     os.makedirs(os.path.dirname(daily_file), exist_ok=True)
     today = time.strftime("%Y-%m-%d")
     try:
@@ -110,7 +113,7 @@ async def run_pending():
 
 def add_daily_keyword(brand: str, keyword: str):
     """Register a keyword for daily auto-tracking."""
-    daily_file = os.path.join(os.path.dirname(__file__), "..", "..", "data", "daily_jobs.json")
+    daily_file = DAILY_FILE
     os.makedirs(os.path.dirname(daily_file), exist_ok=True)
     try:
         with open(daily_file) as f: jobs = json.load(f)
