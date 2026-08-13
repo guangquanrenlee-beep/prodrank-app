@@ -18,6 +18,8 @@ class AuditProductRequest(BaseModel):
 
 class AuditSiteRequest(BaseModel):
     domain: str
+    platform: str | None = None
+    access_token: str | None = None
 
 
 class ManualAuditRequest(BaseModel):
@@ -71,7 +73,9 @@ async def audit_site(req: AuditSiteRequest, request: Request):
     """Audit entire site for AI crawlability and Schema coverage. Persists results."""
     try:
         domain = str(req.domain)
-        result = await detector.audit_site(domain)
+        result = await detector.audit_site(
+            domain, platform=req.platform, access_token=req.access_token,
+        )
         # Persist products to Supabase
         try:
             from app.services.db import DB

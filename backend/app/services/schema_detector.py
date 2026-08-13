@@ -486,14 +486,66 @@ class SchemaDetector:
 
     # ── Site-level audit ──
 
-    async def audit_site(self, domain: str) -> SiteAuditResult:
-        """Crawl sitemap + Shopify JSON API for fast site-wide Schema coverage."""
-        result = SiteAuditResult(url=domain)
+    async def audit_site(
+        self, domain: str, platform: str | None = None,
+        access_token: str | None = None,
+    ) -> SiteAuditResult:
+        """Audit an entire site for AI crawlability + Schema coverage.
 
+        Routes on platform so each CMS gets the right strategy:
+          - shopify   → /products.json + sitemap + homepage links
+          - wordpress → plugin REST API (authenticated — works through
+                        Cloudflare / bot protection) → public WooCommerce
+                        REST → RankMath sitemap index → homepage links
+        When platform / token are omitted, they are resolved from the
+        sites table — a connected store is always audited through its
+        auth channel, never a blind crawl.
+        """
         if not domain.startswith("http"):
             domain = f"https://{domain}"
         parsed = urlparse(domain)
         base = f"{parsed.scheme}://{parsed.netloc}"
+        host = parsed.netloc
+
+        if not platform or not access_token:
+            resolved = self._resolve_site(host)
+            if resolved:
+                platform = platform or resolved.get("platform") or None
+                access_token = access_token or resolved.get("access_token") or None
+
+        if not platform:
+            try:
+                from app.services.cms_detector import CMSDetector
+                platform = (await CMSDetector().detect(host)).platform
+            except Exception:
+                platform = None
+
+        if platform == "shopify":
+            return await self._audit_shopify(base, host)
+        if platform in ("woocommerce", "wordpress"):
+            return await self._audit_wordpress(base, host, access_token)
+        # custom / unknown / bigcommerce / magento — generic crawl
+        return await self._audit_shopify(base, host)
+
+    def _resolve_site(self, host: str) -> dict | None:
+        """Look up a connected site (platform + token) from the sites table."""
+        try:
+            from app.services.db import DB
+            from app.services.usage import normalize_domain
+            domain = normalize_domain(host)
+            rows = (DB().client.table("sites")
+                    .select("platform", "access_token", "domain")
+                    .eq("domain", domain).limit(5).execute().data or [])
+            for r in rows:
+                if r.get("platform"):
+                    return r
+        except Exception:
+            pass
+        return None
+
+    async def _audit_shopify(self, base: str, host: str) -> SiteAuditResult:
+        """Crawl sitemap + Shopify JSON API for fast site-wide Schema coverage."""
+        result = SiteAuditResult(url=host)
 
         # Check robots.txt
         try:
@@ -508,23 +560,24 @@ class SchemaDetector:
         products = []
         api_url = urljoin(base, "/products.json?limit=250")
 
-        # Try Shopify /products.json
+        # Try Shopify /products.json. Only a real JSON body counts — an HTML
+        # response is a 404/error page, not Cloudflare protection.
         try:
             html = await self._fetch(api_url)
-            if html.strip().startswith("<"):
-                raise ValueError("Cloudflare HTML response")
+            products = json.loads(html).get("products", [])[:50]
+        except (json.JSONDecodeError, TypeError):
+            products = []
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (401, 403, 429):
+                try:
+                    html = await self._fetch_stealth(api_url)
+                    products = json.loads(html).get("products", [])[:50]
+                except Exception:
+                    products = []
+            else:
+                products = []
         except Exception:
-            try:
-                html = await self._fetch_stealth(api_url)
-            except Exception:
-                html = ""
-
-        if html and not html.strip().startswith("<"):
-            try:
-                data = json.loads(html)
-                products = data.get("products", [])[:50]
-            except json.JSONDecodeError:
-                pass
+            products = []
 
         # Fallback: sitemap
         if not products:
@@ -556,13 +609,16 @@ class SchemaDetector:
         result.total_pages = max(len(products), 1)
 
         if not products:
-            result.top_issues.append("No products found — site may require stealth browser for audit")
+            result.top_issues.append(
+                "No products found — if this is your store, connect it in "
+                "Integrations to enable instant product reading."
+            )
             result.health_score = 0
             return result
 
         # Sample products for Schema check
         # For protected stores (stealth browser), limit to 3 to keep response time sane
-        sample = products[:3] if result.ai_bots_blocked else products[:20]
+        sample = products[:3] if any(result.ai_bots_blocked.values()) else products[:20]
         stealth_used = False
 
         for p in sample:
@@ -582,7 +638,17 @@ class SchemaDetector:
                         try: data=json.loads(s.string); types=SchemaDetector._extract_types(data)
                         except: continue
                         if types & {"Product","ProductGroup"}: has_schema=True; fields=len([k for k in data if k not in ("@context","@type")])
-                    result.sampled_products.append({"title": title or product_title, "url": product_url, "has_schema": has_schema, "schema_fields": fields})
+                    variants = p.get("variants") or []
+                    result.sampled_products.append({
+                        "title": title or product_title,
+                        "url": product_url,
+                        "description": re.sub(r"<[^>]+>", " ", p.get("body_html") or "")[:3000],
+                        "price": str(variants[0].get("price", "")) if variants else "",
+                        "sku": variants[0].get("sku", "") if variants else "",
+                        "brand": p.get("vendor") or "",
+                        "has_schema": has_schema,
+                        "schema_fields": fields,
+                    })
                 except Exception:
                     try:
                         html = await self._fetch_stealth(product_url)
@@ -597,12 +663,272 @@ class SchemaDetector:
         if stealth_used and result.total_pages > 3:
             result.top_issues.append(
                 f"Bot protection active — sampled {len(sample)}/{result.total_pages} pages. "
-                "Install ProdRank Shopify App for complete audit."
+                "Connect the store in Integrations for complete audits."
             )
 
-        # Calculate score
-        if len(sample) > 0:
-            n = len(sample)
+        self._finalize_score(result, len(sample))
+        return result
+
+    async def _audit_wordpress(
+        self, base: str, host: str, access_token: str | None = None,
+    ) -> SiteAuditResult:
+        """WordPress / WooCommerce audit.
+
+        Auth channel first: the ProdRank plugin API returns the real product
+        list straight from WooCommerce — it works through Cloudflare and bot
+        protection because it is an authenticated call, not a crawl. Falls
+        back to the public WooCommerce REST API, then the RankMath sitemap
+        index, then homepage product links (unconnected stores).
+        """
+        result = SiteAuditResult(url=host)
+        result.ai_bots_blocked = {k: False for k in AI_BOTS}
+        try:
+            robots_url = urljoin(base, "/robots.txt")
+            robots_content = await self._fetch(robots_url)
+            result.ai_bots_blocked = self._check_ai_bots(robots_content)
+        except Exception:
+            pass
+
+        products, channel = await self._collect_wp_products(base, access_token)
+
+        result.total_pages = max(len(products), 1)
+        if not products:
+            result.top_issues.append(
+                "No products found — if this is your store, connect it in "
+                "Integrations to enable instant product reading."
+            )
+            result.health_score = 0
+            return result
+
+        if channel != "plugin":
+            result.top_issues.append(
+                f"Product list read via {channel} — connect the store in "
+                "Integrations to audit through the secure plugin channel."
+            )
+        else:
+            result.top_issues.append(
+                f"Connected via plugin — all {len(products)} products read "
+                "through the authenticated channel."
+            )
+
+        # Sample product pages for Schema inspection
+        sample = products[:3] if any(result.ai_bots_blocked.values()) else products[:20]
+        stealth_used = False
+
+        for p in sample:
+            product_url = p.get("url", "")
+            if not product_url:
+                continue
+            try:
+                html = await self._fetch(product_url)
+                soup = BeautifulSoup(html, "lxml")
+                self._count_schemas(soup, result)
+                title = self._extract_title(soup)
+                scripts = soup.find_all("script", type="application/ld+json")
+                has_schema = False; fields = 0
+                for s in scripts:
+                    try: data=json.loads(s.string); types=SchemaDetector._extract_types(data)
+                    except: continue
+                    if types & {"Product","ProductGroup"}: has_schema=True; fields=len([k for k in data if k not in ("@context","@type")])
+                result.sampled_products.append({
+                    "title": title or p.get("title", ""),
+                    "url": product_url,
+                    "description": (p.get("description") or "")[:3000],
+                    "price": str(p.get("price") or ""),
+                    "sku": p.get("sku") or "",
+                    "brand": p.get("brand") or "",
+                    "has_schema": has_schema,
+                    "schema_fields": fields,
+                })
+            except Exception:
+                try:
+                    html = await self._fetch_stealth(product_url)
+                    soup = BeautifulSoup(html, "lxml")
+                    self._count_schemas(soup, result)
+                    result.sampled_products.append({
+                        "title": p.get("title", ""),
+                        "url": product_url,
+                        "description": (p.get("description") or "")[:3000],
+                        "price": str(p.get("price") or ""),
+                        "sku": p.get("sku") or "",
+                        "brand": p.get("brand") or "",
+                        "has_schema": False,
+                        "schema_fields": 0,
+                    })
+                    stealth_used = True
+                except Exception:
+                    result.js_rendering_issues += 1
+
+        if stealth_used and result.total_pages > 3:
+            result.top_issues.append(
+                f"Bot protection active — sampled {len(sample)}/{result.total_pages} pages. "
+                "Connect the store in Integrations for complete audits."
+            )
+
+        self._finalize_score(result, len(sample))
+        return result
+
+    async def _collect_wp_products(
+        self, base: str, access_token: str | None,
+    ) -> tuple[list[dict], str]:
+        """Collect WooCommerce products via the best available channel:
+        plugin API → public WooCommerce REST → sitemap → shop archive → homepage."""
+        # 1. Plugin API (authenticated — works through bot protection)
+        if access_token:
+            try:
+                products = await self._wp_plugin_products(base, access_token)
+                if products:
+                    return products, "plugin"
+            except Exception as e:
+                print(f"[audit] plugin channel failed for {base}: {e}")
+
+        # 2. Public WooCommerce REST API (read endpoints are public by default)
+        try:
+            ua = SchemaDetector._browser_headers()["User-Agent"]
+            async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+                resp = await client.get(
+                    urljoin(base, "/wp-json/wc/v3/products"),
+                    headers={"User-Agent": ua},
+                    params={"per_page": 100, "page": 1},
+                )
+                if resp.status_code == 200 and "application/json" in resp.headers.get("content-type", ""):
+                    data = resp.json()
+                    if isinstance(data, list) and data:
+                        products = [{
+                            "title": p.get("name", ""),
+                            "url": p.get("permalink", ""),
+                            "description": re.sub(r"<[^>]+>", " ", p.get("description", "") or "")[:3000],
+                            "price": str(p.get("price") or ""),
+                            "sku": p.get("sku") or "",
+                            "brand": "",
+                        } for p in data[:300]]
+                        return products, "WooCommerce REST API"
+        except Exception:
+            pass
+
+        # 3. Sitemap index (RankMath / Yoast / WP core) → product URLs
+        products: list[dict] = []
+        for sitemap_path in ("/sitemap_index.xml", "/sitemap.xml", "/wp-sitemap.xml"):
+            try:
+                xml = await self._fetch(urljoin(base, sitemap_path))
+                soup = BeautifulSoup(xml, "xml")
+                sitemap_elems = soup.find_all("sitemap")  # sitemap index form
+                locs = []
+                if sitemap_elems:
+                    locs = [s.find("loc").get_text(strip=True) for s in sitemap_elems if s.find("loc")]
+                else:
+                    locs = [u.find("loc").get_text(strip=True) for u in soup.find_all("url") if u.find("loc")]
+                if not locs:
+                    continue
+
+                product_locs = []
+                for loc in locs[:200]:
+                    if any(k in loc for k in ("/product/", "/products/", "post_type=product")):
+                        product_locs.append(loc)
+
+                # Sitemap index → fetch child sitemaps that look like products
+                if sitemap_elems:
+                    for child in locs[:40]:
+                        if any(k in child.lower() for k in ("product", "wc", "woo")):
+                            try:
+                                child_xml = await self._fetch(child)
+                                child_soup = BeautifulSoup(child_xml, "xml")
+                                for u in child_soup.find_all("url"):
+                                    loc_el = u.find("loc")
+                                    if loc_el and "/product/" in loc_el.get_text(strip=True):
+                                        product_locs.append(loc_el.get_text(strip=True))
+                            except Exception:
+                                continue
+
+                seen = set()
+                for loc in product_locs[:300]:
+                    if loc and loc not in seen:
+                        seen.add(loc)
+                        products.append({"title": "", "url": loc, "description": "", "price": "", "sku": "", "brand": ""})
+                if products:
+                    return products, "sitemap"
+            except Exception:
+                continue
+
+        # 4. Shop archive pages (/shop/, /shop/page/2/, ...)
+        try:
+            ua = SchemaDetector._browser_headers()["User-Agent"]
+            seen = set()
+            archive_products = []
+            for page_no in range(1, 9):
+                url = urljoin(base, "/shop/") if page_no == 1 else urljoin(base, f"/shop/page/{page_no}/")
+                async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+                    resp = await client.get(url, headers={"User-Agent": ua})
+                if resp.status_code != 200:
+                    break
+                soup = BeautifulSoup(resp.text, "lxml")
+                found_any = False
+                for a in soup.find_all("a", href=re.compile(r"/product/")):
+                    href = urljoin(base, a["href"].split("?")[0].split("#")[0])
+                    if href not in seen:
+                        seen.add(href)
+                        archive_products.append({
+                            "title": a.get_text(strip=True), "url": href,
+                            "description": "", "price": "", "sku": "", "brand": "",
+                        })
+                        found_any = True
+                if not found_any:
+                    break
+            if archive_products:
+                return archive_products[:300], "shop archive"
+        except Exception:
+            pass
+
+        # 5. Homepage product links (last resort)
+        try:
+            home_html = await self._fetch(base)
+            home_soup = BeautifulSoup(home_html, "lxml")
+            seen = {p["url"] for p in products}
+            for a in home_soup.find_all("a", href=re.compile(r"/(product|products)/")):
+                href = urljoin(base, a["href"].split("?")[0])
+                if href not in seen:
+                    seen.add(href)
+                    products.append({"title": a.get_text(strip=True), "url": href, "description": "", "price": "", "sku": "", "brand": ""})
+        except Exception:
+            pass
+        if products:
+            return products[:300], "homepage links"
+        return [], "none"
+
+    async def _wp_plugin_products(self, base: str, access_token: str) -> list[dict]:
+        """Paginate the ProdRank plugin /products endpoint (auth channel)."""
+        api = f"{base}/wp-json/prodrank/v1/products"
+        headers = {
+            "X-ProdRank-Token": access_token,
+            "User-Agent": SchemaDetector._browser_headers()["User-Agent"],
+        }
+        products = []
+        offset = 0
+        while len(products) < 500:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=25) as client:
+                resp = await client.get(api, headers=headers, params={"limit": 50, "offset": offset})
+                resp.raise_for_status()
+                data = resp.json()
+            page = data.get("products", []) if isinstance(data, dict) else []
+            if not page:
+                break
+            for p in page:
+                products.append({
+                    "title": p.get("title", ""),
+                    "url": p.get("url", ""),
+                    "description": (p.get("description") or "")[:3000],
+                    "price": str(p.get("price") or ""),
+                    "sku": p.get("sku") or "",
+                    "brand": p.get("brand") or "",
+                })
+            if len(page) < 50:
+                break
+            offset += len(page)
+        return products
+
+    def _finalize_score(self, result: SiteAuditResult, n: int) -> None:
+        """Compute health score + top issues from the sampled pages."""
+        if n > 0:
             cov = result.pages_with_product_schema / n
             result.health_score = int(
                 cov * 50
@@ -614,19 +940,17 @@ class SchemaDetector:
             result.health_score = max(0, min(100, result.health_score))
 
         # Top issues
-        if result.pages_with_product_schema < len(sample):
+        if result.pages_with_product_schema < n:
             result.top_issues.append(
-                f"{len(sample) - result.pages_with_product_schema}/{len(sample)} sampled pages lack Product Schema"
+                f"{n - result.pages_with_product_schema}/{n} sampled pages lack Product Schema"
             )
-        if result.pages_with_faq_schema < len(sample) * 0.3:
+        if result.pages_with_faq_schema < n * 0.3:
             result.top_issues.append("Less than 30% of pages have FAQPage Schema")
         blocked = [name for name, blocked in result.ai_bots_blocked.items() if blocked]
         if blocked:
             result.top_issues.append(f"AI bots blocked: {', '.join(blocked)}")
         if result.js_rendering_issues > 0:
             result.top_issues.append(f"{result.js_rendering_issues} pages had fetch issues")
-
-        return result
 
     def _check_ai_bots(self, robots_content: str) -> dict[str, bool]:
         blocked = {}
