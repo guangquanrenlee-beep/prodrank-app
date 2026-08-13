@@ -3,6 +3,7 @@ Product Schema Detection Engine — Phase 1 Core
 Audits 12 key Schema.org Product fields, FAQPage, AI bot accessibility.
 """
 
+import asyncio
 import json
 import re
 from dataclasses import dataclass, field
@@ -621,44 +622,56 @@ class SchemaDetector:
         sample = products[:3] if any(result.ai_bots_blocked.values()) else products[:20]
         stealth_used = False
 
-        for p in sample:
+        sem = asyncio.Semaphore(4)  # 4 concurrent fetches — more trips CF rate limits
+
+        async def _sample_one(p: dict) -> tuple[dict | None, bool]:
             handle = p.get("handle", "")
             product_title = p.get("title", "") or handle
-            if handle:
-                product_url = urljoin(base, f"/products/{handle}")
+            if not handle:
+                return None, False
+            product_url = urljoin(base, f"/products/{handle}")
+            async with sem:
                 try:
                     html = await self._fetch(product_url)
-                    soup = BeautifulSoup(html, "lxml")
-                    self._count_schemas(soup, result)
-                    # Extract product data for DB persistence
-                    title = self._extract_title(soup)
-                    scripts = soup.find_all("script", type="application/ld+json")
-                    has_schema = False; fields = 0
-                    for s in scripts:
-                        try: data=json.loads(s.string); types=SchemaDetector._extract_types(data)
-                        except: continue
-                        if types & {"Product","ProductGroup"}: has_schema=True; fields=len([k for k in data if k not in ("@context","@type")])
-                    variants = p.get("variants") or []
-                    result.sampled_products.append({
-                        "title": title or product_title,
-                        "url": product_url,
-                        "description": re.sub(r"<[^>]+>", " ", p.get("body_html") or "")[:3000],
-                        "price": str(variants[0].get("price", "")) if variants else "",
-                        "sku": variants[0].get("sku", "") if variants else "",
-                        "brand": p.get("vendor") or "",
-                        "has_schema": has_schema,
-                        "schema_fields": fields,
-                    })
+                    stealth = False
                 except Exception:
                     try:
                         html = await self._fetch_stealth(product_url)
-                        soup = BeautifulSoup(html, "lxml")
-                        self._count_schemas(soup, result)
-                        title = self._extract_title(soup)
-                        result.sampled_products.append({"title": title or product_title, "url": product_url, "has_schema": False, "schema_fields": 0})
-                        stealth_used = True
+                        stealth = True
                     except Exception:
-                        result.js_rendering_issues += 1
+                        return None, False
+            soup = BeautifulSoup(html, "lxml")
+            self._count_schemas(soup, result)
+            # Extract product data for DB persistence
+            title = self._extract_title(soup)
+            scripts = soup.find_all("script", type="application/ld+json")
+            has_schema = False; fields = 0
+            for s in scripts:
+                try: data=json.loads(s.string); types=SchemaDetector._extract_types(data)
+                except: continue
+                if types & {"Product","ProductGroup"}: has_schema=True; fields=len([k for k in data if k not in ("@context","@type")])
+            variants = p.get("variants") or []
+            entry = {
+                "title": title or product_title,
+                "url": product_url,
+                "description": re.sub(r"<[^>]+>", " ", p.get("body_html") or "")[:3000],
+                "price": str(variants[0].get("price", "")) if variants else "",
+                "sku": variants[0].get("sku", "") if variants else "",
+                "brand": p.get("vendor") or "",
+                "has_schema": has_schema,
+                "schema_fields": fields,
+            }
+            return entry, stealth
+
+        # Parallel sampling — serializing 20 page fetches over Cloudflare is slow
+        results = await asyncio.gather(*[_sample_one(p) for p in sample], return_exceptions=True)
+        for r in results:
+            if isinstance(r, Exception) or not r or not r[0]:
+                result.js_rendering_issues += 1
+            else:
+                result.sampled_products.append(r[0])
+                if r[1]:
+                    stealth_used = True
 
         if stealth_used and result.total_pages > 3:
             result.top_issues.append(
@@ -711,53 +724,62 @@ class SchemaDetector:
                 "through the authenticated channel."
             )
 
-        # Sample product pages for Schema inspection
-        sample = products[:3] if any(result.ai_bots_blocked.values()) else products[:20]
+        # Sample product pages for Schema inspection (parallel — serializing
+        # page fetches over Cloudflare is slow). Connected stores need fewer
+        # samples: the plugin already returned the authoritative product list.
+        if any(result.ai_bots_blocked.values()):
+            sample = products[:3]
+        elif channel == "plugin":
+            sample = products[:10]
+        else:
+            sample = products[:20]
         stealth_used = False
 
-        for p in sample:
+        sem = asyncio.Semaphore(4)  # 4 concurrent fetches — more trips CF rate limits
+
+        async def _sample_one(p: dict) -> tuple[dict | None, bool]:
             product_url = p.get("url", "")
             if not product_url:
-                continue
-            try:
-                html = await self._fetch(product_url)
-                soup = BeautifulSoup(html, "lxml")
-                self._count_schemas(soup, result)
-                title = self._extract_title(soup)
-                scripts = soup.find_all("script", type="application/ld+json")
-                has_schema = False; fields = 0
-                for s in scripts:
-                    try: data=json.loads(s.string); types=SchemaDetector._extract_types(data)
-                    except: continue
-                    if types & {"Product","ProductGroup"}: has_schema=True; fields=len([k for k in data if k not in ("@context","@type")])
-                result.sampled_products.append({
-                    "title": title or p.get("title", ""),
-                    "url": product_url,
-                    "description": (p.get("description") or "")[:3000],
-                    "price": str(p.get("price") or ""),
-                    "sku": p.get("sku") or "",
-                    "brand": p.get("brand") or "",
-                    "has_schema": has_schema,
-                    "schema_fields": fields,
-                })
-            except Exception:
+                return None, False
+            async with sem:
                 try:
-                    html = await self._fetch_stealth(product_url)
-                    soup = BeautifulSoup(html, "lxml")
-                    self._count_schemas(soup, result)
-                    result.sampled_products.append({
-                        "title": p.get("title", ""),
-                        "url": product_url,
-                        "description": (p.get("description") or "")[:3000],
-                        "price": str(p.get("price") or ""),
-                        "sku": p.get("sku") or "",
-                        "brand": p.get("brand") or "",
-                        "has_schema": False,
-                        "schema_fields": 0,
-                    })
-                    stealth_used = True
+                    html = await self._fetch(product_url)
+                    stealth = False
                 except Exception:
-                    result.js_rendering_issues += 1
+                    try:
+                        html = await self._fetch_stealth(product_url)
+                        stealth = True
+                    except Exception:
+                        return None, False
+            soup = BeautifulSoup(html, "lxml")
+            self._count_schemas(soup, result)
+            title = self._extract_title(soup)
+            scripts = soup.find_all("script", type="application/ld+json")
+            has_schema = False; fields = 0
+            for s in scripts:
+                try: data=json.loads(s.string); types=SchemaDetector._extract_types(data)
+                except: continue
+                if types & {"Product","ProductGroup"}: has_schema=True; fields=len([k for k in data if k not in ("@context","@type")])
+            entry = {
+                "title": title or p.get("title", ""),
+                "url": product_url,
+                "description": (p.get("description") or "")[:3000],
+                "price": str(p.get("price") or ""),
+                "sku": p.get("sku") or "",
+                "brand": p.get("brand") or "",
+                "has_schema": has_schema,
+                "schema_fields": fields,
+            }
+            return entry, stealth
+
+        results = await asyncio.gather(*[_sample_one(p) for p in sample], return_exceptions=True)
+        for r in results:
+            if isinstance(r, Exception) or not r or not r[0]:
+                result.js_rendering_issues += 1
+            else:
+                result.sampled_products.append(r[0])
+                if r[1]:
+                    stealth_used = True
 
         if stealth_used and result.total_pages > 3:
             result.top_issues.append(
