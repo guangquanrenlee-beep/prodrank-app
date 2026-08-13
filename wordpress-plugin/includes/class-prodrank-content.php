@@ -46,6 +46,37 @@ class ProdRank_Content {
     public function __construct() {
         add_action('init', [$this, 'register_shortcodes']);
         add_action('init', [$this, 'register_gutenberg_block']);
+        // Auto-append published sections to the product page — no shortcode
+        // insertion needed, so "Publish" alone puts content live. Sections the
+        // merchant already placed via shortcode/block are skipped to avoid
+        // double-rendering.
+        add_filter('the_content', [$this, 'append_sections'], 20);
+    }
+
+    /**
+     * Append every enabled, non-empty AI section to the product description.
+     * Frontend output only — post_content stays untouched. Schema is emitted
+     * separately via wp_head (class-prodrank-schema.php).
+     */
+    public function append_sections(string $content): string {
+        if (!function_exists('is_product') || !is_product()) {
+            return $content;
+        }
+        // Merchant hand-placed a block or shortcode for a section — skip it.
+        if (strpos($content, 'wp:prodrank') !== false) {
+            return $content;
+        }
+        $appended = '';
+        foreach (array_keys(self::SHORTCODES) as $field) {
+            if ($field === 'schema') {
+                continue;
+            }
+            if (has_shortcode($content, self::SHORTCODES[$field])) {
+                continue;
+            }
+            $appended .= $this->render_field($field);
+        }
+        return $appended ? $content . $appended : $content;
     }
 
     /**
