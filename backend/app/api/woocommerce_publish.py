@@ -249,6 +249,16 @@ def _extract_woo_product(p: dict) -> dict:
 # redirects so the www/no-www variant always works.
 _HTTP = {"timeout": 25, "follow_redirects": True}
 
+# The plugin's field whitelist (ProdRank_Content::FIELDS) uses 'specification'
+# (singular) while the SaaS generation chain stores drafts under
+# 'specifications' (plural). Translate at the plugin boundary, or the plugin
+# silently skips the field on publish and the spec table never hits the page.
+_PLUGIN_FIELD_MAP = {"specifications": "specification"}
+
+
+def _plugin_field(f: str) -> str:
+    return _PLUGIN_FIELD_MAP.get(f, f)
+
 
 async def _plugin_get(domain: str, path: str, **params):
     async with httpx.AsyncClient(**_HTTP) as client:
@@ -519,7 +529,7 @@ async def publish(req: WooPublishRequest):
         synced = _extract_woo_product(product)
         schema = build_schema(synced, {"name": req.domain, "domain": req.domain})
 
-        fields = {f: d["content"] for f, d in drafts.items()}
+        fields = {_plugin_field(f): d["content"] for f, d in drafts.items()}
         fields["schema"] = schema  # ⑤ Schema Renderer — code-assembled, never LLM-fabricated
 
         plugin_resp = await _plugin_post(req.domain, "/publish", {
@@ -544,7 +554,7 @@ async def _verify_via_plugin(domain: str, product_id: int, fields: list[str]) ->
     try:
         product = await _plugin_get(domain, f"/products/{product_id}")
         ai_content = product.get("ai_content", {}) or {}
-        per_field = {f: {"present": bool(ai_content.get(f))} for f in fields}
+        per_field = {_plugin_field(f): {"present": bool(ai_content.get(_plugin_field(f)))} for f in fields}
         return {"metafields_ok": all(v["present"] for v in per_field.values()) if per_field else False, "fields": per_field}
     except Exception as e:
         return {"metafields_ok": False, "error": str(e)[:200]}

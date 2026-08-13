@@ -39,7 +39,7 @@ function SettingsContent() {
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok) setCustomStatus({ ok: true, msg: `Connected to ${d.store_name || d.domain} — ${d.product_count || 0} products synced` });
-      else setCustomStatus({ ok: false, msg: d.detail || d.message || `Connection failed (${r.status})` });
+      else setCustomStatus({ ok: false, msg: typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail || d.message || `Connection failed (${r.status})`) });
     } catch { setCustomStatus({ ok: false, msg: "Network error — is the store running?" }); }
     finally { setCustomConnecting(false); }
   };
@@ -211,7 +211,7 @@ function SettingsContent() {
                   });
                   const d = await r.json().catch(() => ({}));
                   if (r.ok) setWpStatus({ ok: true, msg: `Connected to ${d.domain} — plugin v${d.plugin?.plugin || "?"}` });
-                  else setWpStatus({ ok: false, msg: d.detail || d.message || `Connection failed (${r.status})` });
+                  else setWpStatus({ ok: false, msg: typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail || d.message || `Connection failed (${r.status})`) });
                 } catch { setWpStatus({ ok: false, msg: "Network error — is the local backend running?" }); }
                 finally { setWpConnecting(false); }
               }}

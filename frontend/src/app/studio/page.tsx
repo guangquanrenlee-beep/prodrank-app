@@ -48,7 +48,12 @@ function PublishContent() {
     try {
       const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || d.message || `HTTP ${r.status}`);
+      if (!r.ok) {
+        // detail can be an array of validation errors (422) or a dict —
+        // String() on those yields "[object Object]", so render real JSON.
+        const msg = typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail || d.message || `HTTP ${r.status}`);
+        throw new Error(msg);
+      }
       return d;
     } catch (e: any) {
       setError(e.name === "AbortError" ? "Request timed out — is the backend running?" : e.message);
@@ -186,7 +191,7 @@ function PublishContent() {
     try {
       const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: resolved.product.url || url.trim() }) });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || "Scan failed");
+      if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail || "Scan failed"));
       setScanResult(d); setForceFields(new Set());
     } catch (e: any) { setError(e.message); }
     finally { setScanLoading(false); }
@@ -229,11 +234,13 @@ function PublishContent() {
     if (Object.keys(edited).length > 0 && resolved._platform !== "custom") {
       // Custom stores have no drafts/edit endpoint yet — edited content is
       // part of the preview only; publish uses the stored draft version.
+      // apiBody() sends the right key per platform (domain for WooCommerce,
+      // shop for Shopify) — hardcoding shop here 422'd every WooCommerce publish.
       const editPath = resolved._platform === "shopify" ? "/api/shopify/drafts/edit" : "/api/woocommerce/drafts/edit";
-      await apiPost(editPath, { shop: resolved.domain, product_id: resolved.product.id, fields: edited });
+      await apiPost(editPath, { ...apiBody(), fields: edited });
     }
     const d = await apiPost(apiBase() + "/publish",
-      { shop: resolved.domain, product_id: resolved.product.id, overwrite_description: overwrite, fields: preview ? Object.keys(preview) : undefined });
+      { ...apiBody(), overwrite_description: overwrite, fields: preview ? Object.keys(preview) : undefined });
     if (d) { setResult(d); setStep("published"); }
   };
 
@@ -263,7 +270,7 @@ function PublishContent() {
     });
     const d = await r.json();
     if (r.ok) setTestResult(d);
-    else setError(d.detail || d.message || "Test failed");
+    else setError(typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail || d.message || "Test failed"));
     setTestLoading(false);
   };
 

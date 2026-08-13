@@ -183,7 +183,7 @@ export default function DashboardPage() {
         setApplyStatus(`Generated & published on ${d.applied || 0} products${d.failed ? `, ${d.failed} failed` : ""}`);
         loadAiInsight();
       } else {
-        setApplyStatus(d.detail || "Fix failed");
+        setApplyStatus(typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail || "Fix failed"));
       }
     } catch { setApplyStatus("Network error"); }
     setApplying(false);
