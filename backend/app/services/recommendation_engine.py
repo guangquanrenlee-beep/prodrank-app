@@ -61,6 +61,9 @@ class RecommendationEngine:
         from app.services.llm import get_content_client
         self.client, self.model = get_content_client()
         self.model_fast = "google/gemini-3.6-flash"
+        # The "gemini" leg keeps its ofox identity — reason/entity analysis
+        # compares agents side by side, so the model must not drift.
+        self.ofox = AsyncOpenAI(api_key=get_settings().openai_api_key, base_url=get_settings().openai_base_url)
 
     # ── 1. Reason Engine ──
 
@@ -71,11 +74,11 @@ class RecommendationEngine:
         results = []
 
         agents = [
-            ("chatgpt", self.model),
-            ("gemini", self.model_fast),
+            ("chatgpt", self.model, self.client),
+            ("gemini", self.model_fast, self.ofox),
         ]
 
-        for agent_name, model in agents:
+        for agent_name, model, client in agents:
             prompt = (
                 f"Act as an honest shopping advisor. Explain why you would or would not "
                 f"recommend {product_name}" + (f" by {brand}" if brand else "") +
@@ -88,7 +91,7 @@ class RecommendationEngine:
             )
 
             try:
-                resp = await self.client.chat.completions.create(
+                resp = await client.chat.completions.create(
                     model=model,
                     messages=[
                         {"role": "system", "content": "You analyze product recommendations honestly. Output valid JSON only."},
@@ -175,7 +178,7 @@ class RecommendationEngine:
 
         results = await asyncio.gather(
             self._ask_json(self.model, prompt),
-            self._ask_json(self.model_fast, prompt),
+            self._ask_json(self.model_fast, prompt, client=self.ofox),
             return_exceptions=True,
         )
 
@@ -199,9 +202,9 @@ class RecommendationEngine:
 
         return tuple(entities)  # (chatgpt, gemini)
 
-    async def _ask_json(self, model: str, prompt: str) -> dict:
+    async def _ask_json(self, model: str, prompt: str, client=None) -> dict:
         try:
-            resp = await self.client.chat.completions.create(
+            resp = await (client or self.client).chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2, max_tokens=500, timeout=30.0,

@@ -71,6 +71,10 @@ class CitationEngine:
         from app.services.llm import get_content_client
         self.client, self.model = get_content_client()
         self.model_fast = "google/gemini-3.6-flash"
+        # Citation IDENTITY queries stay on ofox: citation history is tracked per
+        # AI agent over months — swapping the underlying model mid-track would
+        # break cross-model comparability (4 组必保留 ofox).
+        self.ofox = AsyncOpenAI(api_key=get_settings().openai_api_key, base_url=get_settings().openai_base_url)
         # In-memory store (replace with DB for production)
         self._citations: list[SourceCitation] = []
         from app.services.db import DB
@@ -240,7 +244,7 @@ class CitationEngine:
                 f"rtings.com\nwirecutter.com\namazon.com\nyoutube.com\nreddit.com"
             )
             try:
-                resp = await self.client.chat.completions.create(
+                resp = await self.ofox.chat.completions.create(
                     model=model, messages=[{"role": "user", "content": prompt}],
                     temperature=0.8, max_tokens=600, timeout=30.0,
                 )

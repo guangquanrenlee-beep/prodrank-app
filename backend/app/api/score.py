@@ -216,7 +216,7 @@ Return ONLY the JSON array, no other text."""
 
     try:
         resp = await client.chat.completions.create(
-            model="google/gemini-3.6-flash",
+            model=_model,  # DeepSeek v4-flash — competitor detection is replaceable
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3, max_tokens=800, timeout=15.0,
         )

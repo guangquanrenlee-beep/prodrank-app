@@ -86,6 +86,9 @@ class AIParseEngine:
         from app.services.llm import get_content_client
         self.client, self.model_deep = get_content_client()
         self.model_fast = "google/gemini-3.6-flash"
+        # The "gemini" leg keeps its ofox identity — parse reports compare
+        # ChatGPT vs Gemini vs Schema, so the model must not drift.
+        self.ofox = AsyncOpenAI(api_key=get_settings().openai_api_key, base_url=get_settings().openai_base_url)
 
     async def validate_product(self, url: str, title: str, brand: str = "") -> ParseReport:
         """Full AI parse validation: Schema vs real AI understanding."""
@@ -123,7 +126,7 @@ class AIParseEngine:
             import asyncio
             responses = await asyncio.gather(
                 self._ask_agent(self.model_deep, prompt, "chatgpt"),
-                self._ask_agent(self.model_fast, prompt, "gemini"),
+                self._ask_agent(self.model_fast, prompt, "gemini", client=self.ofox),
                 return_exceptions=True,
             )
 
@@ -220,7 +223,7 @@ class AIParseEngine:
         import asyncio
         results = await asyncio.gather(
             self._ask_agent(self.model_deep, prompt, "chatgpt"),
-            self._ask_agent(self.model_fast, prompt, "gemini"),
+            self._ask_agent(self.model_fast, prompt, "gemini", client=self.ofox),
             return_exceptions=True,
         )
 
@@ -229,10 +232,10 @@ class AIParseEngine:
             "gemini": results[1] if not isinstance(results[1], Exception) else "Error",
         }
 
-    async def _ask_agent(self, model: str, prompt: str, label: str) -> str | None:
+    async def _ask_agent(self, model: str, prompt: str, label: str, client=None) -> str | None:
         """Query an AI agent with a simple prompt."""
         try:
-            resp = await self.client.chat.completions.create(
+            resp = await (client or self.client).chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": "Answer concisely and factually. One sentence or short phrase."},
