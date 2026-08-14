@@ -169,8 +169,8 @@ export default function KnowledgeGraphPage() {
               <div className="text-sm text-zinc-500 mt-1">Site Health Score</div>
               <div className="flex justify-center gap-6 mt-4 text-xs text-zinc-500">
                 <span>{siteAudit.total_pages} pages found</span>
-                <span>{siteAudit.pages_with_product_schema} with Product Schema</span>
-                <span>{siteAudit.pages_with_faq_schema} with FAQ Schema</span>
+                <span>{siteAudit.pages_with_product_schema} of {siteAudit.sampled_pages ?? siteAudit.total_pages} sampled with Product Schema</span>
+                <span>{siteAudit.pages_with_faq_schema} of {siteAudit.sampled_pages ?? siteAudit.total_pages} sampled with FAQPage Schema</span>
               </div>
             </div>
             {siteAudit.top_issues?.length > 0 && (

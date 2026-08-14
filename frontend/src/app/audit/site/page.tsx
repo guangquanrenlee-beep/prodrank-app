@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 interface SiteAuditData {
   url: string;
   total_pages: number;
+  sampled_pages?: number;
   pages_with_product_schema: number;
   pages_with_faq_schema: number;
   pages_with_breadcrumb: number;
@@ -74,8 +75,9 @@ function SiteAuditContent() {
       ? "text-yellow-400"
       : "text-red-400";
 
-  const productCoverage = data.total_pages > 0
-    ? Math.round((data.pages_with_product_schema / data.total_pages) * 100)
+  const sampled = data.sampled_pages ?? data.total_pages;
+  const productCoverage = sampled > 0
+    ? Math.round((data.pages_with_product_schema / sampled) * 100)
     : 0;
 
   return (
@@ -95,7 +97,7 @@ function SiteAuditContent() {
         </div>
         <div className="text-zinc-500 mt-2">AI Health Score / 100</div>
         <div className="text-sm text-zinc-600 mt-1">
-          {data.total_pages} pages analyzed
+          {data.total_pages} pages found · {sampled} sampled for schema
         </div>
       </div>
 
@@ -104,22 +106,22 @@ function SiteAuditContent() {
         <CoverageCard
           label="Product Schema"
           count={data.pages_with_product_schema}
-          total={data.total_pages}
+          total={sampled}
         />
         <CoverageCard
           label="FAQPage Schema"
           count={data.pages_with_faq_schema}
-          total={data.total_pages}
+          total={sampled}
         />
         <CoverageCard
           label="BreadcrumbList"
           count={data.pages_with_breadcrumb}
-          total={data.total_pages}
+          total={sampled}
         />
         <CoverageCard
           label="Organization"
           count={data.pages_with_organization}
-          total={data.total_pages}
+          total={sampled}
         />
       </div>
 

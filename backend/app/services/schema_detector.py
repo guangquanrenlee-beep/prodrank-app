@@ -51,6 +51,7 @@ class SiteAuditResult:
     health_score: int = 0
     top_issues: list[str] = field(default_factory=list)
     sampled_products: list[dict] = field(default_factory=list)
+    sampled_pages: int = 0  # how many pages the score counters were computed over
 
 
 @dataclass
@@ -617,9 +618,17 @@ class SchemaDetector:
             result.health_score = 0
             return result
 
-        # Sample products for Schema check
-        # For protected stores (stealth browser), limit to 3 to keep response time sane
-        sample = products[:3] if any(result.ai_bots_blocked.values()) else products[:20]
+        # Sample pages for Schema inspection. Blocked stores (stealth browser)
+        # stay at 3; everything else is sampled in full (≤100) — the score must
+        # reflect the whole store, not just the newest products.
+        if any(result.ai_bots_blocked.values()):
+            sample = products[:3]
+        elif len(products) <= 100:
+            sample = products
+        else:
+            step = len(products) // 100
+            sample = products[::step][:100]  # evenly-spaced, deterministic
+        result.sampled_pages = len(sample)
         stealth_used = False
 
         sem = asyncio.Semaphore(4)  # 4 concurrent fetches — more trips CF rate limits
@@ -725,14 +734,18 @@ class SchemaDetector:
             )
 
         # Sample product pages for Schema inspection (parallel — serializing
-        # page fetches over Cloudflare is slow). Connected stores need fewer
-        # samples: the plugin already returned the authoritative product list.
+        # page fetches over Cloudflare is slow). Connected stores are sampled
+        # in FULL: the plugin list is authoritative, and first-N-only sampling
+        # was biased (WooCommerce lists newest products first — usually the
+        # best-optimized ones — inflating the score).
         if any(result.ai_bots_blocked.values()):
             sample = products[:3]
-        elif channel == "plugin":
-            sample = products[:10]
+        elif len(products) <= 100:
+            sample = products
         else:
-            sample = products[:20]
+            step = len(products) // 100
+            sample = products[::step][:100]  # evenly-spaced, deterministic
+        result.sampled_pages = len(sample)
         stealth_used = False
 
         sem = asyncio.Semaphore(4)  # 4 concurrent fetches — more trips CF rate limits
@@ -951,12 +964,14 @@ class SchemaDetector:
     def _finalize_score(self, result: SiteAuditResult, n: int) -> None:
         """Compute health score + top issues from the sampled pages."""
         if n > 0:
-            cov = result.pages_with_product_schema / n
+            # ratios capped at 1.0 — counters must never exceed the sampled
+            # page count, but keep the cap as defense in depth
+            cov = min(1.0, result.pages_with_product_schema / n)
             result.health_score = int(
                 cov * 50
-                + (result.pages_with_faq_schema / n) * 20
-                + (result.pages_with_breadcrumb / n) * 10
-                + (result.pages_with_organization / n) * 10
+                + min(1.0, result.pages_with_faq_schema / n) * 20
+                + min(1.0, result.pages_with_breadcrumb / n) * 10
+                + min(1.0, result.pages_with_organization / n) * 10
                 - (result.js_rendering_issues / n) * 10
             )
             result.health_score = max(0, min(100, result.health_score))
@@ -985,22 +1000,30 @@ class SchemaDetector:
         return blocked
 
     def _count_schemas(self, soup: BeautifulSoup, result: SiteAuditResult) -> None:
-        """Count Schema types on a page and update SiteAuditResult."""
+        """Count Schema types on a page and update SiteAuditResult.
+
+        Counts PAGES, not scripts — a product page often carries several
+        JSON-LD blocks (theme Organization, WooCommerce default Product,
+        plugin @graph). One page with N Product scripts used to increment
+        the counter N times, letting counters exceed the sampled page count
+        and inflating the health score past its cap.
+        """
         scripts = soup.find_all("script", type="application/ld+json")
+        page_types: set[str] = set()
         for script in scripts:
             try:
                 data = json.loads(script.string)
             except (json.JSONDecodeError, TypeError):
                 continue
-            types = self._extract_types(data)
-            if types & {"Product", "ProductGroup"}:
-                result.pages_with_product_schema += 1
-            if "FAQPage" in types:
-                result.pages_with_faq_schema += 1
-            if "BreadcrumbList" in types:
-                result.pages_with_breadcrumb += 1
-            if "Organization" in types:
-                result.pages_with_organization += 1
+            page_types |= self._extract_types(data)
+        if page_types & {"Product", "ProductGroup"}:
+            result.pages_with_product_schema += 1
+        if "FAQPage" in page_types:
+            result.pages_with_faq_schema += 1
+        if "BreadcrumbList" in page_types:
+            result.pages_with_breadcrumb += 1
+        if "Organization" in page_types:
+            result.pages_with_organization += 1
 
     @staticmethod
     def _extract_types(data: dict) -> set[str]:

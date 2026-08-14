@@ -95,6 +95,7 @@ async def audit_site(req: AuditSiteRequest, request: Request):
         return {
             "url": result.url,
             "total_pages": result.total_pages,
+            "sampled_pages": result.sampled_pages,
             "pages_with_product_schema": result.pages_with_product_schema,
             "pages_with_faq_schema": result.pages_with_faq_schema,
             "pages_with_breadcrumb": result.pages_with_breadcrumb,
