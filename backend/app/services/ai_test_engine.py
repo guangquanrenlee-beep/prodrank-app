@@ -347,7 +347,10 @@ class AITestEngine:
                 {"role": "user", "content": prompt},
             ],
             temperature=0.3,
-            max_tokens=400,
+            # deepseek is verbose — cap it tight (cheap + parser only needs
+            # rank/brand lines); the 4 ofox models keep headroom so long
+            # answers don't truncate mid-list.
+            max_tokens=300 if model == "deepseek" else 400,
         )
         return (resp.choices[0].message.content or "").strip(), model_id
 

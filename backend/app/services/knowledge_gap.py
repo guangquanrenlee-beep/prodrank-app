@@ -34,12 +34,9 @@ class KnowledgeGapEngine:
     """Detects question coverage gaps between AI answers and product pages."""
 
     def __init__(self):
-        settings = get_settings()
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
-        self.model = "google/gemini-3.6-flash"
+        # Content-type task — DeepSeek direct when key set, ofox fallback.
+        from app.services.llm import get_content_client
+        self.client, self.model = get_content_client()
 
     async def detect_gaps(
         self, category: str, product_description: str, existing_faq: list[str] | None = None

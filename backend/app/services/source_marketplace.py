@@ -17,13 +17,11 @@ class SourceMarketplace:
     """Discover citation sources and generate outreach pitches."""
 
     def __init__(self):
-        settings = get_settings()
-        self.ai_client = AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-        )
-        self.fast_model = "google/gemini-3.6-flash"
-        self.pitch_model = "anthropic/claude-haiku-4.5"
+        # Pitches are a content-type task — DeepSeek direct when key set,
+        # ofox fallback otherwise.
+        from app.services.llm import get_content_client
+        self.ai_client, self.pitch_model = get_content_client()
+        self.fast_model = self.pitch_model  # legacy alias, unused elsewhere
 
     # ── Source Discovery ──
 

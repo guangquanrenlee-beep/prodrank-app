@@ -101,12 +101,10 @@ async def trigger_weekly_report(request: Request):
             import httpx, json
             from bs4 import BeautifulSoup
             # Quick competitor detection via AI
-            from openai import AsyncOpenAI
-            from app.core.config import get_settings
-            settings = get_settings()
-            client = AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+            from app.services.llm import get_content_client
+            client, _model = get_content_client()
             resp = await client.chat.completions.create(
-                model="google/gemini-3.6-flash",
+                model=_model,
                 messages=[{"role": "user", "content": f"List 3 competitors of {domain}. Return JSON array: [{{\"name\":\"...\",\"domain\":\"...\"}}]"}],
                 temperature=0.3, max_tokens=400, timeout=10.0,
             )

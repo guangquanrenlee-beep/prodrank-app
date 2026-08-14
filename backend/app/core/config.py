@@ -9,6 +9,7 @@ load_dotenv()
 class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
+    deepseek_api_key: str = ""  # official DeepSeek — content-type tasks go direct when set
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/prodrank"
     redis_url: str = "redis://localhost:6379/0"
     debug: bool = True
