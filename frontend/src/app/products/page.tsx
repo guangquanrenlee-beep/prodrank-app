@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import ProductAnalysisReport, { type Report } from "@/components/ProductAnalysisReport";
+import { useIntelJob, stageLabel } from "@/lib/use-intel-job";
 
 interface ProductItem {
   id: string; title: string; url: string; description: string;
@@ -36,6 +37,7 @@ function ProductsContent() {
   const [reports, setReports] = useState<Record<string, Report>>({});
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState("");
+  const { job: analyzeJob, start: startAnalysis } = useIntelJob();
 
   useEffect(() => {
     if (user) {
@@ -92,22 +94,15 @@ function ProductsContent() {
     }
   }, [params, runScan]);
 
-  const analyzeProduct = async (p: ProductItem) => {
+  const analyzeProduct = (p: ProductItem) => {
+    if (analyzing !== null) return;
     setAnalyzing(p.id); setAnalyzeError("");
-    try {
-      const url = p.url && p.url.startsWith("http") ? p.url : `https://${p.url || p.title}`;
-      const brand = (() => { try { return new URL(url).hostname; } catch { return ""; } })();
-      const res = await fetch("/api/intel/full", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, brand, category: "" }),
-      });
-      if (!res.ok) throw new Error((await res.text()) || "Analysis failed");
-      const d = await res.json();
-      setReports(prev => ({ ...prev, [p.id]: d }));
-    } catch (e: any) {
-      setAnalyzeError(e.message || "Analysis failed");
-    }
-    setAnalyzing(null);
+    const url = p.url && p.url.startsWith("http") ? p.url : `https://${p.url || p.title}`;
+    const brand = (() => { try { return new URL(url).hostname; } catch { return ""; } })();
+    startAnalysis(url, brand, "", {
+      onResult: (d) => { setReports(prev => ({ ...prev, [p.id]: d })); setAnalyzing(null); },
+      onError: (msg) => { setAnalyzeError(msg); setAnalyzing(null); },
+    });
   };
 
   const filtered = products
@@ -237,12 +232,24 @@ function ProductsContent() {
                     <div className="flex flex-col gap-1.5 flex-shrink-0 text-right">
                       <button onClick={() => analyzeProduct(p)} disabled={analyzing !== null}
                         className="text-xs bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-3 py-1.5 rounded-lg transition whitespace-nowrap">
-                        {analyzing === p.id ? "Analyzing…" : "🔍 Analyze"}
+                        {analyzing === p.id ? `${analyzeJob?.pct ?? 0}%` : "🔍 Analyze"}
                       </button>
                       <button onClick={() => { const n = new Set(expanded); n.has(p.id) ? n.delete(p.id) : n.add(p.id); setExpanded(n); }}
                         className="text-xs text-zinc-500 hover:text-zinc-300">{isExpanded ? "▲ Hide" : "▼ Details"}</button>
                     </div>
                   </div>
+                  {/* Live analysis progress — the AI job takes ~25-60s */}
+                  {analyzing === p.id && analyzeJob && (
+                    <div className="mt-3 pt-3 border-t border-zinc-800">
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="text-zinc-400">{stageLabel(analyzeJob.stage, analyzeJob)}</span>
+                        <span className="text-zinc-500">{analyzeJob.pct}%</span>
+                      </div>
+                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${analyzeJob.pct}%` }} />
+                      </div>
+                    </div>
+                  )}
                   {/* Expanded details */}
                   {isExpanded && missingFields.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-zinc-800">

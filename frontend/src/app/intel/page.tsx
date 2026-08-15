@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useIntelJob, stageLabel } from "@/lib/use-intel-job";
 
 interface IntelReport {
   url: string;
@@ -45,25 +46,16 @@ export default function IntelPage() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<IntelReport | null>(null);
   const [error, setError] = useState("");
+  const { job, start } = useIntelJob();
 
-  const handleScan = async (e: React.FormEvent) => {
+  const handleScan = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    if (!url.trim() || loading) return;
     setLoading(true); setError(""); setData(null);
-
-    try {
-      const res = await fetch("/api/intel/full", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, brand, category }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setData(await res.json());
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    start(url, brand, category, {
+      onResult: (d) => { setData(d as IntelReport); setLoading(false); },
+      onError: (msg) => { setError(msg); setLoading(false); },
+    });
   };
 
   return (
@@ -81,9 +73,21 @@ export default function IntelPage() {
           <input value={category} onChange={e => setCategory(e.target.value)} placeholder="Category (e.g. winter jackets)" className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
         </div>
         <button type="submit" disabled={loading || !url.trim()} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg transition">
-          {loading ? "Scanning..." : "Run Intelligence Report"}
+          {loading ? `${job?.pct ?? 0}%` : "Run Intelligence Report"}
         </button>
       </form>
+
+      {loading && job && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span className="text-zinc-400">{stageLabel(job.stage, job)}</span>
+            <span className="text-zinc-500">{job.pct}%</span>
+          </div>
+          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${job.pct}%` }} />
+          </div>
+        </div>
+      )}
 
       {error && <div className="bg-red-900/30 border border-red-800 rounded-xl p-4 text-red-400 text-sm">{error}</div>}
 

@@ -92,40 +92,64 @@ class AIParseEngine:
 
     async def validate_product(self, url: str, title: str, brand: str = "",
                                schema_values: dict | None = None,
-                               description: str = "") -> ParseReport:
+                               description: str = "",
+                               progress_cb=None) -> ParseReport:
         """Full AI parse validation: Schema vs real AI understanding.
 
         schema_values: field-name → value map from the page's JSON-LD, so the
         "Your Page" column shows what the schema actually says (not the title).
         description: page description/body text — WITHOUT it the agents can
         only guess from the title and every field reads "Not found".
+        progress_cb: optional async callback(kind, payload) fired as stages
+        complete ("fields" → (done, total); "knowledge"/"entity"/"compare" →
+        stage finished). Lets the API expose live progress to the frontend.
         """
         report = ParseReport(url=url, title=title)
 
-        # 1. Field-level validation
-        report.field_validations = await self._validate_fields(title, brand, schema_values, description)
+        import asyncio
 
-        # 2. Knowledge coverage
-        report.knowledge_dimensions, report.knowledge_score, report.missing_dimensions = \
-            await self._assess_knowledge_coverage(title, brand)
+        # All four stages are independent — run them concurrently. Field
+        # validation used to serialize 8 field-batches (~32s); with all 16
+        # agent calls scheduled under one semaphore it finishes in ~2 batches.
+        async def wrap(coro, kind):
+            try:
+                return await coro
+            finally:
+                if progress_cb:
+                    await progress_cb(kind, None)
 
-        # 3. Entity profile
-        report.entity_profile = await self._build_entity_profile(title, brand)
+        f_task = asyncio.create_task(self._validate_fields(title, brand, schema_values, description, progress_cb))
+        k_task = asyncio.create_task(wrap(self._assess_knowledge_coverage(title, brand), "knowledge"))
+        e_task = asyncio.create_task(wrap(self._build_entity_profile(title, brand), "entity"))
+        c_task = asyncio.create_task(wrap(self._compare_ai_understandings(title, brand), "compare"))
 
-        # 4. AI understanding diffs
-        report.ai_understanding_diff = await self._compare_ai_understandings(title, brand)
+        report.field_validations, kd, report.entity_profile, report.ai_understanding_diff = \
+            await asyncio.gather(f_task, k_task, e_task, c_task)
+        report.knowledge_dimensions, report.knowledge_score, report.missing_dimensions = kd
 
         return report
 
     async def _validate_fields(self, title: str, brand: str,
                                schema_values: dict | None = None,
-                               description: str = "") -> list[FieldValidation]:
-        """Query AI agents to check if they recognize key product attributes."""
+                               description: str = "",
+                               progress_cb=None) -> list[FieldValidation]:
+        """Query AI agents to check if they recognize key product attributes.
+
+        All 16 agent calls (8 fields × 2 agents) run concurrently under one
+        semaphore; progress_cb receives (done, total) after each response.
+        """
+        import asyncio
+
         schema_values = schema_values or {}
-        results = []
+        fields = self.FIELDS_TO_VALIDATE
+        total = len(fields) * 2
+        done = 0
+        sem = asyncio.Semaphore(8)
+        lock = asyncio.Lock()
         desc_ctx = (description or "").strip()[:1500]
 
-        for field in self.FIELDS_TO_VALIDATE:
+        async def ask(field: str, client, model: str, label: str) -> FieldValidation:
+            nonlocal done
             v = FieldValidation(field=field)
             # "Your Page" value: what the JSON-LD actually states for this
             # field. Absent fields stay None → UI shows "—" (honest, not a
@@ -139,27 +163,35 @@ class AIParseEngine:
                 (f"\nPage description: {desc_ctx}" if desc_ctx else "")
             )
 
-            # Query ChatGPT + Gemini + Claude in parallel
-            import asyncio
-            responses = await asyncio.gather(
-                self._ask_agent(self.model_deep, prompt, "chatgpt"),
-                self._ask_agent(self.model_fast, prompt, "gemini", client=self.ofox),
-                return_exceptions=True,
-            )
+            async with sem:
+                resp = await self._ask_agent(model, prompt, label, client=client)
+            if resp:
+                setattr(v, f"{label}_value", resp.strip())
+                setattr(v, f"{label}_recognized", not self._is_unknown(resp.strip()))
 
-            # ChatGPT (Haiku)
-            if not isinstance(responses[0], Exception) and responses[0]:
-                v.chatgpt_value = responses[0].strip()
-                v.chatgpt_recognized = not self._is_unknown(v.chatgpt_value)
+            async with lock:
+                done += 1
+                if progress_cb:
+                    await progress_cb("fields", (done, total))
+            return v
 
-            # Gemini
-            if len(responses) > 1 and not isinstance(responses[1], Exception) and responses[1]:
-                v.gemini_value = responses[1].strip()
-                v.gemini_recognized = not self._is_unknown(v.gemini_value)
+        tasks = [
+            asyncio.create_task(ask(f, self.client, self.model_deep, "chatgpt"))
+            for f in fields
+        ] + [
+            asyncio.create_task(ask(f, self.ofox, self.model_fast, "gemini"))
+            for f in fields
+        ]
+        results = await asyncio.gather(*tasks)
 
-            results.append(v)
-
-        return results
+        merged = {f: FieldValidation(field=f, schema_value=schema_values.get(f)) for f in fields}
+        for r in results:
+            m = merged[r.field]
+            if r.chatgpt_value:
+                m.chatgpt_value, m.chatgpt_recognized = r.chatgpt_value, r.chatgpt_recognized
+            if r.gemini_value:
+                m.gemini_value, m.gemini_recognized = r.gemini_value, r.gemini_recognized
+        return [merged[f] for f in fields]
 
     async def _assess_knowledge_coverage(
         self, title: str, brand: str
