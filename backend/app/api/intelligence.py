@@ -26,11 +26,18 @@ async def full_intelligence(req: IntelligenceRequest):
     audit = await detector.audit_product(req.url)
 
     # 2. AI Parse validation (cross-reference Schema with AI understanding)
+    # Build the field→value map from the page's JSON-LD so the "Your Page"
+    # column shows real schema values, not the product title.
+    schema_vals = {f.field: f.value for f in audit.schema_fields if f.value}
+    if "offers" in schema_vals and not schema_vals.get("price"):
+        # schema audit stores the price inside the offers value ("$49.99 USD")
+        schema_vals["price"] = schema_vals["offers"]
     try:
         parse_report = await parse_engine.validate_product(
             url=req.url,
             title=audit.title or req.url,
             brand=req.brand,
+            schema_values=schema_vals,
         )
     except Exception as e:
         parse_report = None

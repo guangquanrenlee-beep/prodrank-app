@@ -90,12 +90,17 @@ class AIParseEngine:
         # ChatGPT vs Gemini vs Schema, so the model must not drift.
         self.ofox = AsyncOpenAI(api_key=get_settings().openai_api_key, base_url=get_settings().openai_base_url)
 
-    async def validate_product(self, url: str, title: str, brand: str = "") -> ParseReport:
-        """Full AI parse validation: Schema vs real AI understanding."""
+    async def validate_product(self, url: str, title: str, brand: str = "",
+                               schema_values: dict | None = None) -> ParseReport:
+        """Full AI parse validation: Schema vs real AI understanding.
+
+        schema_values: field-name → value map from the page's JSON-LD, so the
+        "Your Page" column shows what the schema actually says (not the title).
+        """
         report = ParseReport(url=url, title=title)
 
         # 1. Field-level validation
-        report.field_validations = await self._validate_fields(title, brand)
+        report.field_validations = await self._validate_fields(title, brand, schema_values)
 
         # 2. Knowledge coverage
         report.knowledge_dimensions, report.knowledge_score, report.missing_dimensions = \
@@ -109,12 +114,18 @@ class AIParseEngine:
 
         return report
 
-    async def _validate_fields(self, title: str, brand: str) -> list[FieldValidation]:
+    async def _validate_fields(self, title: str, brand: str,
+                               schema_values: dict | None = None) -> list[FieldValidation]:
         """Query AI agents to check if they recognize key product attributes."""
+        schema_values = schema_values or {}
         results = []
 
         for field in self.FIELDS_TO_VALIDATE:
             v = FieldValidation(field=field)
+            # "Your Page" value: what the JSON-LD actually states for this
+            # field. Absent fields stay None → UI shows "—" (honest, not a
+            # title placeholder).
+            v.schema_value = schema_values.get(field)
 
             prompt = (
                 f"Answer ONLY with the {field} of this product. "
@@ -139,10 +150,6 @@ class AIParseEngine:
             if len(responses) > 1 and not isinstance(responses[1], Exception) and responses[1]:
                 v.gemini_value = responses[1].strip()
                 v.gemini_recognized = not self._is_unknown(v.gemini_value)
-
-            if brand:
-                schema_val = getattr(self, f"_schema_{field}", None)
-                v.schema_value = title
 
             results.append(v)
 

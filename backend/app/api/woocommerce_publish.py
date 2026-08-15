@@ -244,6 +244,65 @@ def _extract_woo_product(p: dict) -> dict:
     }
 
 
+# ── Scoring ──
+# Two tiers so 1000+ SKU stores stay practical:
+#   Quick score  — from the plugin payload only, no page fetch (all rows)
+#   Live audit   — real SchemaDetector crawl (stealth tiers), sampled rows
+# The Products page shows whichever tier the row got.
+
+def _quick_content_score(p: dict) -> int:
+    """Content quality from plugin data alone — a cheap proxy, replaced by
+    the real audit score when the row is live-audited."""
+    score = 0
+    desc = (p.get("description") or "").strip()
+    if len(desc) >= 200:
+        score += 35
+    elif len(desc) >= 100:
+        score += 20
+    elif desc:
+        score += 10
+    if p.get("price"):
+        score += 15
+    if p.get("images"):
+        score += 20
+    if p.get("review_count") and p.get("rating"):
+        score += 10
+    if p.get("sku"):
+        score += 10
+    return min(100, score)
+
+
+def _quick_ai_score(p: dict) -> int:
+    """AI visibility without a crawl: Discover stays 0 (no schema confirmed),
+    Understand/Trust carry the payload's real content + review signals."""
+    from app.services.ai_score import AIScoringEngine
+    desc = (p.get("description") or "").strip()
+    s = AIScoringEngine().score_product(
+        schema_field_count=0, has_product_schema=False,
+        content_quality_score=_quick_content_score(p),
+        description_length=len(desc),
+        has_aggregate_rating=bool(p.get("review_count")),
+        review_count=int(p.get("review_count") or 0),
+    )
+    return s.overall
+
+
+def _score_from_audit(audit, p: dict) -> tuple[int, int]:
+    """Composite score from a real schema audit (matches the tools' math)."""
+    from app.services.ai_score import AIScoringEngine
+    s = AIScoringEngine().score_product(
+        schema_field_count=audit.field_count,
+        max_fields=audit.max_fields,
+        has_product_schema=audit.has_product_schema,
+        has_faq_schema=audit.has_faq_schema,
+        content_quality_score=audit.content_quality_score,
+        description_length=len((p.get("description") or "").strip()),
+        has_aggregate_rating=bool(p.get("review_count")),
+        review_count=int(p.get("review_count") or 0),
+    )
+    return s.overall, audit.content_quality_score
+
+
 # httpx does NOT follow redirects by default — merchants often connect via
 # www.myshop.com while the site 301s to myshop.com (or vice versa). Follow
 # redirects so the www/no-www variant always works.
@@ -395,31 +454,73 @@ async def sync(req: WooSyncRequest):
         if len(items) < limit:
             break
 
-    rows = [_extract_woo_product(p) for p in all_products]
+    from datetime import datetime, timezone
+    # Two-tier scoring (see helpers above): rows keep their prior real audit
+    # data if present; everything else gets a quick score from the payload.
+    existing = {r["url"]: r for r in db.client.table("products")
+                .select("url,schema_fields,schema_present,content_quality_score,ai_visibility_score")
+                .eq("site_id", site_id).execute().data or []}
+
+    rows = []
+    for p in all_products:
+        row = _extract_woo_product(p)
+        prev = existing.get(row.get("url", "")) or {}
+        prev_fields = int(prev.get("schema_fields") or 0)
+        quick_content = _quick_content_score(p)
+        if prev_fields > 0:
+            # Prior real audit exists — keep it, don't clobber with a quick score.
+            row["schema_fields"] = prev_fields
+            row["content_quality_score"] = int(prev.get("content_quality_score") or 0) or quick_content
+            row["ai_visibility_score"] = int(prev.get("ai_visibility_score") or 0)
+        else:
+            row["schema_fields"] = 0
+            row["content_quality_score"] = quick_content
+            row["ai_visibility_score"] = _quick_ai_score(p)
+        rows.append(row)
+
     db.save_products_batch(site_id, rows)
 
-    # Live schema check: fetch product pages (parallel, capped), store the
-    # actual present field list — the Products page shows count + real missing.
+    # Live audit: real SchemaDetector (3-tier stealth crawl) on a sample.
+    # Auditing every SKU doesn't scale to 1000+ product stores — sample
+    # evenly across the list so the store view is representative.
     import asyncio
-    from app.services.health_check import product_schema_fields, _fetch_page
-    urls = [(r.get("url"), r.get("id")) for r in rows if r.get("url")][:200]
-    sem = asyncio.Semaphore(10)
-    async def check(item):
-        url, _pid = item
+    from app.services.schema_detector import SchemaDetector
+    LIVE_AUDIT_MAX = 15
+    detector = SchemaDetector()
+    url_rows = [r for r in rows if r.get("url")]
+    step = max(1, len(url_rows) // LIVE_AUDIT_MAX)
+    sample = url_rows[::step][:LIVE_AUDIT_MAX]
+    sem = asyncio.Semaphore(4)
+    audited = 0
+
+    async def live_audit(row: dict):
+        nonlocal audited
         async with sem:
-            html = await _fetch_page(url)
-            return url, product_schema_fields(html) if html else []
-    checked = await asyncio.gather(*[check(u) for u in urls])
-    for url, fields in checked:
-        if url:
             try:
-                db.client.table("products").update({
-                    "schema_fields": len(fields), "schema_present": fields,
-                }).eq("site_id", site_id).eq("url", url).execute()
+                return row, await detector.audit_product(row["url"])
             except Exception as e:
-                print(f"[sync] schema update failed for {url}: {str(e)[:150]}")
+                print(f"[sync] live audit failed for {row.get('url')}: {str(e)[:150]}")
+                return row, None
+
+    results = await asyncio.gather(*[live_audit(r) for r in sample])
+    for row, audit in results:
+        if not audit:
+            continue
+        audited += 1
+        ai_score, content_score = _score_from_audit(audit, row)
+        try:
+            db.client.table("products").update({
+                "schema_fields": audit.field_count,
+                "schema_present": [f.field for f in audit.schema_fields if f.present],
+                "content_quality_score": content_score,
+                "ai_visibility_score": ai_score,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("site_id", site_id).eq("url", row["url"]).execute()
+        except Exception as e:
+            print(f"[sync] audit write failed for {row['url']}: {str(e)[:150]}")
+
     return {"status": "synced", "domain": domain, "total": len(all_products),
-            "schema_checked": len(checked)}
+            "quick_scored": len(rows) - audited, "live_audited": audited}
 
 
 MAX_GENERATIONS = 3

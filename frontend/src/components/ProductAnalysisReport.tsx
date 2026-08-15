@@ -25,11 +25,27 @@ const priorityColor = (p: string) => p === "high" ? "text-red-400 bg-red-900/20 
 const PRODUCT_CATEGORIES: Record<string, string[]> = {
   "Fashion": ["Material", "Fit", "Season", "Audience", "Care instructions", "Style", "Size range"],
   "Electronics": ["Battery life", "Compatibility", "Warranty", "Tech specs", "Use case", "Brand reputation"],
+  "Photography": ["Lighting needs", "Mount compatibility", "Battery/AC power", "Resolution & output", "Studio vs portable", "Accessories included"],
   "Home & Kitchen": ["Material", "Warranty", "Installation", "Dimensions", "Maintenance", "Energy efficiency"],
   "Beauty": ["Ingredients", "Skin type", "Usage frequency", "Shelf life", "Allergens", "Cruelty-free"],
   "Sports": ["Terrain", "Skill level", "Material", "Weight", "Weather suitability", "Durability"],
   "Toys & Games": ["Age range", "Safety certs", "Battery required", "Number of players", "Educational value"],
+  "Pet Supplies": ["Breed/size", "Age range", "Ingredients", "Safety certifications", "Maintenance", "Dietary needs"],
   "Food & Beverage": ["Ingredients", "Dietary tags", "Shelf life", "Origin", "Certifications", "Nutrition facts"],
+};
+
+/* knowledge_gap.category (backend key) → display category above */
+const CATEGORY_KEY_MAP: Record<string, string> = {
+  photography: "Photography",
+  electronics: "Electronics",
+  fashion: "Fashion",
+  beauty: "Beauty",
+  home: "Home & Kitchen",
+  coffee: "Food & Beverage",
+  sports: "Sports",
+  toys: "Toys & Games",
+  pet: "Pet Supplies",
+  food: "Food & Beverage",
 };
 
 export default function ProductAnalysisReport({ report }: { report: Report }) {
@@ -161,20 +177,35 @@ export default function ProductAnalysisReport({ report }: { report: Report }) {
       )}
 
       {/* Category Attribute Reference */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-        <h3 className="font-semibold text-lg mb-4">📂 Product Attributes AI Agents Look For</h3>
-        <p className="text-xs text-zinc-500 mb-5">AI doesn't browse like a human — it matches product attributes to questions. If your page doesn't mention these, AI can't match you.</p>
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(PRODUCT_CATEGORIES).map(([cat, attrs]) => (
-            <details key={cat} className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg flex-1 min-w-[200px] group">
-              <summary className="px-4 py-3 text-sm font-medium text-zinc-300 cursor-pointer hover:text-white">{cat}</summary>
-              <div className="px-4 pb-3 space-y-1">{attrs.map(a => (
-                <div key={a} className="flex items-center gap-2 text-xs text-zinc-500"><span className="w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0" />{a}</div>
-              ))}</div>
-            </details>
-          ))}
-        </div>
-      </div>
+      {(() => {
+        // Auto-expand + highlight the category detected for this product
+        const activeCat = CATEGORY_KEY_MAP[report.knowledge_gap?.category || ""] || "";
+        return (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h3 className="font-semibold text-lg mb-4">📂 Product Attributes AI Agents Look For</h3>
+            <p className="text-xs text-zinc-500 mb-5">
+              AI doesn't browse like a human — it matches product attributes to questions. If your page doesn't mention these, AI can't match you.
+              {activeCat && <span className="text-emerald-400 font-medium"> We detected <span className="underline decoration-dotted">{activeCat}</span> — the highlighted section below is the one to focus on.</span>}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(PRODUCT_CATEGORIES).map(([cat, attrs]) => {
+                const isActive = cat === activeCat;
+                return (
+                  <details key={cat} open={isActive}
+                    className={`bg-zinc-800/30 border rounded-lg flex-1 min-w-[200px] group ${isActive ? "border-emerald-600/60 bg-emerald-900/10" : "border-zinc-700/50"}`}>
+                    <summary className={`px-4 py-3 text-sm font-medium cursor-pointer hover:text-white ${isActive ? "text-emerald-400" : "text-zinc-300"}`}>
+                      {cat}{isActive && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-900/60 text-emerald-400 border border-emerald-700/50">DETECTED</span>}
+                    </summary>
+                    <div className="px-4 pb-3 space-y-1">{attrs.map(a => (
+                      <div key={a} className="flex items-center gap-2 text-xs text-zinc-500"><span className="w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0" />{a}</div>
+                    ))}</div>
+                  </details>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Content Issues */}
       {report.schema_audit.content_issues?.length > 0 && (
