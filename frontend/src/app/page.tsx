@@ -17,7 +17,7 @@ const FEATURES = [
 ];
 
 const USE_CASES = [
-  { icon: "🛒", title: "Shopify Stores", desc: "Install our official Shopify App. Schema injection, product sync, and AI ranking in one click." },
+  { icon: "🛒", title: "Shopify Stores", desc: "Install our official Shopify App. Schema injection, product sync, and AI ranking in one click.", comingSoon: true },
   { icon: "🧩", title: "WooCommerce", desc: "Upload our WordPress plugin. Works with any theme and auto-detects your product pages." },
 ];
 
@@ -172,7 +172,10 @@ export default function HomePage() {
           {USE_CASES.map(uc => (
             <div key={uc.title} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center hover:border-zinc-700 transition">
               <div className="text-3xl mb-3">{uc.icon}</div>
-              <h3 className="font-semibold text-zinc-200 mb-1">{uc.title}</h3>
+              <h3 className="font-semibold text-zinc-200 mb-1 flex items-center justify-center gap-2">
+                {uc.title}
+                {uc.comingSoon && <span className="text-[10px] font-medium text-amber-400 bg-amber-900/30 border border-amber-800/50 px-1.5 py-0.5 rounded-full">Coming Soon</span>}
+              </h3>
               <p className="text-xs text-zinc-500 leading-relaxed">{uc.desc}</p>
             </div>
           ))}
