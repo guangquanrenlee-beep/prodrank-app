@@ -466,12 +466,30 @@ async def sync(req: WooSyncRequest):
         row = _extract_woo_product(p)
         prev = existing.get(row.get("url", "")) or {}
         prev_fields = int(prev.get("schema_fields") or 0)
+        prev_present = prev.get("schema_present") or []
+        # "Real audit" = 3+ fields with a field list. schema_fields=1 with an
+        # empty list is the old buggy-sync artifact — treat as unaudited.
+        has_real_audit = prev_fields >= 3 and len(prev_present) >= prev_fields
         quick_content = _quick_content_score(p)
-        if prev_fields > 0:
+        if has_real_audit:
             # Prior real audit exists — keep it, don't clobber with a quick score.
             row["schema_fields"] = prev_fields
-            row["content_quality_score"] = int(prev.get("content_quality_score") or 0) or quick_content
-            row["ai_visibility_score"] = int(prev.get("ai_visibility_score") or 0)
+            prev_content = int(prev.get("content_quality_score") or 0) or quick_content
+            row["content_quality_score"] = prev_content
+            prev_ai = int(prev.get("ai_visibility_score") or 0)
+            if prev_ai > 0:
+                row["ai_visibility_score"] = prev_ai
+            else:
+                # Old rows predate AI scoring — backfill from the kept metrics.
+                from app.services.ai_score import AIScoringEngine
+                s = AIScoringEngine().score_product(
+                    schema_field_count=prev_fields, has_product_schema=True,
+                    content_quality_score=prev_content,
+                    description_length=len((p.get("description") or "").strip()),
+                    has_aggregate_rating=bool(p.get("review_count")),
+                    review_count=int(p.get("review_count") or 0),
+                )
+                row["ai_visibility_score"] = s.overall
         else:
             row["schema_fields"] = 0
             row["content_quality_score"] = quick_content
