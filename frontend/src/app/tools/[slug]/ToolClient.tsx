@@ -322,6 +322,35 @@ export function ToolClient({ tool }: { tool: typeof TOOLS[0] }) {
                 </div>
               </div>
             )}
+            {result.ai_parse?.field_validations?.length > 0 && (
+              <div>
+                <div className="text-xs text-zinc-500 mb-2">What AI agents recognize from your description:</div>
+                <div className="space-y-1.5">
+                  {result.ai_parse.field_validations.map((fv: any, i: number) => (
+                    <div key={i} className="text-xs bg-zinc-800/40 border border-zinc-700/50 rounded-lg px-3 py-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-300 capitalize">{String(fv.field || "").replace(/_/g, " ")}</span>
+                        <span className="flex items-center gap-2">
+                          <span className={fv.chatgpt_recognized ? "text-emerald-400" : "text-red-400"}>GPT {fv.chatgpt_recognized ? "✓" : "✗"}</span>
+                          <span className={fv.gemini_recognized ? "text-emerald-400" : "text-red-400"}>Gemini {fv.gemini_recognized ? "✓" : "✗"}</span>
+                        </span>
+                      </div>
+                      {fv.chatgpt_value && <div className="text-zinc-500 mt-1 truncate">ChatGPT: {String(fv.chatgpt_value).slice(0, 100)}</div>}
+                      {fv.gemini_value && <div className="text-zinc-500 truncate">Gemini: {String(fv.gemini_value).slice(0, 100)}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {result.ai_parse?.entity_profile && (
+              <div className="text-xs bg-zinc-800/40 border border-zinc-700/50 rounded-lg px-3 py-2.5 space-y-1 text-zinc-400">
+                <div className="text-zinc-500 mb-1">AI's understanding of this product:</div>
+                {result.ai_parse.entity_profile.best_for && <div>Best for: <span className="text-zinc-200">{result.ai_parse.entity_profile.best_for}</span></div>}
+                {result.ai_parse.entity_profile.worst_for && <div>Worst for: <span className="text-zinc-200">{result.ai_parse.entity_profile.worst_for}</span></div>}
+                {result.ai_parse.entity_profile.audience && <div>Audience: <span className="text-zinc-200">{result.ai_parse.entity_profile.audience}</span></div>}
+                {result.ai_parse.entity_profile.price_range && <div>Price range: <span className="text-zinc-200">{result.ai_parse.entity_profile.price_range}</span></div>}
+              </div>
+            )}
             {result.knowledge_gap && (
               <div className="text-xs bg-zinc-800/40 border border-zinc-700/50 rounded-lg px-3 py-2 text-zinc-400">
                 Question coverage: <span className="text-zinc-200">{result.knowledge_gap.covered_questions}/{result.knowledge_gap.total_ai_questions}</span> answered
