@@ -17,14 +17,14 @@ function genActions(domain: string, score: any): ActionItem[] {
   const t = b.trust?.score || 0;
   const r = b.recommend?.score || 0;
   return [
-    {id:"schema",title:"Add Missing Schema Fields",impact:d<50?5:d<70?4:d<90?2:1,difficulty:"Easy",time:"5 min",cat:"Discover",ev:Math.max(0,12-Math.round(d*12/100))+" schema fields missing — AI cannot find your products",link:`/knowledge-graph?domain=${encodeURIComponent(domain)}`,pts:Math.round((100-d)*0.25)},
-    {id:"faq",title:"Add FAQPage Schema",impact:u<50?5:u<70?4:2,difficulty:"Easy",time:"5 min",cat:"Understand",ev:"Products without FAQ score 40% lower on AI recommendations",link:`/knowledge-graph?domain=${encodeURIComponent(domain)}`,pts:9},
-    {id:"desc",title:"Improve Product Descriptions",impact:u<50?4:u<70?3:1,difficulty:"Easy",time:"10 min",cat:"Understand",ev:"Short descriptions (<200 chars) — AI cannot understand product details",link:`/knowledge-graph?domain=${encodeURIComponent(domain)}`,pts:7},
+    {id:"schema",title:"Add Missing Schema Fields",impact:d<50?5:d<70?4:d<90?2:1,difficulty:"Easy",time:"5 min",cat:"Discover",ev:Math.max(0,12-Math.round(d*12/100))+" schema fields missing — AI cannot find your products",link:`/products?scan=${encodeURIComponent(domain)}`,pts:Math.round((100-d)*0.25)},
+    {id:"faq",title:"Add FAQPage Schema",impact:u<50?5:u<70?4:2,difficulty:"Easy",time:"5 min",cat:"Understand",ev:"Products without FAQ score 40% lower on AI recommendations",link:`/products?scan=${encodeURIComponent(domain)}`,pts:9},
+    {id:"desc",title:"Improve Product Descriptions",impact:u<50?4:u<70?3:1,difficulty:"Easy",time:"10 min",cat:"Understand",ev:"Short descriptions (<200 chars) — AI cannot understand product details",link:`/products?scan=${encodeURIComponent(domain)}`,pts:7},
     {id:"reviews",title:"Collect More Product Reviews",impact:t<40?5:t<60?4:2,difficulty:"Hard",time:"Ongoing",cat:"Trust",ev:"Few or no reviews — AI heavily weights review count and quality",link:"/cite",pts:Math.round((100-t)*0.25)},
     {id:"cite",title:"Get Listed on Review Sites",impact:t<50?4:t<70?3:1,difficulty:"Medium",time:"30 min",cat:"Trust",ev:"Low citation count — competitors cited more often. Check Citation Intelligence.",link:"/cite",pts:Math.round((100-t)*0.15)},
     {id:"comp",title:"Check Competitor Rankings",impact:r<50?4:2,difficulty:"Easy",time:"2 min",cat:"Recommend",ev:"Low AI recommendation rate — competitors may be outranking you",link:`/compare?domain=${encodeURIComponent(domain)}`,pts:Math.round((100-r)*0.20)},
     {id:"img",title:"Add Alt Text to Product Images",impact:d<60?3:1,difficulty:"Easy",time:"15 min",cat:"Discover",ev:"Images without alt text — AI cannot see your products without descriptions",link:"/actions",pts:3},
-    {id:"h1",title:"Fix H1 Tags on Product Pages",impact:u<60?3:1,difficulty:"Easy",time:"10 min",cat:"Understand",ev:"Missing or duplicate H1 tags — AI uses headings to understand structure",link:"/knowledge-graph",pts:4},
+    {id:"h1",title:"Fix H1 Tags on Product Pages",impact:u<60?3:1,difficulty:"Easy",time:"10 min",cat:"Understand",ev:"Missing or duplicate H1 tags — AI uses headings to understand structure",link:"/products",pts:4},
     {id:"brand",title:"Strengthen Brand Entity",impact:t<50?3:1,difficulty:"Medium",time:"1 hour",cat:"Trust",ev:"Weak brand entity — build Wikipedia, Crunchbase, LinkedIn for AI trust signals",link:"/cite",pts:6},
   ].sort((a,b)=>b.impact-a.impact);
 }

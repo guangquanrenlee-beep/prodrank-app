@@ -778,7 +778,7 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-3 text-right flex-shrink-0">
                             <span className="text-xs bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full font-medium">{opp.expected_gain}</span>
                             <span className="text-xs text-zinc-500">{opp.time}</span>
-                            <Link href="/knowledge-graph" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition whitespace-nowrap">Fix →</Link>
+                            <Link href="/products" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition whitespace-nowrap">Fix →</Link>
                           </div>
                         </div>
                       );
@@ -1037,7 +1037,7 @@ export default function DashboardPage() {
               {/* ── BOTTOM: Trend + Actions ── */}
               <div className="flex gap-3 justify-center">
                 <Link href="/actions" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition">⚡ Action Center</Link>
-                <Link href="/knowledge-graph" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm rounded-lg transition">🧠 Knowledge Graph</Link>
+                <Link href="/products" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm rounded-lg transition">📦 Products</Link>
                 <Link href="/compare" className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm rounded-lg transition">⚔️ Compare vs Competitors</Link>
               </div>
             </>

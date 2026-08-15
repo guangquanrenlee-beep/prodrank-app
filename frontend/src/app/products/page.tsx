@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import ProductAnalysisReport, { type Report } from "@/components/ProductAnalysisReport";
 
 interface ProductItem {
   id: string; title: string; url: string; description: string;
@@ -13,8 +15,9 @@ interface ProductItem {
 
 interface SiteItem { id: string; domain: string; ai_visibility_score?: number; }
 
-export default function ProductsPage() {
+function ProductsContent() {
   const { user, loading: l } = useAuth();
+  const params = useSearchParams();
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [sites, setSites] = useState<SiteItem[]>([]);
   const [siteId, setSiteId] = useState("");
@@ -24,10 +27,27 @@ export default function ProductsPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const sc = (s: number) => s >= 70 ? "text-emerald-400" : s >= 40 ? "text-amber-400" : "text-red-400";
 
+  // ── Scan Store state ──
+  const [scanDomain, setScanDomain] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<any>(null);
+  const [scanError, setScanError] = useState("");
+  // ── Per-product deep analysis state ──
+  const [reports, setReports] = useState<Record<string, Report>>({});
+  const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [analyzeError, setAnalyzeError] = useState("");
+
   useEffect(() => {
     if (user) {
       supabase.from("sites").select("id,domain").eq("user_id", user.id).order("updated_at", { ascending: false })
-        .then(({ data }) => { if (data?.length) { setSites(data as SiteItem[]); setSiteId(data[0].id); loadProducts(data[0].id); } });
+        .then(({ data }) => {
+          if (data?.length) {
+            setSites(data as SiteItem[]);
+            setSiteId(data[0].id);
+            loadProducts(data[0].id);
+            setScanDomain(prev => prev || data[0].domain);
+          }
+        });
     }
   }, [user]);
 
@@ -36,6 +56,58 @@ export default function ProductsPage() {
     const { data } = await supabase.from("products").select("*").eq("site_id", sid).order("ai_visibility_score", { ascending: true });
     setProducts((data as ProductItem[]) || []);
     setLoading(false);
+  };
+
+  const runScan = useCallback(async (target: string) => {
+    const raw = target.trim();
+    if (!raw) return;
+    setScanning(true); setScanError(""); setScanResult(null);
+    try {
+      const clean = raw.replace(/^https?:\/\//, "").replace(/\/$/, "").split("/")[0];
+      const res = await fetch("/api/audit/site", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: clean }),
+      });
+      if (!res.ok) throw new Error((await res.text()) || "Scan failed");
+      const d = await res.json();
+      setScanResult(d);
+      // reload products for the site that was just scanned
+      const { data } = await supabase.from("sites").select("id,domain").eq("user_id", user!.id);
+      const site = (data || []).find((s: any) => s.domain === clean);
+      if (site) { setSiteId(site.id); await loadProducts(site.id); }
+    } catch (e: any) {
+      setScanError(e.message || "Scan failed — the site may have bot protection");
+    }
+    setScanning(false);
+  }, [user]);
+
+  // Auto-scan when arriving with ?scan=<domain> (from Action Center etc.)
+  const scanTriggered = useRef(false);
+  useEffect(() => {
+    const sp = params.get("scan");
+    if (sp && !scanTriggered.current) {
+      scanTriggered.current = true;
+      setScanDomain(sp);
+      runScan(sp);
+    }
+  }, [params, runScan]);
+
+  const analyzeProduct = async (p: ProductItem) => {
+    setAnalyzing(p.id); setAnalyzeError("");
+    try {
+      const url = p.url && p.url.startsWith("http") ? p.url : `https://${p.url || p.title}`;
+      const brand = (() => { try { return new URL(url).hostname; } catch { return ""; } })();
+      const res = await fetch("/api/intel/full", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, brand, category: "" }),
+      });
+      if (!res.ok) throw new Error((await res.text()) || "Analysis failed");
+      const d = await res.json();
+      setReports(prev => ({ ...prev, [p.id]: d }));
+    } catch (e: any) {
+      setAnalyzeError(e.message || "Analysis failed");
+    }
+    setAnalyzing(null);
   };
 
   const filtered = products
@@ -58,7 +130,7 @@ export default function ProductsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mt-1">📦 Products</h1>
-              <p className="text-zinc-400 text-sm mt-1">Scan all products, see their AI visibility score, and fix the lowest-scoring ones first.</p>
+              <p className="text-zinc-400 text-sm mt-1">Scan your store, see each product's AI visibility score, and analyze the lowest-scoring ones first.</p>
             </div>
             <div className="flex items-center gap-2">
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" className="w-36 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 text-xs" />
@@ -69,14 +141,56 @@ export default function ProductsPage() {
           </div>
         </div>
 
+        {/* ── Scan Store ── */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+          <div className="flex gap-3">
+            <input value={scanDomain} onChange={e => setScanDomain(e.target.value)} placeholder="yourstore.com — scan all products"
+              className="flex-1 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <button onClick={() => runScan(scanDomain)} disabled={scanning || !scanDomain.trim()}
+              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg transition whitespace-nowrap">
+              {scanning ? "Scanning…" : "🔍 Scan Store"}
+            </button>
+          </div>
+          {scanError && <p className="text-red-400 text-sm mt-3">{scanError}</p>}
+          {scanning && <p className="text-xs text-zinc-500 mt-3">Crawling sitemap to find product pages, sampling pages, checking Schema coverage — may take 2-5 minutes for large stores.</p>}
+        </div>
+
+        {/* ── Scan result banner ── */}
+        {!scanning && scanResult && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+            <div className="flex items-center justify-between gap-6">
+              <div className="flex items-center gap-6">
+                <div>
+                  <div className={`text-5xl font-bold ${scanResult.health_score >= 70 ? "text-emerald-400" : scanResult.health_score >= 40 ? "text-amber-400" : "text-red-400"}`}>{scanResult.health_score}</div>
+                  <div className="text-xs text-zinc-500 mt-1">Site Health Score</div>
+                </div>
+                <div className="text-xs text-zinc-500 space-y-1">
+                  <div>{scanResult.total_pages} pages found · {scanResult.sampled_pages ?? scanResult.total_pages} sampled</div>
+                  <div>Product Schema: {scanResult.pages_with_product_schema}/{scanResult.sampled_pages ?? scanResult.total_pages}</div>
+                  <div>FAQPage Schema: {scanResult.pages_with_faq_schema}/{scanResult.sampled_pages ?? scanResult.total_pages}</div>
+                </div>
+              </div>
+              {scanResult.top_issues?.length > 0 && (
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  {scanResult.top_issues.slice(0, 4).map((issue: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-xs text-amber-300 bg-amber-900/10 border border-amber-800/30 rounded-lg px-3 py-2"><span>⚠</span><span>{issue}</span></div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {sites.length > 1 && (
           <div className="flex gap-2 flex-wrap">
             {sites.map(s => (
-              <button key={s.id} onClick={() => { setSiteId(s.id); loadProducts(s.id); }}
+              <button key={s.id} onClick={() => { setSiteId(s.id); loadProducts(s.id); setScanDomain(s.domain); }}
                 className={`text-xs px-3 py-1.5 rounded-full border ${s.id === siteId ? "border-emerald-500 bg-emerald-900/20 text-emerald-400" : "border-zinc-700 text-zinc-400 hover:text-zinc-200"}`}>{s.domain}</button>
             ))}
           </div>
         )}
+
+        {analyzeError && <p className="text-red-400 text-sm">{analyzeError}</p>}
 
         {products.length > 0 && (
           <>
@@ -104,6 +218,7 @@ export default function ProductsPage() {
               const ALL_FIELDS = ["name","description","image","offers","brand","aggregateRating","review","sku","gtin","itemCondition","availability","shippingDetails"];
               const present = Array.isArray(p.schema_present) ? p.schema_present : [];
               const missingFields = present.length > 0 ? ALL_FIELDS.filter(f => !present.includes(f)) : ALL_FIELDS.slice(fields);
+              const report = reports[p.id];
               return (
                 <div key={p.id} className={`bg-zinc-900 border rounded-xl p-5 transition ${score < 40 ? "border-red-800/30 hover:border-red-700/50" : score < 70 ? "border-amber-800/20 hover:border-amber-700/40" : "border-emerald-800/20 hover:border-emerald-700/40"}`}>
                   <div className="flex items-start gap-4">
@@ -120,17 +235,10 @@ export default function ProductsPage() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1.5 flex-shrink-0 text-right">
-                      {p.url ? (
-                        <Link href={`/knowledge-graph?domain=${encodeURIComponent(p.url)}`}
-                          className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition whitespace-nowrap">
-                          🔧 Auto-Fix →
-                        </Link>
-                      ) : (
-                        <Link href={`/knowledge-graph?domain=${encodeURIComponent(p.title||"")}`}
-                          className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition whitespace-nowrap">
-                          🔧 Analyze →
-                        </Link>
-                      )}
+                      <button onClick={() => analyzeProduct(p)} disabled={analyzing !== null}
+                        className="text-xs bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+                        {analyzing === p.id ? "Analyzing…" : "🔍 Analyze"}
+                      </button>
                       <button onClick={() => { const n = new Set(expanded); n.has(p.id) ? n.delete(p.id) : n.add(p.id); setExpanded(n); }}
                         className="text-xs text-zinc-500 hover:text-zinc-300">{isExpanded ? "▲ Hide" : "▼ Details"}</button>
                     </div>
@@ -142,11 +250,17 @@ export default function ProductsPage() {
                       <div className="flex flex-wrap gap-1">
                         {missingFields.map(f => <span key={f} className="text-xs bg-red-900/20 text-red-400/80 px-2 py-0.5 rounded">{f}</span>)}
                       </div>
-                      <p className="text-xs text-zinc-600 mt-2">Click <span className="text-emerald-400">Auto-Fix</span> to go to Knowledge Graph and fix these.</p>
+                      <p className="text-xs text-zinc-600 mt-2">Click <span className="text-emerald-400">Analyze</span> to see how AI reads this product page and what to fix.</p>
                     </div>
                   )}
                   {isExpanded && missingFields.length === 0 && (
                     <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-emerald-400">✅ All 12 schema fields complete!</div>
+                  )}
+                  {/* Inline deep analysis */}
+                  {report && (
+                    <div className="mt-5 pt-5 border-t border-zinc-800">
+                      <ProductAnalysisReport report={report} />
+                    </div>
                   )}
                 </div>
               );
@@ -163,14 +277,21 @@ export default function ProductsPage() {
         {!loading && products.length === 0 && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center space-y-4">
             <div className="text-4xl">📦</div>
-            <h3 className="text-lg font-semibold text-white">No products scanned yet</h3>
+            <h3 className="text-lg font-semibold text-white">No products yet</h3>
             <p className="text-zinc-400 text-sm max-w-md mx-auto">
-              Go to Knowledge Graph, enter your store domain, and run a bulk scan. All products will appear here with their AI visibility scores.
+              Enter your store domain above and click <span className="text-emerald-400">Scan Store</span>. All products will appear here with their AI visibility scores.
             </p>
-            <Link href="/knowledge-graph" className="inline-block px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition">🧠 Go to Knowledge Graph →</Link>
           </div>
         )}
       </div>
     </main>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-zinc-950 flex items-center justify-center"><div className="animate-spin h-5 w-5 text-emerald-500 border-2 border-emerald-500 border-t-transparent rounded-full" /></main>}>
+      <ProductsContent />
+    </Suspense>
   );
 }
