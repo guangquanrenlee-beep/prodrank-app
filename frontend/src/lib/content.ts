@@ -19,7 +19,7 @@ export const TOOLS = [
   { slug: "schema-validator", title: "Free Schema Validator", desc: "Paste a URL, see if AI agents can read your product.", icon: "🔍", endpoint: "/api/audit/product" },
   { slug: "ai-score-checker", title: "Free AI Score Checker", desc: "Enter your domain, get an AI Visibility Score instantly.", icon: "📊", endpoint: "/api/calculate" },
   { slug: "faq-generator", title: "Free FAQ Generator", desc: "Generate FAQ Schema for any product page.", icon: "❓", endpoint: "/api/optimize/fixes" },
-  { slug: "jsonld-generator", title: "Free JSON-LD Generator", desc: "Generate complete Product Schema JSON-LD.", icon: "📝", endpoint: "/api/optimize/fixes/from-data" },
+  { slug: "jsonld-generator", title: "Free JSON-LD Generator", desc: "Generate complete Product Schema JSON-LD.", icon: "📝", endpoint: "/api/optimize/fixes" },
   { slug: "description-analyzer", title: "Product Description Analyzer", desc: "Check if your product description gives AI enough context.", icon: "📄", endpoint: "/api/intel/full" },
   { slug: "citation-checker", title: "AI Citation Checker", desc: "Find out which sources AI agents trust in your category.", icon: "📰", endpoint: "/api/cite/report" },
 ];
