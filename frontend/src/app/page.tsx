@@ -110,7 +110,7 @@ export default function HomePage() {
       {/* ===== Hero ===== */}
       <section className="px-4 py-20 md:py-28 text-center max-w-3xl mx-auto space-y-8">
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight text-white">
-          Make AI recommend <span className="text-emerald-400">your</span> products
+          Make AI recommend your products
         </h1>
         <p className="text-lg text-zinc-400 max-w-xl mx-auto">
           See if ChatGPT, Gemini, Claude, and Grok can find your store — and fix it when they can&apos;t.
