@@ -74,30 +74,44 @@ async def resolve_product_url(req: WooResolveUrlRequest):
                     resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36"})
                     html = resp.text
                     soup = BeautifulSoup(html, "lxml")
-                    # Try to find WooCommerce product ID
-                    product_id = None
-                    # WooCommerce stores product ID in various places
+                    # Collect candidate IDs from the page. The page may contain
+                    # multiple product:retailer_item_id metas (main product +
+                    # related products) — the LAST one is NOT necessarily ours,
+                    # so gather all of them, then verify against the plugin.
+                    candidates = []
                     for meta in soup.find_all("meta"):
-                        if meta.get("property") == "product:retailer_item_id":
-                            product_id = int(meta["content"]) if meta["content"].isdigit() else None
-                    # Fallback: try body class for postid
-                    if not product_id:
-                        body = soup.find("body")
-                        if body:
-                            classes = body.get("class", [])
-                            for c in classes:
-                                if c.startswith("postid-"):
-                                    try:
-                                        product_id = int(c.replace("postid-", ""))
-                                    except ValueError:
-                                        pass
-                            # Another pattern: single-product postid-XXX
-                            for c in classes:
-                                if c.startswith("page-id-") and "single-product" in classes:
-                                    try:
-                                        product_id = int(c.replace("page-id-", ""))
-                                    except ValueError:
-                                        pass
+                        if meta.get("property") == "product:retailer_item_id" and meta.get("content", "").isdigit():
+                            candidates.append(int(meta["content"]))
+                    # Fallback: WP post id in body class (postid-N / single-postid-N)
+                    body = soup.find("body")
+                    if body:
+                        for c in body.get("class", []):
+                            if c.startswith("postid-") or c.startswith("single-postid-"):
+                                try:
+                                    candidates.append(int(c.replace("postid-", "").replace("single-", "")))
+                                except ValueError:
+                                    pass
+                    # De-duplicate, keep order
+                    seen = set()
+                    candidates = [c for c in candidates if not (c in seen or seen.add(c))]
+
+                    # Verify each candidate against the plugin API — the page can
+                    # reference OTHER products (related items), so only accept
+                    # an id the plugin actually knows.
+                    product_id = None
+                    if candidates:
+                        for cid in candidates:
+                            try:
+                                plugin_data = await _plugin_get(domain, f"/products/{cid}")
+                                product_id = cid
+                                product["title"] = plugin_data.get("title", product["title"])
+                                product["description"] = plugin_data.get("description", product["description"])
+                                product["price"] = plugin_data.get("price", product["price"])
+                                product["sku"] = plugin_data.get("sku", "")
+                                product["brand"] = plugin_data.get("brand", "")
+                                break
+                            except Exception:
+                                continue
 
                     # Extract product info from page
                     title = soup.find("title").text.strip() if soup.find("title") else ""
@@ -117,25 +131,15 @@ async def resolve_product_url(req: WooResolveUrlRequest):
                         if img.get("content"):
                             images.append(img["content"])
 
-                    product["title"] = title[:200] if title else url.split("/")[-1].replace("-", " ").title()
-                    product["description"] = description[:3000]
-                    product["price"] = price
+                    # Plugin data (verified above) takes priority; page crawl only fills gaps
+                    if not product["title"]:
+                        product["title"] = title[:200] if title else url.split("/")[-1].replace("-", " ").title()
+                    if not product["description"]:
+                        product["description"] = description[:3000]
+                    if not product["price"]:
+                        product["price"] = price
                     product["images"] = images[:5]
                     product["id"] = product_id or 0
-
-                    # If we found a product_id, enrich with plugin data
-                    if product_id:
-                        try:
-                            plugin_data = await _plugin_get(domain, f"/products/{product_id}")
-                            product["title"] = plugin_data.get("title", product["title"])
-                            product["description"] = plugin_data.get("description", product["description"])
-                            product["price"] = plugin_data.get("price", product["price"])
-                            product["sku"] = plugin_data.get("sku", "")
-                            product["brand"] = plugin_data.get("brand", "")
-                            product["id"] = product_id
-                        except Exception:
-                            pass
-
                     product["found_via"] = "page_crawl"
         except Exception as e:
             product["crawl_error"] = str(e)[:200]
@@ -158,13 +162,29 @@ async def resolve_product_url(req: WooResolveUrlRequest):
                 product["description"] = desc_meta["content"][:3000] if desc_meta and desc_meta.get("content") else ""
                 images = [img["content"] for img in soup.find_all("meta", attrs={"property": "og:image"}) if img.get("content")]
                 product["images"] = images[:5]
+                # WP post id from body class — for WooCommerce this IS the product id
+                body = soup.find("body")
+                pid = None
+                if body:
+                    for c in body.get("class", []):
+                        if c.startswith("postid-") or c.startswith("single-postid-"):
+                            try:
+                                pid = int(c.replace("postid-", "").replace("single-", ""))
+                            except ValueError:
+                                pass
+                product["id"] = pid or 0
                 product["found_via"] = "page_crawl_no_token"
         except Exception as e:
             product["crawl_error"] = str(e)[:200]
 
-    # If no real product_id, use a hash of the URL as a synthetic id
+    # No id found anywhere (or every candidate failed plugin verification).
+    # Fail loudly instead of synthesizing a fake id — a fake id silently breaks
+    # generate/publish downstream ("No drafts found" 400s).
     if not product["id"]:
-        product["id"] = abs(hash(url)) % 100000
+        raise HTTPException(status_code=400,
+                            detail=f"Could not resolve a product id for {url} — the page "
+                                   f"has no product meta and the plugin did not verify any candidate. "
+                                   f"Make sure the ProdRank plugin is active on this product.")
 
     return {"status": "ok", "domain": domain, "has_token": bool(token), "product": product}
 
