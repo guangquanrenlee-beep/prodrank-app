@@ -32,23 +32,28 @@ async def full_intelligence(req: IntelligenceRequest):
     if "offers" in schema_vals and not schema_vals.get("price"):
         # schema audit stores the price inside the offers value ("$49.99 USD")
         schema_vals["price"] = schema_vals["offers"]
+
+    # Page description — the AI agents need the actual body text to judge
+    # whether fields are present; without it every field reads "Not found".
+    description = ""
+    for f in audit.schema_fields:
+        if f.field == "description" and f.value:
+            description = f.value
+            break
+
     try:
         parse_report = await parse_engine.validate_product(
             url=req.url,
             title=audit.title or req.url,
             brand=req.brand,
             schema_values=schema_vals,
+            description=description,
         )
     except Exception as e:
         parse_report = None
 
     # 3. Knowledge Gap detection
     category = req.category or audit.title or req.url.split("/")[-1]
-    description = ""
-    for f in audit.schema_fields:
-        if f.field == "description" and f.value:
-            description = f.value
-            break
 
     try:
         gap_report = await gap_engine.detect_gaps(category, description)

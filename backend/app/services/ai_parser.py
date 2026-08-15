@@ -91,16 +91,19 @@ class AIParseEngine:
         self.ofox = AsyncOpenAI(api_key=get_settings().openai_api_key, base_url=get_settings().openai_base_url)
 
     async def validate_product(self, url: str, title: str, brand: str = "",
-                               schema_values: dict | None = None) -> ParseReport:
+                               schema_values: dict | None = None,
+                               description: str = "") -> ParseReport:
         """Full AI parse validation: Schema vs real AI understanding.
 
         schema_values: field-name → value map from the page's JSON-LD, so the
         "Your Page" column shows what the schema actually says (not the title).
+        description: page description/body text — WITHOUT it the agents can
+        only guess from the title and every field reads "Not found".
         """
         report = ParseReport(url=url, title=title)
 
         # 1. Field-level validation
-        report.field_validations = await self._validate_fields(title, brand, schema_values)
+        report.field_validations = await self._validate_fields(title, brand, schema_values, description)
 
         # 2. Knowledge coverage
         report.knowledge_dimensions, report.knowledge_score, report.missing_dimensions = \
@@ -115,10 +118,12 @@ class AIParseEngine:
         return report
 
     async def _validate_fields(self, title: str, brand: str,
-                               schema_values: dict | None = None) -> list[FieldValidation]:
+                               schema_values: dict | None = None,
+                               description: str = "") -> list[FieldValidation]:
         """Query AI agents to check if they recognize key product attributes."""
         schema_values = schema_values or {}
         results = []
+        desc_ctx = (description or "").strip()[:1500]
 
         for field in self.FIELDS_TO_VALIDATE:
             v = FieldValidation(field=field)
@@ -130,7 +135,8 @@ class AIParseEngine:
             prompt = (
                 f"Answer ONLY with the {field} of this product. "
                 f"One short phrase. If unknown, say 'Unknown'.\n\n"
-                f"Product: {title}" + (f"\nBrand: {brand}" if brand else "")
+                f"Product: {title}" + (f"\nBrand: {brand}" if brand else "") +
+                (f"\nPage description: {desc_ctx}" if desc_ctx else "")
             )
 
             # Query ChatGPT + Gemini + Claude in parallel
