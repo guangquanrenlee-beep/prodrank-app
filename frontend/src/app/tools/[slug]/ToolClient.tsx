@@ -32,26 +32,74 @@ export function ToolClient({ tool }: { tool: typeof TOOLS[0] }) {
   const [loading, setLoading] = useState(false);
   const [pastedHtml, setPastedHtml] = useState("");
   const [manualLoading, setManualLoading] = useState(false);
+  // Citation flow: detected category from the pasted URL + tiered sources
+  const [detected, setDetected] = useState<any>(null);
+  const [sources, setSources] = useState<any>(null);
 
   const isCitation = tool.endpoint === "/api/cite/report";
   const supportsPaste = tool.endpoint === "/api/audit/product";
 
-  const run = async () => {
-    if (!input.trim()) return;
-    setLoading(true); setError(""); setResult(null);
-    try {
-      const body: any = { url: input, domain: input, product_name: input };
-      if (isCitation) body.category = category.trim() || input.replace(/^https?:\/\//, "").split("/")[0];
-      const r = await fetch(tool.endpoint || "", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (r.ok) { setResult(await r.json()); return; }
+  const isUrlInput = (s: string) =>
+    /^https?:\/\//i.test(s.trim()) || (s.includes(".") && !s.includes(" "));
+
+  const showError = (r: Response) => {
+    const show = async () => {
       let detail = "";
       try { detail = String((await r.json()).detail || ""); } catch { /* non-JSON body */ }
       const msg = detail || `Request failed (HTTP ${r.status})`;
       if (r.status === 429) setError("Free limit reached — 3 checks/day per tool. Sign in for unlimited access, or try again tomorrow.");
       else setError(msg);
+    };
+    return show();
+  };
+
+  const fetchSources = async (cat: string) => {
+    const r = await fetch("/api/cite/sources", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: cat }),
+    });
+    if (r.ok) setSources(await r.json());
+    else await showError(r);
+  };
+
+  const run = async () => {
+    if (!input.trim()) return;
+    setLoading(true); setError(""); setResult(null); setSources(null);
+    // NB: `detected` is NOT reset here — it survives so the user can edit
+    // the category and re-check with their own value. Re-detect button resets it.
+    try {
+      if (isCitation) {
+        // Citation flow: paste a product URL → detect its category → tiered
+        // sources. Typing a category directly skips detection.
+        if (isUrlInput(input)) {
+          if (!detected) {
+            const dr = await fetch("/api/cite/detect", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: input.trim() }),
+            });
+            if (dr.ok) {
+              const dd = await dr.json();
+              setDetected(dd);
+              setCategory(dd.category);
+              await fetchSources(dd.category);
+            } else await showError(dr);
+          } else {
+            // URL already detected; the user edited the category — re-fetch
+            // with whatever is in the category box now.
+            await fetchSources(category.trim() || "general");
+          }
+        } else {
+          await fetchSources(category.trim() || input.trim());
+        }
+      } else {
+        const body: any = { url: input, domain: input, product_name: input };
+        const r = await fetch(tool.endpoint || "", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (r.ok) { setResult(await r.json()); }
+        else await showError(r);
+      }
     } catch (e: any) {
       setError(e.message || "Network error — is the API reachable?");
     }
@@ -91,9 +139,17 @@ export function ToolClient({ tool }: { tool: typeof TOOLS[0] }) {
         placeholder="Paste a product page URL, e.g. yourstore.com/product/led-ring-light"
         className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
       {isCitation && (
-        <input value={category} onChange={e => setCategory(e.target.value)}
-          placeholder="Product category, e.g. ring lights (used for the citation report)"
-          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+        <div className="space-y-1.5">
+          <input value={category} onChange={e => setCategory(e.target.value)}
+            placeholder="Product category — auto-detected from your URL, edit if wrong"
+            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          {detected && (
+            <div className="text-xs text-zinc-500 flex items-center justify-between">
+              <span>Detected: <span className="text-emerald-400 font-medium">{detected.category}</span> ({detected.detected_from}, {detected.confidence}% confident){detected.title ? ` — from "${detected.title.slice(0, 60)}"` : ""}</span>
+              <button onClick={() => { setDetected(null); run(); }} className="text-xs text-zinc-400 hover:text-white underline">Re-detect</button>
+            </div>
+          )}
+        </div>
       )}
       <button onClick={run} disabled={loading || !input.trim()}
         className="w-full px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-medium rounded-lg transition">
@@ -132,6 +188,64 @@ export function ToolClient({ tool }: { tool: typeof TOOLS[0] }) {
     {homepageHint && (
       <div className="bg-amber-900/10 border border-amber-800 rounded-xl p-4 text-sm text-amber-300">
         ⚠️ This looks like a <span className="font-medium">homepage</span>, not a product page — no Product Schema was found, which is expected on a homepage. Paste a specific product URL instead, e.g. <span className="text-amber-200">yourstore.com/product/led-ring-light</span>.
+      </div>
+    )}
+
+    {/* ── Citation: tiered trusted sources ── */}
+    {isCitation && sources && (
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-6">
+        <div className="text-center">
+          <div className="text-3xl font-bold text-emerald-400">{sources.tier1_measured.length + sources.tier2_industry.length}</div>
+          <div className="text-sm text-zinc-500">Trusted sources for "{sources.category}"</div>
+        </div>
+
+        {/* Tier 1 — measured */}
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-semibold text-zinc-200">📊 Measured citations</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-800/50">REAL DATA</span>
+          </div>
+          <p className="text-[10px] text-zinc-600 mb-2">{sources.tier1_note}</p>
+          {sources.tier1_measured.length > 0 ? (
+            <div className="space-y-1.5">
+              {sources.tier1_measured.slice(0, 10).map((s: any, i: number) => (
+                <div key={i} className="flex items-center justify-between text-xs bg-zinc-800/40 border border-zinc-700/50 rounded-lg px-3 py-2">
+                  <span className="text-zinc-300">{s.domain}</span>
+                  <span className="text-emerald-400">{s.count}× cited by AI</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-zinc-600 bg-zinc-800/30 border border-zinc-700/50 rounded-lg px-3 py-2">
+              No measured citation history yet — this grows as our daily AI monitoring runs. For now, see the industry list below.
+            </div>
+          )}
+        </div>
+
+        {/* Tier 2 — industry consensus */}
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-semibold text-zinc-200">🏛️ Industry-consensus outlets</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-900/50 text-amber-400 border border-amber-800/50">CURATED, NOT MEASURED</span>
+          </div>
+          <p className="text-[10px] text-zinc-600 mb-2">{sources.tier2_note} — good pitching targets.</p>
+          <div className="space-y-2">
+            {sources.tier2_industry.map((s: any, i: number) => (
+              <details key={i} className="bg-zinc-800/40 border border-zinc-700/50 rounded-lg">
+                <summary className="px-4 py-2.5 text-sm text-zinc-300 cursor-pointer flex items-center gap-2">
+                  <span className="font-medium">{s.domain}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-700 text-zinc-400">industry</span>
+                </summary>
+                <div className="px-4 pb-3 space-y-1">
+                  <p className="text-xs text-zinc-500">📌 {s.why}</p>
+                  <p className="text-xs text-zinc-400">✉️ {s.pitch}</p>
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-[10px] text-zinc-600">Honest note: neither list means "these sites cited <i>you</i>". Tier 1 = domains AI actually mentioned in real queries; Tier 2 = where the category's reviews live. Both are pitching targets, not citations of your brand.</p>
       </div>
     )}
 

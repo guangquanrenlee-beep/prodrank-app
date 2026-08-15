@@ -83,9 +83,16 @@ class CitationEngine:
     # ── 1. Extract citations from an AI response ──
 
     def extract_citations(
-        self, raw_response: str, ai_agent: str, keyword: str, category: str = ""
+        self, raw_response: str, ai_agent: str, keyword: str, category: str = "",
+        persist: bool = True,
     ) -> list[SourceCitation]:
-        """Extract domains from AI response — simple line-by-line parsing."""
+        """Extract domains from AI response — simple line-by-line parsing.
+
+        persist=False for ad-hoc queries (e.g. the free tool's category
+        report): those are AI-suggested outlets, NOT measured citations,
+        and writing them to the citations table would pollute the real
+        citation history used by the dashboard.
+        """
         citations = []
         seen = set()
 
@@ -125,11 +132,12 @@ class CitationEngine:
             )
             citations.append(citation)
             self._citations.append(citation)
-            # Persist to Supabase
-            self._db.save_citation(
-                ai_response_id="", source_url=citation.url,
-                source_domain=citation.domain, source_type="review",
-            )
+            if persist:
+                # Persist to Supabase (real query pipelines only)
+                self._db.save_citation(
+                    ai_response_id="", source_url=citation.url,
+                    source_domain=citation.domain, source_type="review",
+                )
 
         return citations
 
@@ -249,7 +257,9 @@ class CitationEngine:
                     temperature=0.8, max_tokens=600, timeout=30.0,
                 )
                 raw = resp.choices[0].message.content or ""
-                citations = self.extract_citations(raw, agent_name, combined_kws, category)
+                # persist=False: ad-hoc tool query — AI-suggested outlets,
+                # not measured citations. Never pollute the citations table.
+                citations = self.extract_citations(raw, agent_name, combined_kws, category, persist=False)
                 return [
                     {"domain": c.domain, "url": c.url, "ai_agent": c.ai_agent,
                      "keyword": combined_kws, "position": c.position}
