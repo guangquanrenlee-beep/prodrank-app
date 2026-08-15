@@ -19,7 +19,6 @@ const FEATURES = [
 const USE_CASES = [
   { icon: "🛒", title: "Shopify Stores", desc: "Install our official Shopify App. Schema injection, product sync, and AI ranking in one click." },
   { icon: "🧩", title: "WooCommerce", desc: "Upload our WordPress plugin. Works with any theme and auto-detects your product pages." },
-  { icon: "📦", title: "Amazon Sellers", desc: "Track if AI agents recommend your brand when shoppers ask for category comparisons." },
 ];
 
 const PRICING = [
@@ -169,7 +168,7 @@ export default function HomePage() {
           <h2 className="text-3xl font-bold text-white">Works with your platform</h2>
           <p className="text-zinc-400 mt-2">No matter how your store is built, we have an integration for you.</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {USE_CASES.map(uc => (
             <div key={uc.title} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center hover:border-zinc-700 transition">
               <div className="text-3xl mb-3">{uc.icon}</div>
