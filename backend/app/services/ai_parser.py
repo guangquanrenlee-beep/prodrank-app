@@ -269,6 +269,8 @@ class AIParseEngine:
         unknown_markers = [
             "unknown", "not specified", "not available", "not provided",
             "i don't know", "i cannot", "unable to", "unspecified",
-            "not mentioned", "no information", "n/a", ""
+            "not mentioned", "no information", "n/a",
         ]
-        return any(m in v for m in unknown_markers)
+        # Note: "" is NOT a marker — `"" in v` is True for every string,
+        # which would flag every real answer as unknown.
+        return not v or any(m in v for m in unknown_markers)
