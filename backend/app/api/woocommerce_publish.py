@@ -70,7 +70,7 @@ async def resolve_product_url(req: WooResolveUrlRequest):
                 # But that's slow for large stores. Instead, crawl the page for WP product ID.
                 import httpx
                 from bs4 import BeautifulSoup
-                async with httpx.AsyncClient(timeout=15) as client:
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
                     resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36"})
                     html = resp.text
                     soup = BeautifulSoup(html, "lxml")
@@ -149,7 +149,7 @@ async def resolve_product_url(req: WooResolveUrlRequest):
         try:
             import httpx
             from bs4 import BeautifulSoup
-            async with httpx.AsyncClient(timeout=15) as client:
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
                 resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36"})
                 html = resp.text
                 soup = BeautifulSoup(html, "lxml")
