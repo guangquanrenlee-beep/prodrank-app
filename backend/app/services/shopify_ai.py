@@ -243,7 +243,10 @@ class ShopifyAIService:
         description = (product.get("description") or "")[:300].lower()
         combined = f"{ptype} {title_lower} {tags} {description}"
 
-        # Quick keyword match for common Shopify Product Types
+        # Quick keyword match for common Shopify Product Types.
+        # Substring gotchas handled: no "led" ("enameled"), no "brush"
+        # ("brushed interior"), no "wash" ("machine washable") — short/embedded
+        # words misclassify. Alias buckets (toys) map via CATEGORY_ALIASES.
         keyword_map: dict[str, list[str]] = {
             "fashion": ["cloth", "shirt", "t-shirt", "dress", "pant", "jean", "jacket", "coat", "shoe",
                         "sneaker", "hoodie", "sweater", "skirt", "top", "bottom", "apparel", "wear",
@@ -252,12 +255,12 @@ class ShopifyAIService:
             "electronics": ["electronic", "gadget", "phone", "laptop", "tablet", "camera", "speaker",
                            "headphone", "charger", "cable", "adapter", "monitor", "keyboard", "mouse",
                            "watch", "tv", "television", "audio", "computer", "usb", "hdmi",
-                           "led", "ring light", "tripod", "headset", "earbud", "drone", "gimbal"],
+                           "ring light", "tripod", "headset", "earbud", "drone", "gimbal"],
             "beauty": ["cosmetic", "makeup", "skincare", "cream", "serum", "lotion", "shampoo",
                       "conditioner", "perfume", "fragrance", "nail", "lipstick", "mascara", "beauty",
                       "hair", "face", "skin", "bath", "soap",
                       "serum", "moisturizer", "cleanser", "mask", "sunscreen", "retinol",
-                      "lipstick", "lip", "eye", "patch", "wash", "brush"],
+                      "lipstick", "lip", "eye", "patch"],
             "home": ["kitchen", "cook", "bake", "furniture", "decor", "bed", "pillow", "blanket",
                     "towel", "lamp", "light", "rug", "curtain", "storage", "organizer", "home",
                     "household", "dinner", "plate", "cup", "mug", "pan", "pot", "appliance",
@@ -266,21 +269,25 @@ class ShopifyAIService:
                     "supplement", "vitamin", "protein", "nutrition", "organic", "gluten", "vegan"],
             "sports": ["sport", "fitness", "exercise", "yoga", "gym", "running", "hiking", "camping",
                       "bike", "cycling", "swim", "outdoor", "athletic", "training", "ball"],
+            "toys": ["toy", "toys", "plush", "plushie", "dinosaur", "building blocks", "building tiles",
+                    "tiles", "blocks", "puzzle", "doll", "stuffed", "figurine", "lego", "educational"],
         }
         for cat, keywords in keyword_map.items():
             score = sum(1 for kw in keywords if kw in combined)
             if score >= 3:     # strong match — 3+ keywords hit
-                return (cat, 95)
-            if score >= 1 and cat == "fashion" and any(k in combined for k in ["shirt", "dress", "shoe", "jacket", "pant"]):
+                return (CATEGORY_ALIASES.get(cat, cat), 95)
+            if score >= 1 and cat == "fashion" and any(k in combined for k in ["shirt", "dress", "shoe", "jacket", "pant", "hoodie", "sweater", "coat", "hat", "scarf", "bag", "backpack", "t-shirt", "jean"]):
                 return (cat, 92)
             if score >= 1 and cat == "home" and any(k in combined for k in ["oven", "kettle", "cookware", "knife", "dutch", "fry pan", "vacuum"]):
                 return (cat, 92)
             if score >= 1 and cat == "sports" and any(k in combined for k in ["yoga", "dumbbell", "resistance band", "jump rope", "treadmill", "fitness tracker"]):
                 return (cat, 92)
-            if score >= 1 and cat == "electronics" and any(k in combined for k in ["led", "ring light", "camera", "tripod", "headphone", "speaker", "charger", "monitor", "keyboard", "mouse"]):
+            if score >= 1 and cat == "electronics" and any(k in combined for k in ["ring light", "camera", "tripod", "headphone", "speaker", "charger", "monitor", "keyboard", "mouse"]):
                 return (cat, 92)
-            if score >= 1 and cat == "beauty" and any(k in combined for k in ["makeup", "cleanser", "serum", "patch", "brush", "mask", "sunscreen", "lotion"]):
+            if score >= 1 and cat == "beauty" and any(k in combined for k in ["makeup", "cleanser", "serum", "patch", "mask", "sunscreen", "lotion"]):
                 return (cat, 92)
+            if score >= 1 and cat == "toys" and any(k in combined for k in ["toy", "plush", "dinosaur", "building blocks", "tiles", "blocks", "puzzle", "doll", "stuffed"]):
+                return (CATEGORY_ALIASES["toys"], 92)
 
         # AI fallback: let the LLM classify. The content model is a reasoning
         # model — its answer comes AFTER reasoning_content, so max_tokens must
@@ -299,7 +306,7 @@ class ShopifyAIService:
                         f"Type: {ptype or 'unknown'}\n"
                         f"Description: {(product.get('description') or '')[:200]}\n"
                         f"Tags: {tags}\n\n"
-                        f"Categories: fashion, electronics, beauty, home, food, sports, generic\n"
+                        f"Categories: fashion, electronics, beauty, home, food, sports, toys, generic\n"
                         f"Reply: <category> <confidence_0-100>"
                     ),
                 }],
