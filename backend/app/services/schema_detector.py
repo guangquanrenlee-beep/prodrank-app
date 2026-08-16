@@ -217,7 +217,7 @@ class SchemaDetector:
 
         # 1. Schema.org JSON-LD inspection
         json_ld_scripts = soup.find_all("script", type="application/ld+json")
-        product_data = {}
+        product_candidates: list[dict] = []
         faq_found = False
 
         for script in json_ld_scripts:
@@ -233,19 +233,33 @@ class SchemaDetector:
 
             # Product/ProductGroup are equivalent for Schema auditing
             if t in ("Product", "ProductGroup"):
-                product_data = data
+                product_candidates.append(data)
             elif isinstance(data, dict) and "@graph" in data:
                 for item in data["@graph"]:
                     gt = item.get("@type")
                     if isinstance(gt, list):
                         gt = gt[0] if gt else None
                     if gt in ("Product", "ProductGroup"):
-                        product_data = item
+                        product_candidates.append(item)
                     elif gt == "FAQPage":
                         faq_found = True
 
             if t == "FAQPage":
                 faq_found = True
+
+        # Multiple Product blocks can coexist (plugin-injected + theme/SEO
+        # plugin @graph). Taking the last one loses richer data — e.g. the
+        # theme copy often drops brand or nests price differently, which
+        # showed up as "no price" / "no brand" on real stores. Keep the
+        # candidate with the most complete schema fields instead.
+        AUDIT_FIELDS = ("name", "description", "image", "offers", "brand",
+                        "aggregateRating", "review", "sku", "gtin",
+                        "itemCondition", "availability", "shippingDetails")
+        product_data = max(
+            product_candidates,
+            key=lambda d: sum(1 for f in AUDIT_FIELDS if d.get(f) is not None),
+            default={},
+        )
 
         result.has_product_schema = bool(product_data)
         result.has_faq_schema = faq_found
@@ -330,6 +344,17 @@ class SchemaDetector:
                     offers = offers[0] if offers else {}
         has_offer = bool(offers)
         has_price = has_offer and "price" in offers
+        # Google/theme format nests the price inside priceSpecification
+        # (UnitPriceSpecification) instead of offers.price — parse that too
+        # (seen on WooCommerce @graph output, was misread as "no price").
+        if has_offer and not has_price:
+            ps = offers.get("priceSpecification")
+            if isinstance(ps, list):
+                ps = ps[0] if ps else {}
+            if isinstance(ps, dict) and ps.get("price"):
+                offers = dict(offers, price=ps["price"],
+                              priceCurrency=ps.get("priceCurrency", offers.get("priceCurrency", "USD")))
+                has_price = True
         note = ""
         if has_price:
             note = f"${offers.get('price')} {offers.get('priceCurrency', '')}"
