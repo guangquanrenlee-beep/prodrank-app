@@ -132,6 +132,16 @@ CATEGORY_RULES: dict[str, dict] = {
     },
 }
 
+# Categories the AI may return that have no dedicated module set — map them
+# to the closest backend category instead of dropping to "generic".
+CATEGORY_ALIASES: dict[str, str] = {
+    "toys": "sports",
+    "kids": "sports",
+    "pet": "home",
+    "photography": "electronics",
+    "accessories": "fashion",
+}
+
 CATEGORY_PROMPT_VERSION = "v2"   # bumped: category-aware generation
 MODEL = "deepseek-v4-flash"  # DeepSeek official (llm.get_content_client handles fallback)
 
@@ -241,12 +251,13 @@ class ShopifyAIService:
                         "bag", "backpack", "wallet", "purse", "handbag", "tote", "clutch"],
             "electronics": ["electronic", "gadget", "phone", "laptop", "tablet", "camera", "speaker",
                            "headphone", "charger", "cable", "adapter", "monitor", "keyboard", "mouse",
-                           "watch", "tv", "television", "audio", "computer", "usb", "hdmi"],
+                           "watch", "tv", "television", "audio", "computer", "usb", "hdmi",
+                           "led", "ring light", "tripod", "headset", "earbud", "drone", "gimbal"],
             "beauty": ["cosmetic", "makeup", "skincare", "cream", "serum", "lotion", "shampoo",
                       "conditioner", "perfume", "fragrance", "nail", "lipstick", "mascara", "beauty",
                       "hair", "face", "skin", "bath", "soap",
                       "serum", "moisturizer", "cleanser", "mask", "sunscreen", "retinol",
-                      "lipstick", "lip", "eye", "patch", "wash"],
+                      "lipstick", "lip", "eye", "patch", "wash", "brush"],
             "home": ["kitchen", "cook", "bake", "furniture", "decor", "bed", "pillow", "blanket",
                     "towel", "lamp", "light", "rug", "curtain", "storage", "organizer", "home",
                     "household", "dinner", "plate", "cup", "mug", "pan", "pot", "appliance",
@@ -266,8 +277,15 @@ class ShopifyAIService:
                 return (cat, 92)
             if score >= 1 and cat == "sports" and any(k in combined for k in ["yoga", "dumbbell", "resistance band", "jump rope", "treadmill", "fitness tracker"]):
                 return (cat, 92)
+            if score >= 1 and cat == "electronics" and any(k in combined for k in ["led", "ring light", "camera", "tripod", "headphone", "speaker", "charger", "monitor", "keyboard", "mouse"]):
+                return (cat, 92)
+            if score >= 1 and cat == "beauty" and any(k in combined for k in ["makeup", "cleanser", "serum", "patch", "brush", "mask", "sunscreen", "lotion"]):
+                return (cat, 92)
 
-        # AI fallback: let the LLM classify
+        # AI fallback: let the LLM classify. The content model is a reasoning
+        # model — its answer comes AFTER reasoning_content, so max_tokens must
+        # leave room for both (15 used to be consumed entirely by reasoning →
+        # empty content → every fallback product silently became "generic").
         try:
             resp = await self.client.chat.completions.create(
                 model=self.model,
@@ -285,18 +303,33 @@ class ShopifyAIService:
                         f"Reply: <category> <confidence_0-100>"
                     ),
                 }],
-                temperature=0.1, max_tokens=15, timeout=10.0,
+                temperature=0.1, max_tokens=200, timeout=15.0,
             )
             raw = (resp.choices[0].message.content or "").strip().lower()
-            parts = raw.split()
-            cat = parts[0] if parts else "generic"
-            conf = 0
-            try:
-                conf = int(parts[1]) if len(parts) > 1 else 60
-            except ValueError:
-                conf = 60
-            cat = cat if cat in CATEGORY_RULES else "generic"
-            return (cat, min(100, conf))
+            if raw:
+                parts = raw.split()
+                cat = parts[0]
+                conf = 0
+                try:
+                    conf = int(parts[1]) if len(parts) > 1 else 60
+                except ValueError:
+                    conf = 60
+                # Backend has 7 category modules; map the nearest alias instead
+                # of dropping the AI's judgment to "generic" (toys → sports,
+                # photography → electronics, pet → home).
+                if cat not in CATEGORY_RULES:
+                    cat = CATEGORY_ALIASES.get(cat, "generic")
+                return (cat, min(100, conf))
+            # Empty reply (reasoning ate the budget / provider hiccup) — don't
+            # default to generic blindly: deterministic strongest-hit pass.
+            best, best_score = "generic", 0
+            for cat, keywords in keyword_map.items():
+                score = sum(1 for kw in keywords if kw in combined)
+                if score > best_score:
+                    best, best_score = cat, score
+            if best_score >= 1:
+                return (best, 70)
+            return ("generic", 30)
         except Exception:
             return ("generic", 30)
 
