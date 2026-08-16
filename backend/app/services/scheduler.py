@@ -5,6 +5,14 @@ from app.services.task_queue import TaskQueue
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
 DAILY_FILE = os.path.join(DATA_DIR, "daily_jobs.json")
 
+# PAUSED 2026-08-17 (user rule: no automatic ofox spend until real users arrive).
+# rank_check = 4-model ofox query per tracked keyword; citation_watch = ~21 ofox calls/day.
+# The ofox code paths (ai_query.py query_all, citation_watch.py run_citation_watch) are
+# kept intact — re-enable by setting AUTO_RANK_TRACKING=1 / AUTO_CITATION_WATCH=1 in the
+# VPS .env (no code change needed). Manual user-triggered queries are unaffected.
+AUTO_RANK_TRACKING = os.getenv("AUTO_RANK_TRACKING", "0") == "1"
+AUTO_CITATION_WATCH = os.getenv("AUTO_CITATION_WATCH", "0") == "1"
+
 async def run_pending():
     """Called periodically by the in-app worker. Processes task queue and daily jobs."""
     queue = TaskQueue()
@@ -18,7 +26,7 @@ async def run_pending():
         with open(daily_file) as f: jobs = json.load(f)
     except: jobs = {"last_run": "", "tracked_keywords": [], "last_collect": ""}
 
-    if jobs.get("last_run") != today and jobs.get("tracked_keywords"):
+    if AUTO_RANK_TRACKING and jobs.get("last_run") != today and jobs.get("tracked_keywords"):
         jobs["last_run"] = today
         for kw in jobs["tracked_keywords"]:
             queue.enqueue("rank_check", {"product_name": kw.get("brand",""), "keyword": kw.get("keyword",""), "brand": kw.get("brand","")})
@@ -73,7 +81,7 @@ async def run_pending():
         queue.enqueue("competitor_watch", {})
 
     # Daily Citation Watch (real-model queries — what sources AI cites)
-    if jobs.get("last_citations") != today:
+    if AUTO_CITATION_WATCH and jobs.get("last_citations") != today:
         jobs["last_citations"] = today
         with open(daily_file, "w") as f: json.dump(jobs, f)
         queue.enqueue("citation_watch", {})
