@@ -226,7 +226,9 @@ function PublishContent() {
     if (!resolved) return;
     // Skip fields the scan found on the page (unless the merchant forced them)
     const skipFields = (scanResult?.summary?.found || []).filter((f: string) => !forceFields.has(f));
-    const d = await apiPost(apiBase() + "/publish/generate", { ...apiBody(), skip_fields: skipFields });
+    // AI generation is slow (DeepSeek reasoning model, measured 140s+ for a
+    // single field) — generous timeout instead of the 120s default.
+    const d = await apiPost(apiBase() + "/publish/generate", { ...apiBody(), skip_fields: skipFields }, 300000);
     if (!d) return;
     setPreview(d.preview); setEdited({});
     setMissing(d.missing || []);
@@ -238,7 +240,7 @@ function PublishContent() {
   const handleRegenerate = async () => {
     if (!resolved) return;
     const d = await apiPost(apiBase() + "/publish/generate",
-      apiBody());
+      apiBody(), 300000);
     if (!d) return;
     setPreview(d.preview); setEdited({});
     setMissing(d.missing || []);
