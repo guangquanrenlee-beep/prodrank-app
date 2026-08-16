@@ -28,9 +28,12 @@ class KnowledgeEngine:
 
     def __init__(self):
         settings = get_settings()
-        self.ai = AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+        # Text extraction is a content-type task → DeepSeek (cheap, per user rule).
+        # Vision has no DeepSeek equivalent — keep the ofox gpt-4o client only for images.
+        from app.services.llm import get_content_client
+        self.text_client, self.text_model = get_content_client()
+        self.vision_client = AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
         self.vision_model = "openai/gpt-4o"
-        self.text_model = "anthropic/claude-haiku-4.5"
 
     # ── CSV Processing ──
 
@@ -83,7 +86,7 @@ class KnowledgeEngine:
 }
 Only include attributes you can actually see. Confidence = how sure you are (0.0-1.0)."""
         try:
-            resp = await self.ai.chat.completions.create(
+            resp = await self.vision_client.chat.completions.create(
                 model=self.vision_model,
                 messages=[{"role": "user", "content": [
                     {"type": "text", "text": prompt},
@@ -136,7 +139,7 @@ Text to analyze:
 
 Return ONLY valid JSON array: [{{"type":"...","value":"...","confidence":0.X}}, ...]"""
         try:
-            resp = await self.ai.chat.completions.create(
+            resp = await self.text_client.chat.completions.create(
                 model=self.text_model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2, max_tokens=1000, timeout=25,
