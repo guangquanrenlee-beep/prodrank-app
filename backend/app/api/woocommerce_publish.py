@@ -608,7 +608,19 @@ async def generate_content(req: WooGenerateRequest):
         filtered_fields = [f for f in requested if f in template_fields and f not in req.skip_fields]
 
         # Step 3: generate with category context
-        generated = await ai.generate_fields(synced, filtered_fields, category=category)
+        # Knowledge-gap injection: if FAQ is being generated, detect which
+        # category questions the page can't answer (Analyze's Shopper
+        # Questions) and force the FAQ to cover them — one extra DeepSeek
+        # call, turns red ❌ gaps green on the next Analyze.
+        gap_questions = None
+        if "faq" in filtered_fields:
+            try:
+                from app.services.knowledge_gap import KnowledgeGapEngine
+                gap = await KnowledgeGapEngine().detect_gaps(category, synced.get("description", ""))
+                gap_questions = gap.top_missing or None
+            except Exception:
+                gap_questions = None
+        generated = await ai.generate_fields(synced, filtered_fields, category=category, gap_questions=gap_questions)
         if "error" in generated:
             raise HTTPException(status_code=500, detail=generated["error"])
 

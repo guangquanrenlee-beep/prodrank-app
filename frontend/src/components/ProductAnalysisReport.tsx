@@ -21,6 +21,15 @@ export interface Report {
 const sc = (s: number) => s >= 70 ? "text-emerald-400" : s >= 40 ? "text-amber-400" : "text-red-400";
 const priorityColor = (p: string) => p === "high" ? "text-red-400 bg-red-900/20 border-red-800" : p === "medium" ? "text-amber-400 bg-amber-900/20 border-amber-800" : "text-zinc-400 bg-zinc-800 border-zinc-700";
 
+/* Fix link → AI Optimization (studio) with the product URL pre-filled.
+   fix=faq lands on FAQ-type gaps; fix=content on schema/content issues. */
+const FixLink = ({ url, kind, label = "Fix →" }: { url: string; kind: "faq" | "content"; label?: string }) => (
+  <Link href={`/studio?url=${encodeURIComponent(url)}&fix=${kind}`}
+    className="text-xs text-emerald-400 hover:text-emerald-300 underline underline-offset-2 whitespace-nowrap">
+    {label}
+  </Link>
+);
+
 /* Ecommerce: product attributes AI looks for */
 const PRODUCT_CATEGORIES: Record<string, string[]> = {
   "Fashion": ["Material", "Fit", "Season", "Audience", "Care instructions", "Style", "Size range"],
@@ -111,8 +120,16 @@ export default function ProductAnalysisReport({ report }: { report: Report }) {
                   <tr key={i} className="border-b border-zinc-800/50">
                     <td className="py-3 px-3 text-zinc-400 capitalize font-medium">{fv.field.replace(/_/g, " ")}</td>
                     <td className="py-3 px-3 text-zinc-500 max-w-[160px] truncate" title={fv.schema_value}>{fv.schema_value || <span className="text-zinc-700">—</span>}</td>
-                    <td className="py-3 px-3">{fv.chatgpt_recognized ? <span className="text-emerald-400">{fv.chatgpt_value || "✓"}</span> : <span className="text-red-400">✗ Not found</span>}</td>
-                    <td className="py-3 px-3">{fv.gemini_recognized ? <span className="text-emerald-400">{fv.gemini_value || "✓"}</span> : <span className="text-red-400">✗ Not found</span>}</td>
+                    <td className="py-3 px-3">
+                      {fv.chatgpt_recognized
+                        ? <span className="text-emerald-400">{fv.chatgpt_value || "✓"}</span>
+                        : <span className="text-red-400">✗ Not found <FixLink url={report.url} kind="content" /></span>}
+                    </td>
+                    <td className="py-3 px-3">
+                      {fv.gemini_recognized
+                        ? <span className="text-emerald-400">{fv.gemini_value || "✓"}</span>
+                        : <span className="text-red-400">✗ Not found <FixLink url={report.url} kind="content" /></span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -163,7 +180,10 @@ export default function ProductAnalysisReport({ report }: { report: Report }) {
             {report.knowledge_gap.gaps.map((g, i) => (
               <div key={i} className={`flex items-center justify-between rounded-lg px-4 py-2.5 border ${g.covered ? "border-emerald-800/50 bg-emerald-900/5" : "border-zinc-700 bg-zinc-800/20"}`}>
                 <div className="flex items-center gap-3"><span>{g.covered ? "✅" : "❌"}</span><span className="text-sm text-zinc-300">{g.question}</span></div>
-                <span className={`text-xs px-2 py-0.5 rounded-full border ${priorityColor(g.priority)}`}>{g.priority}</span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${priorityColor(g.priority)}`}>{g.priority}</span>
+                  {!g.covered && <FixLink url={report.url} kind="faq" />}
+                </div>
               </div>
             ))}
           </div>
@@ -212,7 +232,11 @@ export default function ProductAnalysisReport({ report }: { report: Report }) {
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <h3 className="font-semibold text-lg mb-4">⚠️ Content Issues</h3>
           <div className="space-y-2">{report.schema_audit.content_issues.map((issue, i) => (
-            <div key={i} className="flex items-start gap-2 text-sm text-zinc-300 bg-zinc-800/50 rounded-lg px-4 py-2.5"><span className="text-amber-400 mt-0.5">⚠</span><span>{issue}</span></div>
+            <div key={i} className="flex items-start gap-2 text-sm text-zinc-300 bg-zinc-800/50 rounded-lg px-4 py-2.5">
+              <span className="text-amber-400 mt-0.5">⚠</span>
+              <span className="flex-1">{issue}</span>
+              <FixLink url={report.url} kind="content" />
+            </div>
           ))}</div>
         </div>
       )}

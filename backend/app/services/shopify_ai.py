@@ -322,7 +322,8 @@ class ShopifyAIService:
 
     async def generate_fields(self, product: dict, fields: list[str],
                               category: str | None = None,
-                              template_mode: bool = False) -> dict:
+                              template_mode: bool = False,
+                              gap_questions: list[str] | None = None) -> dict:
         """Generate the requested content fields in one AI call.
         If `category` is provided, only modules applicable to that category are
         generated (category-specific fields are filtered before the LLM call).
@@ -378,6 +379,19 @@ class ShopifyAIService:
                 + "\n".join(f"- {q}" for q in real_questions[:10])
             )
 
+        # Knowledge-gap injection: questions the page currently CANNOT answer
+        # (from the Analyze report's Shopper Questions) — the generated FAQ
+        # must cover them so the next Analyze run turns ❌ green.
+        gap_rule = ""
+        if gap_questions:
+            gap_rule = (
+                "\n\nCOVERAGE GAPS — these are questions shoppers ask about this "
+                "product that the page currently does NOT answer. The FAQ MUST "
+                "include (reworded as needed) every one of these — answering them "
+                "is the point of this generation:\n"
+                + "\n".join(f"- {q}" for q in gap_questions[:8])
+            )
+
         prompt = f"""You are a GEO (Generative Engine Optimization) content writer for e-commerce.
 
 PRODUCT CATEGORY: {cat_label}
@@ -389,6 +403,7 @@ Generate ONLY the content fields listed below. This is a {cat_label} product —
 CONCISENESS (hard rule): Write tight, scannable copy. Description <= 120 words. FAQ answers <= 50 words. Pros items <= 12 words each, 4-6 items. Buying guide steps <= 25 words. Comparison cells <= 15 words. No filler, no repeated marketing fluff, no preamble sentences.
 {template_rule}
 {real_q_rule}
+{gap_rule}
 
 FIELDS TO GENERATE ({len(fields)}):
 {shape_guide}

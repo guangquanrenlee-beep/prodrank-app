@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -17,6 +17,7 @@ function PublishContent() {
   const searchParams = useSearchParams();
   // Pre-fill from ?url= — alert "Fix in AI Studio" links land here ready to go.
   const [url, setUrl] = useState(searchParams.get("url") || "");
+  const fixParam = searchParams.get("fix"); // "faq" | "content" — from report Fix links
   const [overwrite, setOverwrite] = useState(false);
   const [step, setStep] = useState<Step>("idle");
   const [loading, setLoading] = useState(false);
@@ -122,7 +123,7 @@ function PublishContent() {
         setGenUsed(0); setGenRemaining(MAX);
         if (d.product?.id) loadExisting(d.domain, d.product.id, "custom");
         setError(d.has_token ? "" : "⚠ Store not connected — connect in Settings first.");
-        return;
+        return d;
       }
       // Not a custom store — fall through to the platform resolvers
     }
@@ -140,6 +141,7 @@ function PublishContent() {
     }
     if (!d.has_token) setError("⚠ Store not connected — connect in Settings first.");
     else setError("");
+    return d;
   };
 
   const loadExisting = async (domain: string, pid: string | number, pf: string) => {
@@ -185,17 +187,32 @@ function PublishContent() {
   /** Scan the live product page first: what info already exists (found),
    *  what's vague (fuzzy) and what's absent (missing). Only missing + fuzzy
    *  get generated — "found" fields are skipped unless the merchant opts in. */
-  const handleScan = async () => {
-    if (!resolved) return;
+  const handleScan = async (resolvedOverride?: any) => {
+    const target = resolvedOverride || resolved;
+    if (!target) return;
     setScanLoading(true); setError("");
     try {
-      const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: resolved.product.url || url.trim() }) });
+      const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: target.product?.url || url.trim() }) });
       const d = await r.json();
       if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail || "Scan failed"));
       setScanResult(d); setForceFields(new Set());
     } catch (e: any) { setError(e.message); }
     finally { setScanLoading(false); }
   };
+
+  // "Fix in AI Studio" links (?url= + ?fix=) land here pre-filled — resolve
+  // the product automatically, and when the fix targets gaps, scan the page
+  // so "Generate missing" fills exactly what the report flagged.
+  const autoStartRef = useRef(false);
+  useEffect(() => {
+    if (autoStartRef.current || !url.trim()) return;
+    autoStartRef.current = true;
+    (async () => {
+      const d = await handleResolve();
+      if (d && fixParam) handleScan(d);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleForce = (field: string) => {
     setForceFields(prev => {
