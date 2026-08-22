@@ -27,19 +27,21 @@ cd test/wp-docker && docker compose up -d   # 首次需启动 Docker Desktop
 cd test && python mock_shopify.py
 ```
 
+> **完整运维手册见 `README.md`**（服务器拓扑/部署流程/密钥清单/自动任务开关/已知坑）。以下为编码规则摘要。
+
 ## 技术栈
 
-- 后端：FastAPI（Python 3.12）+ Supabase（PostgreSQL）+ DeepSeek V4-flash（内容生成，走 ofox 兜底）+ Redis 队列
+- 后端：FastAPI（Python 3.12）+ Supabase（PostgreSQL）+ DeepSeek（内容生成，ofox 仅限 Analyze 对比槽与图片视觉）+ **文件式任务队列**（`backend/tasks/`，无 Redis）
 - 前端：Next.js 16（output: export 静态部署 → Cloudflare Pages）
 - 商家端：Shopify Theme Extension（Liquid）+ WordPress 插件（PHP，post meta 存储）
-- 部署：GitHub push → VPS cron 自动部署后端；Cloudflare Pages Git 集成自动部署前端
+- 部署：前端 push GitHub main → Cloudflare Pages 自动；后端**手动** `python C:\Users\36177\deploy_prod.py`（直连生产机 98.159.111.217，无 cron）
 
 ## 目录与约定
 
 - `backend/app/api/` — FastAPI 路由；`services/` — 业务逻辑（llm.py 是统一 LLM 工厂）
 - 内容生成遵循 `services/knowledge_templates.py` 四层模板（Identity/Knowledge/Decision/Trust），AI 缺失字段绝不编造，返回 missing 清单
 - 内容边界：`docs/product-content-boundaries.md`（只改描述[opt-in]/模块/JSON-LD，禁碰主题/导航/图片）
-- 配额：免费 3 次/月生成，产品级 3 次上限；`services/usage.py`
+- 配额：`services/usage.py` 配额链（OWNER_USER_IDS 或 subscriptions.plan → free 3/pro 50/growth 200/agency 500/unlimited）；owner 店 shop.prodrank.app 已解锁 unlimited
 - 数据库迁移：`database/migrations/`，改表后需在 Supabase SQL Editor 手动执行
 - 数据资产（问题库）只进 `/admin/data`（X-Admin-Key），用户不可见
 
