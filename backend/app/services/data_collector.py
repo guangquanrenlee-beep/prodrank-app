@@ -409,6 +409,11 @@ class DataCollector:
                         print(f"[data_collector] cluster empty response (attempt {attempt + 1}) — retrying")
                         await asyncio.sleep(1)
                     except Exception as e:
+                        # Balance exhausted (402) won't recover within this run — abort
+                        # clustering instead of retrying every batch twice.
+                        if "402" in str(e) or "Insufficient Balance" in str(e):
+                            print("[data_collector] cluster aborted: LLM balance exhausted (402)")
+                            return clustered
                         if attempt == 1:
                             raise
                         print(f"[data_collector] cluster LLM call failed (retrying): {str(e)[:100]}")
