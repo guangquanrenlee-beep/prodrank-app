@@ -2,18 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Lean Shopfloor Coach ‚Äî Free MCP for Claude | ProdRank",
+  title: "Lean Shopfloor Coach ‚Ä?Free MCP for Claude | ProdRank",
   description:
     "Free remote MCP for Claude: practical lean / TPS shopfloor coaching (Hoshin, A3, kanban, heijunka, poka-yoke). Not affiliated with Toyota.",
   openGraph: {
-    title: "Lean Shopfloor Coach ‚Äî Free MCP for Claude",
+    title: "Lean Shopfloor Coach ‚Ä?Free MCP for Claude",
     description:
       "Practical lean shopfloor coaching tools for Claude via MCP. Free beta.",
     url: "https://prodrank.app/lean-shopfloor-coach",
   },
 };
 
-const MCP_URL = "https://astarnamed.com/mcp/lean-shopfloor-coach";
+const MCP_URL = "https://api.prodrank.app/mcp/lean-shopfloor-coach";
 const MCP_TOKEN = "c73aaab01dc6d640d759cf655216feda";
 
 const claudeConfig = `{
@@ -35,7 +35,7 @@ export default function LeanShopfloorCoachPage() {
   return (
     <main className="min-h-screen max-w-3xl mx-auto px-4 py-16 space-y-8">
       <Link href="/" className="text-zinc-500 text-sm">
-        ‚Üê Home
+        ‚Ü?Home
       </Link>
 
       <header className="space-y-3">
